@@ -78,20 +78,20 @@ signal d: Bit := not x
 ### Bool 赋值给 Bit
 
 ```syl
-# signal s: Bit := true  # 错误
-signal s: Bit := 1        # 正确
+# signal s: Bit := true  // 错误
+signal s: Bit := 1        // 正确
 ```
 
 ### Bit 赋值给 Bool
 
 ```syl
-# const c: Bool = some_signal  # 错误：Bit 不能赋值给 Bool
+# const c: Bool = some_signal  // 错误：Bit 不能赋值给 Bool
 ```
 
 ### Bool 在硬件中使用
 
 ```syl
-# signal result: Bit := a and debug_flag  # 错误：debug_flag 是 Bool
+# signal result: Bit := a and debug_flag  // 错误：debug_flag 是 Bool
 ```
 
 ## 转换

@@ -107,7 +107,7 @@ use std.stage.stage_from_stream
 use std.stage.stage_link
 use std.stage.stage_to_stream
 
-# 数据类型定义
+// 数据类型定义
 bundle AluCmd<W: Nat> {
     op: UInt<4>,
     a: UInt<W>,
@@ -124,7 +124,7 @@ bundle AluRsp<W: Nat> {
     data: UInt<W>,
 }
 
-# 组合逻辑：指令解码
+// 组合逻辑：指令解码
 map decode_cmd<W: Nat>(cmd: AluCmd<W>) -> Decoded<W> =
     Decoded<W> {
         add: cmd.op == 0,
@@ -132,14 +132,14 @@ map decode_cmd<W: Nat>(cmd: AluCmd<W>) -> Decoded<W> =
         b: cmd.b,
     }
 
-# 组合逻辑：执行
+// 组合逻辑：执行
 map execute_cmd<W: Nat>(cmd: Decoded<W>) -> UInt<W> =
     select unique {
         cmd.add => cmd.a + cmd.b,
         default => cmd.a xor cmd.b,
     }
 
-# 流水线 ALU 主模块
+// 流水线 ALU 主模块
 cell PipelinedAlu<W: Nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
@@ -147,30 +147,30 @@ cell PipelinedAlu<W: Nat, D: Domain>(
     cmd_in: in Stream<AluCmd<W>>.sink,
     rsp_out: out Stream<AluRsp<W>>.source,
 ) {
-    # 阶段 1：输入
+    // 阶段 1：输入
     let in_stage = place stage_from_stream<AluCmd<W>>(
         stream: cmd_in,
     )
 
-    # 阶段 1→2：可暂停的连接
+    // 阶段 1→2：可暂停的连接
     let decode_ctrl = place halt_link<AluCmd<W>>(
         up: in_stage,
         halt: stall_decode,
     )
 
-    # 阶段 2：执行（带时钟的流水线级）
+    // 阶段 2：执行（带时钟的流水线级）
     let execute_stage = place stage_link<AluCmd<W>, D>(
         clk: clk,
         rst: rst,
         up: decode_ctrl,
     )
 
-    # 阶段 3：输出
+    // 阶段 3：输出
     let out_stream = place stage_to_stream<AluCmd<W>>(
         stage: execute_stage,
     )
 
-    # 组合逻辑：在阶段间处理数据
+    // 组合逻辑：在阶段间处理数据
     rsp_out.valid := out_stream.valid
     rsp_out.payload := AluRsp<W> {
         data: execute_cmd<W>(decode_cmd<W>(out_stream.payload)),

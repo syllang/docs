@@ -23,7 +23,7 @@ Syl 的端口有三种方向：
 
 ```syl
 cell Bad(x: in Bit) {
-    x := 1    # 错误：不能驱动 in 端口
+    x := 1    // 错误：不能驱动 in 端口
 }
 ```
 
@@ -31,7 +31,7 @@ cell Bad(x: in Bit) {
 
 ```syl
 cell Bad(y: out Bit) {
-    signal s: Bit := y    # 错误：不能读取 out 端口
+    signal s: Bit := y    // 错误：不能读取 out 端口
 }
 ```
 
@@ -39,8 +39,8 @@ cell Bad(y: out Bit) {
 
 ```syl
 cell Bus(bus: inout Bit) {
-    signal s: Bit := bus    # 可以读取
-    bus := 1                # 可以驱动
+    signal s: Bit := bus    // 可以读取
+    bus := 1                // 可以驱动
 }
 ```
 
@@ -50,9 +50,9 @@ cell Bus(bus: inout Bit) {
 
 ```syl
 cell Good(y: out Bit) {
-    signal internal: Bit    # 内部信号
-    internal := 1           # 可以驱动
-    y := internal           # 可以读取
+    signal internal: Bit    // 内部信号
+    internal := 1           // 可以驱动
+    y := internal           // 可以读取
 }
 ```
 
@@ -62,7 +62,7 @@ cell Good(y: out Bit) {
 
 ```syl
 cell Top(y: out Bit) {
-    signal s: Bit := y    # 错误
+    signal s: Bit := y    // 错误
 }
 ```
 
@@ -72,7 +72,7 @@ cell Top(y: out Bit) {
 
 ```syl
 cell Top(x: in Bit) {
-    x := 1    # 错误
+    x := 1    // 错误
 }
 ```
 
@@ -81,6 +81,6 @@ cell Top(x: in Bit) {
 ```syl
 cell Top(bus: inout Bit) {
     bus := 1
-    # 需要在同一周期内驱动和读取的场合，注意驱动冲突
+    // 需要在同一周期内驱动和读取的场合，注意驱动冲突
 }
 ```

@@ -46,9 +46,9 @@ cell Buffer(
 常量的初始值可以是表达式，只要表达式在编译期可求值：
 
 ```syl
-const ADDR_BITS: Nat = clog2(16)    # 调用编译期函数
-const MASK: Nat = (1 << 8) - 1       # 算术运算
-const IS_DEBUG: Bool = (WIDTH > 32)  # 比较运算
+const ADDR_BITS: Nat = clog2(16)    // 调用编译期函数
+const MASK: Nat = (1 << 8) - 1       // 算术运算
+const IS_DEBUG: Bool = (WIDTH > 32)  // 比较运算
 ```
 
 ## fn
@@ -74,8 +74,8 @@ fn clog2(x: Nat) -> Nat {
 ### 调用
 
 ```syl
-const W: Nat = clog2(64)     # W = 6
-const ADDR_W: Nat = clog2(16) # ADDR_W = 4
+const W: Nat = clog2(64)     // W = 6
+const ADDR_W: Nat = clog2(16) // ADDR_W = 4
 ```
 
 ### fn 中的变量
@@ -83,10 +83,12 @@ const ADDR_W: Nat = clog2(16) # ADDR_W = 4
 `fn` 内部使用 `var` 声明可变变量。变量只在 `fn` 的执行过程中存在，不生成硬件。
 
 ```syl
-fn parity(x: UInt<8>) -> Bit {
-    var result: Bit = 0
-    for i in 0..8 {
-        result = result xor x[i]
+fn sum_to(n: Nat) -> Nat {
+    var result: Nat = 0
+    var i: Nat = 1
+    while i <= n {
+        result = result + i
+        i = i + 1
     }
     return result
 }
@@ -109,9 +111,9 @@ cell Controller(
 ) {
     if HAS_TIMEOUT {
         signal timeout: Bit
-        # 带超时的逻辑
+        // 带超时的逻辑
     } else {
-        # 不带超时的逻辑
+        // 不带超时的逻辑
     }
 }
 ```
@@ -238,7 +240,7 @@ cell Buffer<W: Nat, D: Nat>(
 ### 编译期类型和硬件类型混用
 
 ```syl
-# fn add(x: UInt<8>) -> UInt<8> { ... }  # 错误：fn 不能操作硬件类型
+# fn add(x: UInt<8>) -> UInt<8> { ... }  // 错误：fn 不能操作硬件类型
 ```
 
 `fn` 只接受编译期类型。需要处理硬件信号的逻辑使用 `map`。
@@ -246,7 +248,7 @@ cell Buffer<W: Nat, D: Nat>(
 ### for 范围不是常量
 
 ```syl
-# for i in 0..variable { }   # 错误：variable 不是编译期常量
+# for i in 0..variable { }   // 错误：variable 不是编译期常量
 ```
 
 `for` 的循环次数必须在编译期确定。
@@ -255,7 +257,7 @@ cell Buffer<W: Nat, D: Nat>(
 
 ```syl
 const W: Nat = 256
-signal s: UInt<8> := W       # 错误：256 超出 UInt<8> 范围
+signal s: UInt<8> := W       // 错误：256 超出 UInt<8> 范围
 ```
 
 常量值如果用于硬件信号，不能超出信号类型的表示范围。

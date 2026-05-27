@@ -30,11 +30,11 @@ signal s: Bit := 1
 `Bit` 支持以下逻辑运算：
 
 ```syl
-signal a: Bit := x and y    # 与
-signal b: Bit := x or y     # 或
-signal c: Bit := x xor y    # 异或
-signal d: Bit := not x      # 非
-signal e: Bit := x eq y     # 相等
+signal a: Bit := x and y    // 与
+signal b: Bit := x or y     // 或
+signal c: Bit := x xor y    // 异或
+signal d: Bit := not x      // 非
+signal e: Bit := x eq y     // 相等
 ```
 
 注意 `and`、`or`、`not`、`xor`、`eq` 是硬件逻辑运算，对应的 Verilog 运算符是 `&`、`|`、`~`、`^`、`==`。
@@ -44,10 +44,10 @@ signal e: Bit := x eq y     # 相等
 `Bit` 是硬件信号。`Bool` 是编译期布尔值。它们不能混用：
 
 ```syl
-signal s: Bit := 1           # 正确：Bit 字面量是 0 或 1
+signal s: Bit := 1           // 正确：Bit 字面量是 0 或 1
 
-const c: Bool = true         # 正确：Bool 字面量是 true 或 false
-# signal t: Bit := true     # 错误：Bool 不能赋值给 Bit
+const c: Bool = true         // 正确：Bool 字面量是 true 或 false
+# signal t: Bit := true     // 错误：Bool 不能赋值给 Bit
 ```
 
 Bit 字面量写作 `0` 或 `1`。Bool 字面量写作 `true` 或 `false`。
@@ -92,12 +92,12 @@ const TOTAL: Nat = WORDS * WIDTH
 `Nat` 支持以下编译期运算：
 
 ```syl
-const a: Nat = 10 + 20       # 加法
-const b: Nat = 30 - 15       # 减法（结果不能为负数）
-const c: Nat = 4 * 8         # 乘法
-const d: Nat = 16 / 4        # 除法
-const e: Nat = 17 % 4        # 取模
-const f: Nat = 1 << 4        # 左移
+const a: Nat = 10 + 20       // 加法
+const b: Nat = 30 - 15       // 减法（结果不能为负数）
+const c: Nat = 4 * 8         // 乘法
+const d: Nat = 16 / 4        // 除法
+const e: Nat = 17 % 4        // 取模
+const f: Nat = 1 << 4        // 左移
 ```
 
 `Nat` 的运算在编译期执行，不生成硬件。结果用于确定类型宽度和数组大小。
@@ -132,7 +132,7 @@ cell Top(y: out UInt<8>) {
 
 ```syl
 const W: Nat = 4
-const VALID: Bool = W > 0    # 编译期检查 W 是否大于 0
+const VALID: Bool = W > 0    // 编译期检查 W 是否大于 0
 ```
 
 ### Bool 的运算
@@ -140,11 +140,11 @@ const VALID: Bool = W > 0    # 编译期检查 W 是否大于 0
 `Bool` 支持以下编译期逻辑运算：
 
 ```syl
-const a: Bool = true and false    # 与（短路求值）
-const b: Bool = true or false     # 或（短路求值）
-const c: Bool = not true          # 非
-const d: Bool = (4 > 2)           # 比较
-const e: Bool = (8 == 8)          # 相等
+const a: Bool = true and false    // 与（短路求值）
+const b: Bool = true or false     // 或（短路求值）
+const c: Bool = not true          // 非
+const d: Bool = (4 > 2)           // 比较
+const e: Bool = (8 == 8)          // 相等
 ```
 
 注意 `and`、`or`、`not` 用于 `Bool` 时是编译期逻辑运算，对应于 `&&`、`||`、`!`。硬件信号 `Bit` 的运算也写作 `and`、`or`、`not`，编译器根据上下文区分。
@@ -154,8 +154,8 @@ const e: Bool = (8 == 8)          # 相等
 三种基本类型之间不能隐式转换：
 
 ```syl
-# const n: Nat = true     # 错误：Bool 不能转为 Nat
-# signal b: Bit = 5       # 错误：Nat 不能转为 Bit（5 不是 0 或 1）
+# const n: Nat = true     // 错误：Bool 不能转为 Nat
+# signal b: Bit = 5       // 错误：Nat 不能转为 Bit（5 不是 0 或 1）
 ```
 
 需要转换时，通过 `fn` 在编译期计算：
@@ -192,8 +192,8 @@ cell Top<D: Domain>(
 ### 混淆 Bit 和 Bool
 
 ```syl
-# signal s: Bit := true    # 错误
-# if s { }                  # 错误：if 条件需要 Bool，不是 Bit
+# signal s: Bit := true    // 错误
+# if s { }                  // 错误：if 条件需要 Bool，不是 Bit
 ```
 
 `Bit` 是硬件信号，`Bool` 是编译期值。在编译期条件中使用 `Bit` 会报错。如果需要根据硬件信号的值做条件选择，使用 `select` 表达式。
@@ -201,7 +201,7 @@ cell Top<D: Domain>(
 ### Nat 在运行时使用
 
 ```syl
-# signal s: Nat := 5       # 错误：Nat 不能用于硬件
+# signal s: Nat := 5       // 错误：Nat 不能用于硬件
 ```
 
 `Nat` 只在编译期有效。硬件信号使用 `UInt<W>`。
@@ -211,8 +211,8 @@ cell Top<D: Domain>(
 `0` 和 `1` 既是 `Bit` 字面量也是 `Nat` 字面量，编译器根据上下文推断：
 
 ```syl
-signal b: Bit := 0          # 0 是 Bit 字面量
-const n: Nat = 0            # 0 是 Nat 字面量
+signal b: Bit := 0          // 0 是 Bit 字面量
+const n: Nat = 0            // 0 是 Nat 字面量
 ```
 
 ## 下一步阅读

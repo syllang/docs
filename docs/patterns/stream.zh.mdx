@@ -112,7 +112,7 @@ cell BackpressureConsumer(
     stream: in Stream<UInt<8>>.sink,
     buffer_full: in Bit,
 ) {
-    # 缓冲区满时暂停接收
+    // 缓冲区满时暂停接收
     stream.ready := not buffer_full
 }
 ```
@@ -160,7 +160,7 @@ cell PipelineStage<T, D: Domain>(
 
 ```syl
 signal stream: Stream<Bit>.source
-# 等同于一个 valid-ready 信号对
+// 等同于一个 valid-ready 信号对
 ```
 
 当 Stream 的负载类型为 `Bit` 时，它相当于单独的 valid-ready 握手。
@@ -186,7 +186,7 @@ Stream 的负载可以是任意 Syl 类型。
 ```syl
 use std.stream.Stream
 
-# 连接到流水线阶段
+// 连接到流水线阶段
 use std.stage.stage_from_stream
 use std.stage.stage_to_stream
 ```
@@ -210,7 +210,7 @@ use std.stage.stage_to_stream
 ```syl
 cell Bad(stream: out Stream<UInt<8>>.source) {
     stream.payload := 0
-    # 错误：stream.valid 没有被赋值
+    // 错误：stream.valid 没有被赋值
 }
 ```
 
@@ -222,7 +222,7 @@ cell Bad(stream: out Stream<UInt<8>>.source) {
 cell Bad(stream: in Stream<UInt<8>>.sink) {
     reg data: UInt<8> reset(rst, 0)
     next data := stream.payload
-    # 错误：stream.ready 没有被赋值
+    // 错误：stream.ready 没有被赋值
 }
 ```
 
@@ -231,8 +231,8 @@ cell Bad(stream: in Stream<UInt<8>>.sink) {
 ### 跨域连接方向错误
 
 ```syl
-# 错误：source 连接到 source 方向不匹配
-# 应该 source 连接 sink
+// 错误：source 连接到 source 方向不匹配
+// 应该 source 连接 sink
 ```
 
 发送方的 `source` 视图必须连接接收方的 `sink` 视图。

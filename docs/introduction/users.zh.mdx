@@ -81,7 +81,7 @@ Syl 适合以下类型的项目：
 
 ### 使用注释
 
-Syl 代码使用 `#` 行注释。注释应该说明"为什么这样做"，而不是"做了什么"。代码本身应该清晰地表达做了什么。
+Syl 代码使用 `//` 行注释。注释应该说明"为什么这样做"，而不是"做了什么"。代码本身应该清晰地表达做了什么。
 
 ## 示例项目
 
@@ -120,7 +120,7 @@ sylc src/top.syl src/counter.syl src/types.syl vendor/ip.syl -o build.sv
 
 ```syl
 cell Bad(x: in Bit) {
-    x := 1  # 错误：in 端口不能被赋值
+    x := 1  // 错误：in 端口不能被赋值
 }
 ```
 
@@ -130,7 +130,7 @@ cell Bad(x: in Bit) {
 
 ```syl
 cell Bad(x: in UInt<8>, y: out UInt<16>) {
-    y := x  # 错误：UInt<8> 不能赋值给 UInt<16>
+    y := x  // 错误：UInt<8> 不能赋值给 UInt<16>
 }
 ```
 
@@ -142,7 +142,7 @@ cell Bad(x: in UInt<8>, y: out UInt<16>) {
 cell Sub(a: in Bit, b: out Bit) { }
 
 cell Top(y: out Bit) {
-    let inst = place Sub(a: y)  # 错误：b 未连接
+    let inst = place Sub(a: y)  // 错误：b 未连接
 }
 ```
 

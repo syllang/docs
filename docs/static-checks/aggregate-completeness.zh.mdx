@@ -16,8 +16,8 @@ Syl 编译器检查 `bundle` 构造、`interface` 字段和 `match` 表达式的
 ```syl
 bundle Pair { left: Bit, right: Bit }
 
-signal p: Pair := Pair { left: 1, right: 0 }    # 正确
-# signal q: Pair := Pair { left: 1 }             # 错误：缺少 right
+signal p: Pair := Pair { left: 1, right: 0 }    // 正确
+# signal q: Pair := Pair { left: 1 }             // 错误：缺少 right
 ```
 
 ## interface 视图完整性
@@ -29,7 +29,7 @@ interface Bad {
     a: Bit
     b: Bit
     view v { out a }
-    # 错误：b 没有被 view v 包含
+    // 错误：b 没有被 view v 包含
 }
 ```
 
@@ -45,7 +45,7 @@ enum State { Idle, Run, Done }
 signal next: State := match state {
     .Idle => .Run,
     .Run => .Done,
-    # 错误：缺少 .Done 分支
+    // 错误：缺少 .Done 分支
 }
 ```
 
@@ -57,7 +57,7 @@ signal next: State := match state {
 cell Sub(a: in Bit, b: out Bit)
 cell Top(y: out Bit) {
     let s = place Sub(a: y)
-    # 错误：Sub 的 b 端口未连接
+    // 错误：Sub 的 b 端口未连接
 }
 ```
 
@@ -67,7 +67,7 @@ cell Top(y: out Bit) {
 
 ```syl
 bundle Wide { a: Bit, b: Bit, c: Bit }
-signal w: Wide := Wide { a: 1, b: 0 }    # 错误：缺少 c
+signal w: Wide := Wide { a: 1, b: 0 }    // 错误：缺少 c
 ```
 
 ### match 分支缺少
@@ -77,7 +77,7 @@ enum State { A, B, C }
 signal next: State := match state {
     .A => .B,
     .B => .C,
-    # 错误：缺少 .C
+    // 错误：缺少 .C
 }
 ```
 
@@ -85,5 +85,5 @@ signal next: State := match state {
 
 ```syl
 cell Inst(x: in Bit, y: out Bit, z: in Bit)
-let i = place Inst(x: 1, y: out_sig)    # 错误：z 未连接
+let i = place Inst(x: 1, y: out_sig)    // 错误：z 未连接
 ```

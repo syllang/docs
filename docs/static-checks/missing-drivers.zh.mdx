@@ -15,13 +15,13 @@ Syl 编译器检测 `out` 端口和输出信号是否被赋值。每个输出必
 
 ```syl
 cell Bad(y: out Bit) {
-    # 错误：y 没有被驱动
+    // 错误：y 没有被驱动
 }
 ```
 
 ```syl
 cell Good(y: out Bit) {
-    y := 1    # 正确
+    y := 1    // 正确
 }
 ```
 
@@ -35,7 +35,7 @@ cell Conditional(y: out Bit, enable: in Bit) {
         enable => 1,
         default => 0,
     }
-    # 正确：所有分支都驱动了 y
+    // 正确：所有分支都驱动了 y
 }
 ```
 
@@ -46,7 +46,7 @@ cell Conditional(y: out Bit, enable: in Bit) {
 ```syl
 cell Top(y: out Bit) {
     let d = place Driver(y: y)
-    # 正确：Driver 驱动 y
+    // 正确：Driver 驱动 y
 }
 ```
 
@@ -56,7 +56,7 @@ cell Top(y: out Bit) {
 
 ```syl
 cell Top(y: out Bit) {
-    # 错误：y 没有被赋值或连接
+    // 错误：y 没有被赋值或连接
 }
 ```
 
@@ -67,7 +67,7 @@ cell Top(y: out Bit, sel: in Bit) {
     signal internal: UInt<8>
     y := select {
         sel => 1,
-        # default 分支缺失
+        // default 分支缺失
     }
 }
 ```
@@ -78,6 +78,6 @@ cell Top(y: out Bit, sel: in Bit) {
 
 ```syl
 cell Top -> result: UInt<8> {
-    # 错误：result 没有被赋值
+    // 错误：result 没有被赋值
 }
 ```

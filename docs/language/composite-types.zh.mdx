@@ -121,7 +121,7 @@ signal result: UInt<8> := match op {
 signal next: State := match state {
     State.Idle => State.Running,
     State.Running => State.Done,
-    # 错误：缺少 State.Done 分支
+    // 错误：缺少 State.Done 分支
 }
 ```
 
@@ -134,8 +134,8 @@ signal next: State := match state {
 ### 声明
 
 ```syl
-signal arr: [4] UInt<8>          # 4 个 8 位无符号整数
-signal matrix: [16] [16] Bit     # 16x16 的 Bit 矩阵
+signal arr: [4] UInt<8>          // 4 个 8 位无符号整数
+signal matrix: [16] [16] Bit     // 16x16 的 Bit 矩阵
 ```
 
 ### 访问
@@ -301,7 +301,7 @@ cell PacketBuffer<W: Nat, D: Domain>(
     in_stream: in Stream<Packet<W>>.sink,
     out_stream: out Stream<Packet<W>>.source,
 ) {
-    # 处理 Packet 数据
+    // 处理 Packet 数据
     out_stream.payload.data := in_stream.payload.data + 1
     out_stream.payload.last := in_stream.payload.last
     out_stream.valid := in_stream.valid
@@ -318,7 +318,7 @@ cell PacketBuffer<W: Nat, D: Domain>(
 ```syl
 signal next: State := match state {
     .Idle => .Running,
-    # 缺少 .Running 和 .Done
+    // 缺少 .Running 和 .Done
 }
 ```
 
@@ -328,7 +328,7 @@ signal next: State := match state {
 
 ```syl
 signal arr: [4] UInt<8>
-signal x: UInt<8> := arr[4]    # 错误：索引超出范围 0-3
+signal x: UInt<8> := arr[4]    // 错误：索引超出范围 0-3
 ```
 
 数组索引必须小于数组长度。编译器检查编译期可见的越界索引。
@@ -337,10 +337,10 @@ signal x: UInt<8> := arr[4]    # 错误：索引超出范围 0-3
 
 ```syl
 bundle Pair { left: UInt<8>, right: UInt<8> }
-signal p: Pair := Pair { left: 42, right: 1 }    # 正确
+signal p: Pair := Pair { left: 42, right: 1 }    // 正确
 
 bundle Wide { value: UInt<16> }
-# signal p: Pair := Pair { left: 42, right: Wide { value: 1 } }  # 错误：类型不匹配
+# signal p: Pair := Pair { left: 42, right: Wide { value: 1 } }  // 错误：类型不匹配
 ```
 
 构造 bundle 时每个字段的类型必须匹配声明。
