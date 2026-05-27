@@ -1,0 +1,217 @@
+---
+title: 接口约定
+description: 使用 bundle 和 interface 设计模块间通信协议。
+---
+
+# 接口约定
+
+模块间的通信协议是硬件设计的关键部分。良好的接口设计可以减少连接错误，提高模块的可复用性。AXI、Wishbone、TileLink 等总线协议都有自己的一套接口约定。Syl 的 interface 和 view 提供了在语言层面表达这些约定的能力。设计接口时需要考虑信号的方向、握手方式和使用场景。接口定义一旦确定，后续的模块开发就有明确的契约可循。AXI、Wishbone、TileLink 等总线协议都有自己的一套接口约定。Syl 的 interface 和 view 提供了在语言层面表达这些约定的能力。设计接口时需要考虑信号的方向、握手方式和使用场景。，提高模块的可复用性。AXI、Wishbone、TileLink 等总线协议都有自己的一套接口约定。Syl 的 interface 和 view 提供了在语言层面表达这些约定的能力。，提高模块的可复用性。Syl 的 `bundle` 和 `interface` 提供了定义协议的工具。本文说明如何设计和组织接口约定。
+
+---
+
+## 协议的基本组成
+
+一个模块间通信协议通常包含：
+
+- 数据信号：传输的数据和地址
+- 控制信号：valid、ready、last 等
+- 方向约定：每个信号由哪一方驱动
+
+Syl 的 `interface` 将这三者组合为一个类型。`view` 定义不同连接方向看到的信号方向。
+
+## 设计方法
+
+### 第一步：定义数据格式
+
+用 `bundle` 定义传输的数据格式：
+
+```syl
+bundle AxiAddress<W: Nat> {
+    addr: UInt<W>,
+    len: UInt<8>,
+    size: UInt<3>,
+    burst: UInt<2>,
+}
+
+bundle AxiData<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+```
+
+### 第二步：定义接口
+
+用 `interface` 将数据和控制信号组合起来：
+
+```syl
+interface AxiWriteAddr<W: Nat> {
+    payload: AxiAddress<W>
+    valid: Bit
+    ready: Bit
+
+    view master {
+        out payload
+        out valid
+        in ready
+    }
+
+    view slave {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+### 第三步：使用接口
+
+模块端口使用 `InterfaceName.ViewName`：
+
+```syl
+cell AxiMaster(
+    write_addr: out AxiWriteAddr<32>.master,
+    write_data: out AxiWriteData<32>.master,
+)
+
+cell AxiSlave(
+    write_addr: in AxiWriteAddr<32>.slave,
+    write_data: in AxiWriteData<32>.slave,
+)
+```
+
+## 接口封装模式
+
+### 单接口封装
+
+一个接口包含完整的一组信号：
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source { out payload, out valid, in ready }
+    view sink { in payload, in valid, out ready }
+}
+```
+
+### 多接口封装
+
+复杂协议拆分为多个接口，每个接口对应一个通道：
+
+```syl
+interface WriteAddr<W: Nat> { addr: UInt<W>, valid: Bit, ready: Bit, view m { out addr, out valid, in ready }, view s { in addr, in valid, out ready } }
+interface WriteData<W: Nat> { data: UInt<W>, last: Bit, valid: Bit, ready: Bit, view m { out data, out last, out valid, in ready }, view s { in data, in last, in valid, out ready } }
+interface WriteResp { resp: UInt<2>, valid: Bit, ready: Bit, view m { in resp, in valid, out ready }, view s { out resp, out valid, in ready } }
+
+cell AxiFull<W: Nat>(
+    aw: out WriteAddr<W>.m,
+    w: out WriteData<W>.m,
+    b: in WriteResp.m,
+)
+```
+
+## 接口视图的一致性
+
+接口视图定义了信号方向。确保视图方向一致是很重要的。
+
+```syl
+interface MyInterface {
+    data: UInt<8>
+    valid: Bit
+
+    view a {
+        out data
+        out valid
+    }
+
+    view b {
+        in data
+        in valid
+    }
+}
+```
+
+`view a` 和 `view b` 的信号方向相反。`a` 连接 `b` 时，每个信号的方向匹配。`a` 连接 `a` 时方向冲突。
+
+## 协议变体
+
+### valid-ready 协议
+
+基本的 valid-ready 握手。发送方驱动 valid 和数据，接收方驱动 ready。
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source { out payload, out valid, in ready }
+    view sink { in payload, in valid, out ready }
+}
+```
+
+### valid-only 协议
+
+发送方只驱动 valid，不需要 ready 反馈。
+
+```syl
+interface Pulse<T> {
+    payload: T
+    valid: Bit
+
+    view source { out payload, out valid }
+    view sink { in payload, in valid }
+}
+```
+
+### ready-only 协议
+
+接收方请求数据，发送方响应。
+
+```syl
+interface Request<T> {
+    data: T
+    req: Bit
+
+    view master { in data, out req }
+    view slave { out data, in req }
+}
+```
+
+## 接口的演变
+
+随着设计迭代，接口定义可能会变化。接口变化时需要注意：
+
+1. 新增字段需要添加到所有视图中
+2. 删除字段需要从所有视图中移除
+3. 改变字段方向需要确认所有使用该视图的地方都更新
+
+编译器会检查接口字段和视图的一致性。如果某个字段没有被任何视图包含，或者视图引用了不存在的字段，编译器报错。
+
+## 常见错误
+
+### 视图方向不匹配
+
+```syl
+# 发送方的 source 视图必须连接接收方的 sink 视图
+# source → sink，不能 source → source
+```
+
+### 视图缺少字段
+
+```syl
+interface Bad {
+    a: Bit
+    b: Bit
+    view v { out a }
+    # 错误：b 没有被 view v 包含
+}
+```
+
+视图必须包含或排除接口的所有字段。如果某个字段不属于某个视图，应该检查接口设计。
+
+### 接口定义和实际使用不一致
+
+接口定义应该反映实际的物理信号。如果综合后接口比预期多了或少了信号，说明接口定义和硬件不匹配。

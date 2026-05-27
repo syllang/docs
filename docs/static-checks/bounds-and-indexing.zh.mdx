@@ -1,0 +1,72 @@
+---
+title: 边界与索引
+description: Syl 编译器对数组索引和位选择的边界检查。
+---
+
+# 边界与索引
+
+Syl 编译器检查数组索引和位选择的范围是否合法。本文说明检查规则。
+
+---
+
+## 数组索引检查
+
+### 在范围内
+
+```syl
+signal arr: [4] UInt<8>
+signal x: UInt<8> := arr[0]    # 正确
+signal y: UInt<8> := arr[3]    # 正确
+signal z: UInt<8> := arr[4]    # 错误：索引 4 超出范围 0-3
+```
+
+### 编译期索引
+
+编译期可确定的索引在编译期检查。运行时索引（由硬件信号提供）无法在编译期完全检查。
+
+```syl
+const IDX: Nat = 2
+signal a: UInt<8> := arr[IDX]     # 正确：编译期已知
+signal sel: UInt<8>
+signal b: UInt<8> := arr[sel]     # 运行时选择，不在编译期检查
+```
+
+## 位选择检查
+
+```syl
+signal value: UInt<8>
+signal low: Bit := value[0]        # 正确
+signal high: Bit := value[7]       # 正确
+# signal out_of_range: Bit := value[8]  # 错误：位 8 超出 UInt<8> 范围
+```
+
+## 范围选择检查
+
+```syl
+signal value: UInt<8>
+signal nibble: UInt<4> := value[0..4]    # 正确
+# signal bad: UInt<4> := value[4..9]     # 错误：结束索引 9 超出范围
+```
+
+## 常见错误
+
+### 数组越界
+
+```syl
+signal arr: [4] UInt<8>
+signal x: UInt<8> := arr[4]    # 错误
+```
+
+### 位选择越界
+
+```syl
+signal value: UInt<8>
+signal b: Bit := value[8]      # 错误：只有 0-7
+```
+
+### 范围顺序错误
+
+```syl
+signal value: UInt<8>
+# signal x: UInt<4> := value[4..0]  # 错误：[start..end] 中 start < end
+```

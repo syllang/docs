@@ -1,0 +1,13 @@
+{
+  "title": "Reference",
+  "icon": "reference",
+  "pages": [
+    "lexical-syntax",
+    "grammar",
+    "builtins",
+    "attributes",
+    "cli",
+    "lsp",
+    "diagnostics"
+  ]
+}

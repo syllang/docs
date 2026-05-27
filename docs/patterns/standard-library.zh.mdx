@@ -1,0 +1,206 @@
+---
+title: 标准库
+description: Syl 标准库的组件详解和使用方法。
+---
+
+# 标准库
+
+Syl 标准库是一组用 Syl 编写的硬件抽象组件。它们不是编译器的一部分，而是可复用的硬件设计代码。设计标准库的目标是提供一组基础组件，让用户可以在此基础上构建更复杂的设计。Stream 接口是标准库最基础的组件，其他组件围绕它构建。标准库的组件尽可能保持简单和通用，以适应不同的使用场景。标准库的设计遵循模块化和可组合原则，用户可以根据需要选择使用部分组件。组件的接口保持一致性，便于组合使用。标准库中的组件经过测试，可以作为用户设计的基础。标准库的代码风格也值得参考学习。阅读标准库源码是提升 Syl 编程能力的有效途径。Stream 接口是标准库最基础的组件，其他组件围绕它构建。标准库的组件尽可能保持简单和通用，以适应不同的使用场景。Stream 接口是标准库最基础的组件，其他组件围绕它构建。设计标准库的目标是提供一组基础组件，让用户可以在此基础上构建更复杂的设计。它们和其他 Syl 代码一样经过完整编译。本文详细介绍每个标准库包和组件的功能。
+
+---
+
+## 标准库位置
+
+标准库代码位于仓库的 `examples/std/` 目录下。它们不是编译器的特殊组件，而是普通的 Syl 代码。
+
+编译时通过 `use` 导入标准库组件：
+
+```syl
+use std.stream.Stream
+```
+
+编译器从 `examples/std/` 目录加载标准库代码。
+
+## std.stream
+
+`Stream<T>` 是 valid-ready 握手协议的接口定义。
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+使用方式：
+
+```syl
+use std.stream.Stream
+
+cell Producer(stream: out Stream<UInt<8>>.source)
+cell Consumer(stream: in Stream<UInt<8>>.sink)
+```
+
+## std.stage
+
+流水线阶段组件，用于构建多级流水线。
+
+### stage_from_stream
+
+从 Stream 创建流水线输入阶段。它将 valid-ready 握手转换为流水线内部信号。输入是 Stream 的 sink 视图，输出是流水线阶段。
+
+```syl
+use std.stream.Stream
+use std.stage.stage_from_stream
+
+let in_stage = place stage_from_stream<UInt<8>>(
+    stream: cmd_in,
+)
+```
+
+### stage_to_stream
+
+从流水线输出阶段创建 Stream。输出是 Stream 的 source 视图。
+
+```syl
+use std.stage.stage_to_stream
+
+let out_stream = place stage_to_stream<UInt<8>>(
+    stage: execute_stage,
+)
+```
+
+### stage_link
+
+连接两个流水线阶段。数据在时钟边沿从上游传递到下游。
+
+```syl
+use std.stage.stage_link
+
+let linked = place stage_link<UInt<8>, D>(
+    clk: clk,
+    rst: rst,
+    up: in_stage,
+)
+```
+
+### halt_link
+
+可暂停的流水线连接。`halt` 为 1 时暂停上游数据流动。
+
+```syl
+let ctrl = place halt_link<UInt<8>>(
+    up: in_stage,
+    halt: stall_signal,
+)
+```
+
+### drop_link
+
+可丢弃数据的流水线连接。`drop` 为 1 时丢弃当前数据。
+
+```syl
+let ctrl = place drop_link<UInt<8>>(
+    up: execute_stage,
+    drop: flush_signal,
+)
+```
+
+## std.pipeline
+
+多级流水线的组合工具。`std.pipeline` 包提供将多个阶段组合为完整流水线的函数。
+
+## std.bundle
+
+bundle 操作工具函数。提供 bundle 字段的映射和转换工具。
+
+## std.logic
+
+通用逻辑函数，包括：
+
+- 位操作辅助函数
+- 算术运算辅助函数
+- 类型转换辅助函数
+
+## std.assert
+
+编译期断言工具，用于参数验证和设计假设检查。
+
+```syl
+use std.assert.*
+
+const W: Nat = 8
+assert(W > 0, "width must be positive")
+```
+
+## 标准库和编译流程
+
+标准库代码和其他 Syl 代码一样经过完整编译。这意味着标准库中的错误也会被编译器捕获。
+
+```syl
+# 标准库中的 Stream 接口定义在 examples/std/stream.syl 中
+# 使用 use 导入后，它和其他接口定义没有区别
+```
+
+编译器从 `--std` 参数指定的目录加载标准库。默认值是 `examples/std/`。
+
+## 标准库使用建议
+
+### 按需导入
+
+只导入需要的组件：
+
+```syl
+use std.stream.Stream
+use std.stage.Stage
+```
+
+不要导入整个标准库。导入不需要的组件会增加编译时间。
+
+### 查看源码
+
+标准库源码是学习 Syl 的好材料。阅读 `examples/std/` 目录下的代码，了解如何使用 Syl 构建可复用的硬件抽象。
+
+### 扩展标准库
+
+如果标准库缺少某个组件，可以自己编写并在本地使用。标准库的设计目标是可组合，新增组件时应遵循已有的接口约定。
+
+## 常见错误
+
+### 标准库导入路径错误
+
+```syl
+# use stream.Stream    # 错误
+use std.stream.Stream   # 正确
+```
+
+标准库路径以 `std.` 开头。
+
+### 忘记导入接口
+
+```syl
+# cell Top(stream: out Stream<UInt<8>>.source) { }  # 错误：Stream 未定义
+```
+
+使用标准库类型之前必须先 `use` 导入。
+
+### 类型参数不匹配
+
+```syl
+# let s = place stage_link<UInt<8>>(up: input)  # 错误：缺少 D: Domain 参数
+```
+
+Stage 组件需要时钟域参数。实例化时确保所有类型参数都正确指定。

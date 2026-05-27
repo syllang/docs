@@ -1,0 +1,12 @@
+.next/
+.source/
+node_modules/
+out/
+pnpm-debug.log*
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Environment files — prevent accidental secret commits
+.env
+.env.*
+.env.local

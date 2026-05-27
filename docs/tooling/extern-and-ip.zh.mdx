@@ -1,0 +1,86 @@
+---
+title: 外部模块与 IP 集成
+description: 在 Syl 中使用外部 IP 核和预编译组件。
+---
+
+# 外部模块与 IP 集成
+
+Syl 可以和其他硬件描述语言编写的 IP 核协同工作。通过 `extern cell` 声明外部模块的接口签名。
+
+---
+
+## extern cell
+
+`extern cell` 声明一个外部模块的接口。它只有端口声明，没有实现体。
+
+```syl
+extern cell VendorIP(
+    clk: in Clock<D>,
+    data_in: in UInt<8>,
+    data_out: out UInt<8>,
+    valid: out Bit,
+)
+```
+
+编译器根据签名生成正确的实例化和连接。
+
+## 实例化外部模块
+
+使用 `place` 实例化外部模块：
+
+```syl
+cell Top(y: out UInt<8>) {
+    let ip = place VendorIP(
+        clk: clk,
+        data_in: input_data,
+        data_out: y,
+        valid: v,
+    )
+}
+```
+
+## 不透明摘要
+
+外部模块可以和**不透明摘要**配合使用。摘要描述模块的内部行为：
+
+- 哪些输出信号被内部驱动
+- 延迟类别（组合还是时序）
+- 信任边界
+
+摘要可以由以下方式提供：
+
+- **签名推断。** 编译器根据 `extern cell` 签名自动生成默认摘要。`out` 方向端口默认被驱动。
+- **用户注入。** 通过编译器 API 注入外部提供的摘要文件。可以描述更精确的行为。
+
+## 使用场景
+
+### 第三方 IP 核
+
+```syl
+extern cell DDRController(
+    clk: in Clock<D>,
+    addr: in UInt<32>,
+    data: inout UInt<64>,
+    ready: out Bit,
+)
+```
+
+### Verilog 模块包装
+
+将 Verilog 模块的端口声明为 `extern cell`，在 Syl 中实例化：
+
+```syl
+extern cell VerilogModule(
+    a: in UInt<8>,
+    b: in UInt<8>,
+    y: out UInt<8>,
+)
+```
+
+编译时，Verilog 模块需要和生成的 SV 代码一起提供给综合工具。
+
+## 注意事项
+
+- 外部模块的实现不在 Syl 中，编译器无法检查内部逻辑
+- `extern cell` 的端口声明必须和实际模块一致
+- 不匹配的端口声明可能导致综合错误或仿真失败

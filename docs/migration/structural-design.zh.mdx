@@ -1,0 +1,198 @@
+---
+title: 结构化设计
+description: Syl 硬件设计的组织方法——层次化设计、数据通路和控制逻辑分离。
+---
+
+# 结构化设计
+
+结构化设计是硬件工程的核心方法。它将复杂设计分解为较小的模块，每个模块有明确的接口和职责。本文说明如何在 Syl 中应用结构化设计。
+
+---
+
+## 层次化设计
+
+层次化设计将系统分解为多级模块。顶层模块组合子模块的功能。
+
+```syl
+cell TopLevel(data_in: in UInt<8>, result: out UInt<8>) {
+    signal intermediate: UInt<8>
+
+    let stage1 = place Stage1(input: data_in, output: intermediate)
+    let stage2 = place Stage2(input: intermediate, output: result)
+}
+```
+
+每个子模块有独立的职责：
+
+```syl
+cell Stage1(input: in UInt<8>, output: out UInt<8>) {
+    output := input + 1
+}
+
+cell Stage2(input: in UInt<8>, output: out UInt<8>) {
+    output := input * 2
+}
+```
+
+## 数据通路和控制逻辑分离
+
+结构化设计的一个重要原则：分离数据通路和控制逻辑。
+
+**数据通路**处理数据的变换和传输：加法器、乘法器、移位寄存器、多路选择器。
+
+**控制逻辑**决定数据通路的工作方式：状态机、使能信号、选择信号。
+
+```syl
+cell DataPath(
+    a: in UInt<8>,
+    b: in UInt<8>,
+    sel: in UInt<2>,
+    result: out UInt<8>,
+) {
+    result := select {
+        sel == 0 => a + b,
+        sel == 1 => a - b,
+        sel == 2 => a and b,
+        default => a or b,
+    }
+}
+
+cell Control(
+    start: in Bit,
+    done: out Bit,
+    sel: out UInt<2>,
+) {
+    reg state: UInt<2> reset(rst, 0)
+    next state := select {
+        start and state == 0 => 1,
+        state == 1 => 2,
+        state == 2 => 3,
+        state == 3 => 0,
+        default => state,
+    }
+    done := state == 3
+    sel := state
+}
+```
+
+## 模块职责划分
+
+每个模块应该做一件事，并做好。
+
+```syl
+# 好的设计：模块职责清晰
+cell Adder(a: in UInt<8>, b: in UInt<8>, result: out UInt<8>) {
+    result := a + b
+}
+
+cell Register<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    d: in UInt<8>,
+    q: out UInt<8>,
+) {
+    reg value: UInt<8> reset(rst, 0)
+    next value := d
+    q := value
+}
+```
+
+模块名字应该反映它的功能。`Adder` 做加法，`Register` 做寄存。
+
+## 高内聚低耦合
+
+高内聚指一个模块内部的各个部分紧密相关。低耦合指模块之间的依赖尽可能少。
+
+高内聚的设计：
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W> reset(rst, 0)
+    next value := select { enable => value + 1, default => value }
+    count := value
+}
+```
+
+`Counter` 内部的寄存器和加法逻辑紧密相关（高内聚）。它只通过三个端口（`enable`、`clk/rst`、`count`）和外部交互（低耦合）。
+
+## 接口最小化
+
+模块接口应该只包含必要的信息。不必要的端口增加复杂性并降低复用性。
+
+```syl
+# 好的接口：最小化
+cell Adder(a: in UInt<8>, b: in UInt<8>, result: out UInt<8>) {
+    result := a + b
+}
+
+# 过多的接口：不必要的控制信号
+cell ComplexAdder(
+    a: in UInt<8>, b: in UInt<8>,
+    clk: in Clock<D>, rst: in Reset<D>,
+    enable: in Bit, clear: in Bit,
+    result: out UInt<8>,
+)
+```
+
+如果 `Adder` 不需要时钟，就不应该声明时钟端口。
+
+## 接口设计
+
+模块之间的接口应该清晰简单。流接口（Stream）是 Syl 模块间通信的标准方式：
+
+```syl
+cell PipelineStage<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    upstream: in Stream<T>.sink,
+    downstream: out Stream<T>.source,
+)
+```
+
+统一的接口让不同模块可以互相连接。
+
+## 参数化设计
+
+结构化设计中，参数化让模块适应不同配置：
+
+```syl
+cell ArrayAdder<N: Nat, W: Nat>(
+    inputs: in [N] UInt<W>,
+    output: out UInt<W>,
+) {
+    signal sum: UInt<W> := 0
+    for i in 0..N {
+        sum := sum + inputs[i]
+    }
+    output := sum
+}
+```
+
+`N` 决定输入数量，`W` 决定位宽。
+
+## 设计流程
+
+1. 确定系统功能，划分模块
+2. 设计模块接口
+3. 实现数据通路
+4. 实现控制逻辑
+5. 集成验证
+
+## 常见错误
+
+### 模块过大
+
+一个模块做太多事会降低可读性和复用性。将大模块拆分为多个小模块。每个模块的职责应该能用一句话描述。
+
+### 接口过于复杂
+
+接口端口过多的模块难以使用。使用 `bundle` 和 `interface` 组织相关端口。
+
+### 层次过深
+
+过多的层级增加延迟，降低性能。在划分模块时考虑关键路径的延迟。

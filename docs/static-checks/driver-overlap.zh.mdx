@@ -1,0 +1,81 @@
+---
+title: 多驱动冲突
+description: Syl 编译器对多驱动冲突的检测规则。
+---
+
+# 多驱动冲突
+
+Syl 编译器检测同一个信号被多个来源驱动的情况。多驱动是硬件设计中的常见错误。
+
+---
+
+## 检查规则
+
+每个信号只能被一个连续的驱动源驱动。
+
+```syl
+signal s: Bit
+s := a
+# s := b    # 错误：s 已经被驱动
+```
+
+## 条件赋值的处理
+
+需要多条件赋值时，使用 `select`：
+
+```syl
+signal s: Bit := select {
+    a => 1,
+    b => 0,
+    default => s,
+}
+```
+
+`select` 的所有分支共享一个驱动源。
+
+## 模块实例化
+
+实例化其他模块时，如果外部模块驱动了某个信号，编译器将外部模块视为驱动源：
+
+```syl
+extern cell Driver(y: out Bit)
+
+cell Top(ext_sig: out Bit) {
+    let d = place Driver(y: ext_sig)
+    # ext_sig := 1    # 错误：已经被 Driver 驱动
+}
+```
+
+## 重叠驱动检测
+
+在 `select unique` 模式中，编译器检查条件是否重叠：
+
+```syl
+signal s: Bit := select unique {
+    a => 1,
+    b => 1,
+    default => 0,
+}
+```
+
+如果 `a` 和 `b` 在 `unique` 模式下可能同时为真，编译器报告重叠驱动错误。
+
+## 常见错误
+
+### 同一个信号多个赋值
+
+```syl
+signal s: Bit
+s := cond1
+s := cond2    # 错误
+```
+
+### select 中分支冲突
+
+```syl
+signal s: Bit := select unique {
+    a => 1,
+    a => 0,    # 错误：重复条件
+    default => 0,
+}
+```

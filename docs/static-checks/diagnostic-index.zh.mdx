@@ -1,0 +1,50 @@
+---
+title: 诊断索引
+description: 所有 Syl 编译器诊断代码的完整列表。
+---
+
+# 诊断索引
+
+本文列出所有 Syl 编译器诊断代码。每个代码包含严重级别和简短描述。
+
+---
+
+## 解析阶段
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| E_PARSE_UNEXPECTED_TOKEN | error | 解析器遇到无法识别的 Token |
+
+## HIR 阶段
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| E_HIR_UNKNOWN_NAME | error | 找不到指定名字 |
+| E_HIR_IMPORT_CYCLE | error | 检测到循环导入 |
+
+## 语义分析阶段
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| E_MIDDLE_TYPE_MISMATCH | error | 类型不匹配 |
+| E_MIDDLE_CAPABILITY_VIOLATION | error | 能力违规 |
+| E_MIDDLE_UNKNOWN_TYPE | error | 未定义的类型 |
+| E_MIDDLE_INCOMPLETE_MATCH | error | match 未覆盖所有分支 |
+| E_MIDDLE_CONST_EVAL | error | 常量求值失败 |
+| W_MIDDLE_UNUSED_SIGNAL | warning | 未使用的信号 |
+
+## 展开阶段
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| E_MIDDLE_DUPLICATE_HARDWARE_DRIVER | error | 多驱动冲突 |
+| E_MIDDLE_MISSING_HARDWARE_DRIVER | error | 缺失驱动 |
+| E_MIDDLE_OVERLAPPING_HARDWARE_DRIVER | error | 重叠驱动 |
+
+## 后端阶段
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| E_HWIR_DUPLICATE_MODULE | error | HW IR 中模块名重复 |
+| E_HWIR_UNKNOWN_REFERENCE | error | HW IR 中引用不存在 |
+| E_SV_INVALID_SYNTAX | error | 生成的 SystemVerilog 语法错误 |

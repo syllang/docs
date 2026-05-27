@@ -49,6 +49,10 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser. The dev server supports hot reload for edits under `app/`, `components/`, `lib/`, and `docs/`.
 
+`pnpm dev` uses webpack in development because the default Turbopack path can
+run out of memory on this repository's initial content set. If you want to try
+Turbopack anyway, use `pnpm dev:turbo`.
+
 ### Build
 
 ```bash

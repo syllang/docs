@@ -1,0 +1,16 @@
+{
+  "title": "Syl",
+  "icon": "docs",
+  "pages": [
+    "index",
+    "introduction",
+    "migration",
+    "language",
+    "static-checks",
+    "patterns",
+    "tooling",
+    "reference",
+    "internals",
+    "project"
+  ]
+}

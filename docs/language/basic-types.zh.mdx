@@ -1,0 +1,222 @@
+---
+title: 基本类型
+description: Syl 的基本类型——Bit、Nat、Bool 的含义和使用场景。
+---
+
+# 基本类型
+
+Syl 有三种基本类型：`Bit`、`Nat` 和 `Bool`。它们分别用于不同的场景。本文说明每种类型的含义、使用场景和注意事项。
+
+---
+
+## Bit
+
+`Bit` 是 Syl 中最基本的硬件类型。它表示一条物理连线上的电平值：0 或 1。
+
+```syl
+signal s: Bit := 1
+```
+
+### Bit 的使用场景
+
+`Bit` 用于声明单比特信号和端口：
+
+- 控制信号：`valid`、`ready`、`enable`
+- 单比特输入输出：`data_in`、`data_out`
+- 状态标志：`full`、`empty`、`done`
+
+### Bit 的运算
+
+`Bit` 支持以下逻辑运算：
+
+```syl
+signal a: Bit := x and y    # 与
+signal b: Bit := x or y     # 或
+signal c: Bit := x xor y    # 异或
+signal d: Bit := not x      # 非
+signal e: Bit := x eq y     # 相等
+```
+
+注意 `and`、`or`、`not`、`xor`、`eq` 是硬件逻辑运算，对应的 Verilog 运算符是 `&`、`|`、`~`、`^`、`==`。
+
+### Bit 和 Bool 的区别
+
+`Bit` 是硬件信号。`Bool` 是编译期布尔值。它们不能混用：
+
+```syl
+signal s: Bit := 1           # 正确：Bit 字面量是 0 或 1
+
+const c: Bool = true         # 正确：Bool 字面量是 true 或 false
+# signal t: Bit := true     # 错误：Bool 不能赋值给 Bit
+```
+
+Bit 字面量写作 `0` 或 `1`。Bool 字面量写作 `true` 或 `false`。
+
+## Nat
+
+`Nat` 表示非负整数。它在编译期使用，不生成硬件。
+
+```syl
+const WIDTH: Nat = 8
+const DEPTH: Nat = 16
+```
+
+### Nat 的使用场景
+
+`Nat` 用于以下场景：
+
+**泛型参数。** 模块或类型的位宽参数必须是 `Nat`：
+
+```syl
+cell Counter<W: Nat>(
+    count: out UInt<W>
+) { }
+```
+
+**数组大小。** 数组的长度必须是 `Nat`：
+
+```syl
+signal arr: [4] UInt<8>
+```
+
+**编译期计算。** `Nat` 参与编译期的算术运算：
+
+```syl
+const WORDS: Nat = 4
+const WIDTH: Nat = 8
+const TOTAL: Nat = WORDS * WIDTH
+```
+
+### Nat 的运算
+
+`Nat` 支持以下编译期运算：
+
+```syl
+const a: Nat = 10 + 20       # 加法
+const b: Nat = 30 - 15       # 减法（结果不能为负数）
+const c: Nat = 4 * 8         # 乘法
+const d: Nat = 16 / 4        # 除法
+const e: Nat = 17 % 4        # 取模
+const f: Nat = 1 << 4        # 左移
+```
+
+`Nat` 的运算在编译期执行，不生成硬件。结果用于确定类型宽度和数组大小。
+
+## Bool
+
+`Bool` 表示编译期的真或假。它在编译期使用，不生成硬件。
+
+```syl
+const debug: Bool = true
+```
+
+### Bool 的使用场景
+
+**编译期条件。** `if` 条件必须是 `Bool`：
+
+```syl
+const ENABLE_DEBUG: Bool = true
+
+cell Top(y: out UInt<8>) {
+    if ENABLE_DEBUG {
+        y := debug_value
+    } else {
+        y := normal_value
+    }
+}
+```
+
+如果 `ENABLE_DEBUG` 是 `true`，编译器保留 `debug_value` 分支；如果是 `false`，编译器使用 `normal_value` 分支。
+
+**编译期断言。** 可以在编译期检查条件：
+
+```syl
+const W: Nat = 4
+const VALID: Bool = W > 0    # 编译期检查 W 是否大于 0
+```
+
+### Bool 的运算
+
+`Bool` 支持以下编译期逻辑运算：
+
+```syl
+const a: Bool = true and false    # 与（短路求值）
+const b: Bool = true or false     # 或（短路求值）
+const c: Bool = not true          # 非
+const d: Bool = (4 > 2)           # 比较
+const e: Bool = (8 == 8)          # 相等
+```
+
+注意 `and`、`or`、`not` 用于 `Bool` 时是编译期逻辑运算，对应于 `&&`、`||`、`!`。硬件信号 `Bit` 的运算也写作 `and`、`or`、`not`，编译器根据上下文区分。
+
+## 类型转换规则
+
+三种基本类型之间不能隐式转换：
+
+```syl
+# const n: Nat = true     # 错误：Bool 不能转为 Nat
+# signal b: Bit = 5       # 错误：Nat 不能转为 Bit（5 不是 0 或 1）
+```
+
+需要转换时，通过 `fn` 在编译期计算：
+
+```syl
+fn bool_to_nat(b: Bool) -> Nat {
+    if b { return 1 } else { return 0 }
+}
+
+const result: Nat = bool_to_nat(true)
+```
+
+## Clock 和 Reset
+
+除了 `Bit`、`Nat` 和 `Bool`，还有两个与基本类型相关的重要类型：`Clock<D>` 和 `Reset<D>`。
+
+**`Clock<D>`。** 时钟信号。`D` 是一个 `Domain` 类型参数，用于区分不同的时钟域。
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+) { }
+```
+
+时钟信号连接 `reg` 的时钟输入端。编译器检查 `reg` 的时钟信号和模块的时钟端口类型一致。
+
+**`Reset<D>`。** 复位信号。`D` 也必须和时钟域的 `D` 一致。
+
+**Domain。** 时钟域标识。`Domain` 是一个类型参数，用于将时钟、复位和寄存器关联到同一个时钟域。不同域的时钟和复位不能混用。
+
+## 常见错误
+
+### 混淆 Bit 和 Bool
+
+```syl
+# signal s: Bit := true    # 错误
+# if s { }                  # 错误：if 条件需要 Bool，不是 Bit
+```
+
+`Bit` 是硬件信号，`Bool` 是编译期值。在编译期条件中使用 `Bit` 会报错。如果需要根据硬件信号的值做条件选择，使用 `select` 表达式。
+
+### Nat 在运行时使用
+
+```syl
+# signal s: Nat := 5       # 错误：Nat 不能用于硬件
+```
+
+`Nat` 只在编译期有效。硬件信号使用 `UInt<W>`。
+
+### 字面量混淆
+
+`0` 和 `1` 既是 `Bit` 字面量也是 `Nat` 字面量，编译器根据上下文推断：
+
+```syl
+signal b: Bit := 0          # 0 是 Bit 字面量
+const n: Nat = 0            # 0 是 Nat 字面量
+```
+
+## 下一步阅读
+
+了解完基本类型后，接下来看数值字类型 `UInt<W>`：
+
+[数值字类型](/zh/docs/language/numeric-word-types)

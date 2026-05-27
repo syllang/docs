@@ -1,0 +1,15 @@
+{
+  "title": "编译器内部",
+  "icon": "internals",
+  "pages": [
+    "index",
+    "repository-map",
+    "pipeline",
+    "syntax-ast",
+    "hir-and-tir",
+    "const-mir-and-map-ir",
+    "elab-and-eir",
+    "hw-and-sv-ir",
+    "testing-and-contributing"
+  ]
+}

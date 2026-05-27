@@ -1,0 +1,83 @@
+---
+title: 缺失驱动
+description: Syl 编译器对缺失驱动的检测。
+---
+
+# 缺失驱动
+
+Syl 编译器检测 `out` 端口和输出信号是否被赋值。每个输出必须至少有一个驱动源。
+
+---
+
+## 检查规则
+
+每个 `out` 端口必须在模块内部被驱动：
+
+```syl
+cell Bad(y: out Bit) {
+    # 错误：y 没有被驱动
+}
+```
+
+```syl
+cell Good(y: out Bit) {
+    y := 1    # 正确
+}
+```
+
+## 条件赋值
+
+如果端口在条件语句中被驱动，编译器检查所有条件分支：
+
+```syl
+cell Conditional(y: out Bit, enable: in Bit) {
+    y := select {
+        enable => 1,
+        default => 0,
+    }
+    # 正确：所有分支都驱动了 y
+}
+```
+
+## 实例化驱动
+
+如果端口被连接到子模块实例，子模块被视为驱动源：
+
+```syl
+cell Top(y: out Bit) {
+    let d = place Driver(y: y)
+    # 正确：Driver 驱动 y
+}
+```
+
+## 常见错误
+
+### 忘记连接输出
+
+```syl
+cell Top(y: out Bit) {
+    # 错误：y 没有被赋值或连接
+}
+```
+
+### 条件分支未覆盖
+
+```syl
+cell Top(y: out Bit, sel: in Bit) {
+    signal internal: UInt<8>
+    y := select {
+        sel => 1,
+        # default 分支缺失
+    }
+}
+```
+
+确保 `select` 或 `match` 覆盖所有分支。
+
+### 模块返回值未绑定
+
+```syl
+cell Top -> result: UInt<8> {
+    # 错误：result 没有被赋值
+}
+```

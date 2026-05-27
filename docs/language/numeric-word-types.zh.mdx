@@ -1,0 +1,233 @@
+---
+title: 数值字类型
+description: UInt\<W\> 的声明、运算和宽度推断规则。
+---
+
+# 数值字类型
+
+Syl 的数值字类型 `UInt<W>` 表示 W 位无符号整数。位宽 W 在编译期确定，不生成额外的硬件逻辑来动态调整。本文说明 UInt 的声明方式、支持的运算、宽度推断规则以及常见的使用模式。
+
+---
+
+## 声明
+
+### 端口和信号
+
+```syl
+signal data: UInt<8>            # 8 位无符号信号
+signal addr: UInt<16>           # 16 位无符号信号
+signal result: UInt<32>         # 32 位无符号信号
+```
+
+位宽可以是编译期常量：
+
+```syl
+const W: Nat = 32
+signal value: UInt<W>           # 32 位无符号信号
+```
+
+也可以是泛型参数，由实例化时指定：
+
+```syl
+cell FIFO<W: Nat>(
+    data_in: in UInt<W>,
+    data_out: out UInt<W>,
+)
+
+# 实例化 8 位 FIFO
+let fifo8 = place FIFO<8>(data_in: din, data_out: dout)
+```
+
+### 字面量
+
+数值字面量的类型根据上下文推断：
+
+```syl
+signal a: UInt<8> := 42         # 42 被推断为 UInt<8>
+signal b: UInt<16> := 42        # 42 被推断为 UInt<16>
+```
+
+如果字面量超出目标类型的表示范围，编译器报错：
+
+```syl
+signal c: UInt<8> := 256        # 错误：256 超出 UInt<8> 范围（0-255）
+```
+
+## 运算
+
+### 算术运算
+
+```syl
+signal a: UInt<8> := x + y      # 加法
+signal b: UInt<8> := x - y      # 减法
+signal c: UInt<8> := x * y      # 乘法
+signal d: UInt<8> := x << 2     # 左移
+```
+
+减法在结果小于 0 时回绕。例如 `UInt<4>` 的 `0 - 1` 结果为 `15`。
+
+### 按位运算
+
+```syl
+signal a: UInt<8> := x and y    # 按位与
+signal b: UInt<8> := x or y     # 按位或
+signal c: UInt<8> := x xor y    # 按位异或
+signal d: UInt<8> := not x      # 按位取反
+```
+
+按位运算在两个操作数的对应位上逐位执行。如果两个操作数宽度不同，编译器报错。
+
+### 比较运算
+
+比较运算返回 `Bit`：
+
+```syl
+signal eq: Bit := x == y        # 相等
+signal ne: Bit := x != y        # 不相等
+signal lt: Bit := x < y         # 小于
+signal gt: Bit := x > y         # 大于
+signal le: Bit := x <= y        # 小于等于
+signal ge: Bit := x >= y        # 大于等于
+```
+
+## 宽度推断
+
+Syl 在编译期跟踪每个运算结果的位宽。
+
+### 二元运算的宽度
+
+两个操作数宽度相同时，结果宽度相同：
+
+```syl
+signal a: UInt<8> := x + y      # 结果也是 UInt<8>
+signal b: UInt<16> := p + q     # 结果也是 UInt<16>
+```
+
+如果两个操作数宽度不同，编译器报错。不会自动扩展或截断：
+
+```syl
+signal x: UInt<8>
+signal y: UInt<16>
+# signal r: UInt<8> := x + y   # 错误：宽度 8 和 16 不匹配
+```
+
+### 字面量的宽度
+
+字面量采用目标类型推断：
+
+```syl
+signal a: UInt<8> := 0          # 0 作为 UInt<8>
+signal b: UInt<16> := 0         # 0 作为 UInt<16>
+```
+
+### 条件选择的分支宽度
+
+`select` 和 `match` 的所有分支必须返回相同宽度的类型：
+
+```syl
+signal s: UInt<8> := select {
+    a => 1,                     # UInt<8>
+    b => 256,                   # 错误：256 超出 UInt<8>
+}
+```
+
+## 选择和索引
+
+### 位选择
+
+```syl
+signal value: UInt<8>
+signal low_bit: Bit := value[0]            # 取第 0 位
+signal high_nibble: UInt<4> := value[4..8] # 取高 4 位
+```
+
+范围选择 `[start..end]` 的起始索引和结束索引必须是编译期常量。
+
+### 字段组合
+
+通过 `bundle` 将多个字段组合为一个值：
+
+```syl
+bundle Pair {
+    high: UInt<4>,
+    low: UInt<4>,
+}
+
+signal word: UInt<8>
+signal pair: Pair := Pair { high: word[4..8], low: word[0..4] }
+```
+
+## 宽度扩展
+
+当需要将较窄的值赋给较宽的信号时，可以显式构造：
+
+```syl
+signal a: UInt<8>
+signal b: UInt<16>
+
+# 将 a 扩展到 16 位（高位补零）
+signal ext: UInt<16> := select {
+    default => a,              # a = 0xAB → ext = 0x00AB
+}
+```
+
+这种方式在高位自动补零。如果需要符号扩展（高位复制最高位），需要自行实现逻辑。
+
+## 使用模式：状态计数
+
+```syl
+cell PulseCounter<W: Nat>(
+    pulse: in Bit,
+    clear: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W>
+    signal next_val: UInt<W> := select {
+        clear => 0,
+        pulse => value + 1,
+        default => value,
+    }
+    next value := next_val
+    count := value
+}
+```
+
+`PulseCounter` 对输入脉冲计数。`W` 决定计数器的最大值。`W = 8` 时计数范围 0-255。
+
+## UInt 和 Bit 的关系
+
+`Bit` 可以看作 `UInt<1>`，但它们是不同的类型：
+
+```syl
+signal b: Bit
+# signal u: UInt<1> := b       # 错误：类型不同
+```
+
+如果需要单比特信号，使用 `Bit`。`Bit` 的运算符（`and`、`or`、`not`）和 `UInt<W>` 的按位运算符写法相同，编译器根据操作数类型选择正确的运算。
+
+## 常见错误
+
+### 超出表示范围
+
+```syl
+signal a: UInt<4> := 16        # 错误：UInt<4> 范围 0-15
+```
+
+### 运算回绕
+
+```syl
+signal a: UInt<4> := 15
+signal b: UInt<4> := a + 1     # 结果为 0（回绕）
+```
+
+编译器不会自动生成溢出保护。如果设计需要检测溢出，需要额外逻辑。
+
+### 宽度不匹配的比较
+
+```syl
+signal x: UInt<8>
+signal y: UInt<16>
+# signal eq: Bit := x == y     # 错误：宽度不匹配
+```
+
+不同宽度的值不能直接比较。如果设计需要比较不同宽度的值，需要先将较短的信号扩展到相同宽度。

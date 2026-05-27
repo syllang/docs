@@ -1,0 +1,108 @@
+---
+title: 语法
+description: Syl 的语法定义。
+---
+
+# 语法
+
+本文使用类似 BNF 的风格定义 Syl 的语法。它服务于编译器实现者和需要精确理解语言的用户。
+
+---
+
+## 顶层声明
+
+```
+file         ::= item*
+item         ::= use_item | const_item | fn_item | enum_item
+               | bundle_item | interface_item | map_item
+               | cell_item | module_item | extern_module_item
+
+use_item     ::= "use" path ("." path)*
+const_item   ::= "const" ident ":" type_expr "=" expr
+fn_item      ::= "fn" ident generic_params? param_list ("->" type_expr)? block
+enum_item    ::= "enum" ident "{" ident ("," ident)* "}"
+bundle_item  ::= "bundle" ident generic_params? "{" field_decl* "}"
+interface_item ::= "interface" ident generic_params? "{" field_decl* view_decl* "}"
+map_item     ::= "map" ident generic_params? param_list ("->" type_expr)? "=" expr
+cell_item    ::= "cell" ident generic_params? param_list port_list? result_binding? block
+cell_item  ::= "cell" ident generic_params? param_list port_list? result_binding? block
+extern_cell_item ::= "extern" "cell" ident generic_params? param_list port_list? result_binding?
+```
+
+## 参数和端口
+
+```
+generic_params ::= "<" generic_param ("," generic_param)* ">"
+generic_param  ::= ident ":" type_expr ("=" expr)?
+
+param_list     ::= "(" param ("," param)* ")"
+param          ::= ident ":" ident         # 值参数
+               | ident ":" type_expr       # 类型参数
+
+port_list      ::= "(" port ("," port)* ")"
+port           ::= ident ":" direction type_expr
+direction      ::= "in" | "out" | "inout"
+
+result_binding ::= "->" ident ":" type_expr
+```
+
+## 类型
+
+```
+type_expr      ::= ident                       # 命名类型
+                 | ident "<" type_arg ("," type_arg)* ">"  # 泛型类型
+                 | "[" expr "]" type_expr      # 数组类型
+                 | type_expr "." ident         # 视图选择
+type_arg       ::= type_expr | expr
+```
+
+## 语句
+
+```
+block          ::= "{" stmt* expr? "}"
+stmt           ::= let_stmt | signal_stmt | reg_stmt
+                 | next_stmt | assign_stmt
+                 | if_stmt | for_stmt | while_stmt
+                 | return_stmt | expr_stmt
+
+let_stmt       ::= "let" ident (":" type_expr)? ("=" expr)?
+signal_stmt    ::= "signal" ident ":" type_expr (":=" expr)?
+reg_stmt       ::= "reg" ident ":" type_expr ("reset" "(" expr "," expr ")")?
+next_stmt      ::= "next" ident ":=" expr
+assign_stmt    ::= expr ":=" expr
+if_stmt        ::= "if" expr block ("else" block)?
+for_stmt       ::= "for" ident "in" expr ".." expr block
+return_stmt    ::= "return" expr?
+```
+
+## 表达式
+
+```
+expr           ::= primary
+                 | expr "." ident              # 字段访问
+                 | expr "[" expr "]"           # 索引
+                 | expr "(" call_arg ("," call_arg)* ")"  # 调用
+                 | expr "<" type_expr ("," type_expr)* ">" # 泛型调用
+                 | unary_op expr               # 一元运算
+                 | expr binary_op expr         # 二元运算
+                 | expr ":=" expr              # 赋值
+                 | "select" select_mode? "{" select_arm* "}"
+                 | "match" expr "{" match_arm* "}"
+                 | "place" expr "(" call_arg* ")"  # 实例化
+
+primary        ::= ident | int_literal | bool_literal | string_literal
+                 | "(" expr ")" | block
+                 | type_expr "{" field_init ("," field_init)* "}"
+
+select_mode    ::= "priority" | "unique"
+select_arm     ::= expr "=>" expr (",")?
+match_arm      ::= "." ident "=>" expr (",")?
+call_arg       ::= ident ":" expr
+field_init     ::= ident ":" expr
+
+unary_op       ::= "-" | "not"
+binary_op      ::= "+" | "-" | "*" | "/" | "%"
+                 | "and" | "or" | "xor" | "eq"
+                 | "<<" | ">>"
+                 | "==" | "!=" | "<" | ">" | "<=" | ">="
+```

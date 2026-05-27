@@ -1,0 +1,257 @@
+---
+title: 硬件语义
+description: 连续赋值、驱动能力、信号创建和读取规则。
+---
+
+# 硬件语义
+
+本文说明 Syl 中硬件信号的创建、赋值和读取规则。理解这些规则有助于编写正确的硬件描述，也有助于理解编译器的错误信息。
+
+---
+
+## 信号的创建
+
+Syl 中有三种方式创建硬件信号：
+
+**signal。** 声明组合逻辑信号。
+
+```syl
+signal s: UInt<8> := 0
+```
+
+**reg。** 声明寄存器信号，在时钟边沿更新。
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+```
+
+**端口。** 模块的 `in`、`out`、`inout` 声明自动创建端口信号。
+
+```syl
+cell Top(x: in Bit, y: out Bit)
+# x 和 y 是端口信号
+```
+
+## 连续赋值
+
+`:=` 是连续赋值。赋值持续生效：右侧的值变化时，左侧立即更新。
+
+### 基本赋值
+
+```syl
+y := x and enable    # y 持续等于 x and enable
+```
+
+### 条件赋值
+
+使用 `select` 实现条件赋值：
+
+```syl
+signal result: UInt<8> := select priority {
+    add => a + b,
+    sub => a - b,
+    default => a,
+}
+```
+
+`select` 的所有分支必须返回相同类型的值。编译器检查每个分支的类型。
+
+### 赋值目标
+
+可以赋值的信号包括：
+
+- `out` 端口
+- `signal` 声明
+- `inout` 端口
+
+不可以赋值的信号包括：
+
+- `in` 端口（只能读取）
+- `let` 绑定（只是别名）
+
+## 驱动规则
+
+Syl 的驱动规则确保每个信号只有一个驱动源。
+
+### 单驱动原则
+
+每个信号只能被一个连续赋值驱动。
+
+```syl
+signal s: UInt<8>
+s := 1
+# s := 2      # 错误：s 已经被赋值一次
+```
+
+如果需要多条件赋值，在同一个 `select` 表达式中处理：
+
+```syl
+signal s: UInt<8> := select {
+    cond1 => 1,
+    cond2 => 2,
+    default => 0,
+}
+```
+
+### out 端口必须被驱动
+
+```syl
+cell Top(y: out UInt<8>) {
+    # 错误：y 没有被赋值
+}
+```
+
+`out` 端口必须至少被赋值一次。编译器检查缺失驱动。
+
+### in 端口不能被驱动
+
+```syl
+cell Top(x: in UInt<8>) {
+    # x := 1    # 错误：in 端口不能被赋值
+}
+```
+
+`in` 端口的值由外部提供，模块内部只能读取。
+
+## 信号的读取
+
+读取信号的限制和赋值相反：
+
+- `out` 端口不能被读取
+- `in` 端口可以被读取
+- `signal` 可以被读取
+- `inout` 端口可以被读取
+
+### out 端口不能被读取
+
+```syl
+cell Top(y: out UInt<8>) {
+    signal s: UInt<8> := y    # 错误：out 端口不能被读取
+}
+```
+
+如果需要读取当前输出值，在模块内部声明一个 `signal`，将输出信号赋值给它：
+
+```syl
+cell Top(y: out UInt<8>) {
+    signal internal: UInt<8> := compute()
+    y := internal
+    # 后续可以读取 internal
+}
+```
+
+## select 和 match 的语义
+
+### select 模式
+
+`select` 有两种模式：
+
+**priority 模式。** 条件按顺序检查，第一个满足的条件生效。
+
+```syl
+signal s: UInt<8> := select priority {
+    a => 1,        # 如果 a = 1，结果是 1
+    b => 2,        # 否则如果 b = 1，结果是 2
+    default => 0,  # 否则结果是 0
+}
+```
+
+**unique 模式。** 所有条件同时检查，但条件之间不能重叠。
+
+```syl
+signal s: UInt<8> := select unique {
+    a and b => 1,
+    not a and b => 2,
+    default => 0,
+}
+```
+
+编译器在 `unique` 模式下检查条件是否有重叠。
+
+### match 语义
+
+`match` 基于枚举变体选择值：
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+    State.Done => State.Idle,
+}
+```
+
+`match` 必须覆盖所有枚举变体，否则编译器报错。
+
+## 驱动来源
+
+信号的驱动来源有三种：
+
+**模块内部赋值。** 模块体内的 `:=` 或 `next` 赋值。
+
+**子模块实例。** `place` 实例化的模块驱动的信号。
+
+**不透明摘要。** `extern cell` 的摘要声明了驱动的信号。
+
+```syl
+extern cell Driver(y: out Bit)
+
+cell Top(y: out Bit) {
+    let d = place Driver(y: y)  # Driver 驱动 y
+}
+```
+
+DRC（设计规则检查）将所有驱动来源纳入考虑，检测多驱动冲突。
+
+## 硬件语义和编译器检查
+
+编译器对硬件语义的检查发生在展开阶段。这意味着编译器在生成 SV 代码之前就已经知道每个信号的驱动关系和读写方向。
+
+检查包括：
+
+- 每个信号是否被恰好一个驱动源驱动
+- 每个 `out` 端口是否被赋值
+- 每个 `in` 端口是否只被读取
+- `select` 的条件是否覆盖了所有可能的输入组合
+
+这些检查不需要仿真。编译通过后，这些方面的正确性是有保证的。
+
+## 常见错误
+
+### 信号被多次赋值
+
+```syl
+signal s: Bit
+s := a
+s := b    # 错误：多驱动
+```
+
+使用 `select` 合并多个条件。
+
+### out 端口未被驱动
+
+```syl
+cell Top(y: out Bit) { }    # 错误：y 未被驱动
+```
+
+每个 `out` 端口必须至少被赋值一次。
+
+### 读取 out 端口
+
+```syl
+cell Top(y: out Bit) {
+    signal s: Bit := y    # 错误
+}
+```
+
+在内部声明一个信号来保存需要读取的值。
+
+### inout 端口使用不当
+
+```syl
+cell Top(bus: inout Bit) {
+    bus := 1        # 可以驱动
+    signal s := bus # 可以读取
+}
+```
+
+`inout` 同时支持读取和驱动，但需要设计者确保不会同时发生冲突。

@@ -1,0 +1,86 @@
+---
+title: 能力违规
+description: Syl 编译器对端口方向能力的检查规则。
+---
+
+# 能力违规
+
+Syl 编译器检查每个信号的读写操作是否和它的方向声明一致。本文说明能力检查规则。
+
+---
+
+## 端口方向
+
+Syl 的端口有三种方向：
+
+- `in`：外部驱动，模块内部只读
+- `out`：模块驱动，模块内部只写
+- `inout`：双向读写
+
+## 检查规则
+
+### in 端口不能被赋值
+
+```syl
+cell Bad(x: in Bit) {
+    x := 1    # 错误：不能驱动 in 端口
+}
+```
+
+### out 端口不能被读取
+
+```syl
+cell Bad(y: out Bit) {
+    signal s: Bit := y    # 错误：不能读取 out 端口
+}
+```
+
+### inout 端口可以读写
+
+```syl
+cell Bus(bus: inout Bit) {
+    signal s: Bit := bus    # 可以读取
+    bus := 1                # 可以驱动
+}
+```
+
+## 内部信号
+
+内部 `signal` 和 `reg` 可以任意读写：
+
+```syl
+cell Good(y: out Bit) {
+    signal internal: Bit    # 内部信号
+    internal := 1           # 可以驱动
+    y := internal           # 可以读取
+}
+```
+
+## 常见错误
+
+### 在 out 端口上读取
+
+```syl
+cell Top(y: out Bit) {
+    signal s: Bit := y    # 错误
+}
+```
+
+使用内部信号保存需要读取的值。
+
+### 在 in 端口上驱动
+
+```syl
+cell Top(x: in Bit) {
+    x := 1    # 错误
+}
+```
+
+### inout 端口使用不当
+
+```syl
+cell Top(bus: inout Bit) {
+    bus := 1
+    # 需要在同一周期内驱动和读取的场合，注意驱动冲突
+}
+```

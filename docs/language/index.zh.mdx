@@ -1,0 +1,178 @@
+---
+title: 语言基础
+description: Syl 语言的核心概念概览——类型系统、构造方式和设计思路。
+---
+
+# 语言基础
+
+欢迎来到 Syl 语言基础章节！这篇文章先概览 Syl 的类型系统、核心构造方式和编译期的设计保障。后续每篇文章深入一个具体主题。
+
+---
+
+## 设计思路
+
+Syl 的类型系统和构造方式围绕一个目标设计：**让编译器在编译期尽可能多地检查硬件设计的正确性**。
+
+这意味着 Syl 的类型信息比 Verilog 更丰富。编译器知道每个信号的位宽、方向、能力（可读、可驱动、时钟、复位）。有了这些信息，编译器可以在生成代码之前发现连接错误、类型错误和驱动冲突。
+
+## 类型系统概览
+
+Syl 的类型分为三类：
+
+**基本类型。** `Bit`（单比特）、`Nat`（自然数，编译期使用）、`Bool`（布尔值，编译期使用）。
+
+**数值字类型。** `UInt<W>`（W 位无符号整数）。位宽 W 是一个自然数，在编译期确定。
+
+**复合类型。** `[N] T`（数组）、`bundle`（结构体）、`enum`（枚举）、`interface`（接口/端口组）。
+
+## 核心构造方式
+
+Syl 的声明分为几类，每类服务于不同的硬件设计需求。
+
+**组合逻辑。** 使用 `map` 定义纯组合函数。`map` 的输入输出关系在编译期是确定的，没有状态和副作用。
+
+```syl
+map add(a: UInt<8>, b: UInt<8>) -> UInt<8> = a + b
+```
+
+**时序逻辑。** 使用 `reg` 声明寄存器，使用 `next` 定义下一状态。
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+next count := count + 1
+```
+
+**硬件模块。** 使用 `module` 定义可实例化的硬件模块。模块包含端口声明、信号声明和赋值语句。
+
+**硬件单元。** 使用 `cell` 定义内联展开的硬件单元。`cell` 被实例化时不产生层次边界，内部逻辑直接展开到父模块。
+
+**接口和视图。** 使用 `interface` 将相关端口组合在一起，使用 `view` 定义不同连接方向看到的端口集合。
+
+## 编译期构造
+
+Syl 在编译期执行部分代码：
+
+- `const` 声明编译期常量
+- `fn` 定义编译期执行的函数，支持条件分支和循环
+- `if` 和 `for` 在编译期展开，条件必须是编译期确定的
+
+这些构造的值在编译期确定，不生成硬件。
+
+## 一个完整的设计示例
+
+下面是一个计数器模块，它使用了 Syl 的多种类型和构造：
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    clear: in Bit,
+) -> value: UInt<W> {
+    reg count: UInt<W> reset(rst, 0)
+
+    signal count_next: UInt<W> :=
+        select priority {
+            clear => 0,
+            enable => count + 1,
+            default => count,
+        }
+
+    next count := count_next
+    value := count
+}
+```
+
+这段代码展示了：
+
+- 泛型参数 `W: Nat` 和 `D: Domain`
+- `in` 端口的声明
+- 模块返回值 `-> value: UInt<W>`
+- `reg` 寄存器声明和复位
+- `select priority` 条件选择
+- `next` 寄存器下一状态赋值
+
+## 信号赋值规则
+
+Syl 的信号赋值有三种形式，每种用于不同的场景：
+
+**连续赋值 `:=`。** 赋值持续生效。右侧值变化时左侧立即更新。对应 Verilog 的 `assign`。
+
+```syl
+y := x and enable    # y 持续跟随 x and enable 的值
+```
+
+**寄存器下一状态 `next`。** 值在时钟边沿采样到寄存器。对应 Verilog 的时序逻辑。
+
+```syl
+next count := count + 1    # 每个时钟周期 count 加 1
+```
+
+**绑定赋值 `let`。** 创建一个名字别名，不生成硬件。
+
+```syl
+let sum = a + b            # sum 是 a + b 的别名，不占用硬件
+```
+
+## 条件选择
+
+Syl 提供两种条件选择方式：
+
+**select。** 基于条件选择值。支持 `priority`（优先级编码）和 `unique`（唯一选择）模式。
+
+```syl
+signal result: UInt<8> := select priority {
+    enable => value,
+    clear => 0,
+    default => value,
+}
+```
+
+**match。** 基于枚举变体选择值。
+
+```syl
+signal next_state: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+    State.Done => State.Idle,
+}
+```
+
+## 模块实例化
+
+使用 `place` 关键字实例化其他模块或 cell：
+
+```syl
+let inst = place Counter<8>(
+    clk: clk,
+    rst: rst,
+    enable: en,
+    count: cnt,
+)
+```
+
+实例化时使用命名参数连接端口。编译器检查所有必连端口都已连接。
+
+## 设计原则：显式优于隐式
+
+Syl 的设计偏向显式声明而不是隐式推断。
+
+**端口方向是显式的。** 每个端口必须声明 `in`、`out` 或 `inout`。编译器不会根据信号的使用方式推断方向。
+
+**位宽是显式的。** `UInt<8>` 和 `UInt<16>` 是不同的类型。编译器不会自动扩展或截断位宽。
+
+**驱动是显式的。** 每个信号只能被一个源驱动。多驱动需要显式使用 `select` 或 `match`。
+
+## 本章导航
+
+| 文章 | 内容 |
+|------|------|
+| 基本类型 | Bit、Nat、Bool 以及它们的使用场景 |
+| 数值字类型 | UInt\<W\> 的声明、运算和宽度推断 |
+| 复合类型 | bundle、enum、数组 |
+| 接口与视图 | interface、view、端口分组 |
+| 结构构造 | cell、port、place 实例化 |
+| 编译期构造 | const、fn、编译期 if 和 for |
+| 硬件语义 | 连续赋值、驱动、读写能力 |
+| 时序逻辑 | reg、next、复位 |
+| 包与导入 | package、use、文件组织 |

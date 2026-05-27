@@ -1,0 +1,238 @@
+---
+title: 为什么静态可分析性重要
+description: 了解 Syl 的静态分析为什么比嵌入式 DSL 更直接，以及编译期检查解决了什么实际问题。
+---
+
+# 为什么静态可分析性重要
+
+本文解释"静态可分析性"对硬件设计者意味着什么，以及 Syl 的实现方式与嵌入式 DSL 有什么不同。
+
+---
+
+## 静态分析的两个层次
+
+硬件领域的静态分析可以发生在两个层次。
+
+**传统 HDL 的层次（Verilog / VHDL）。** 编译器只负责语法检查和基本的语义检查。宽度不匹配、端口未连接、多驱动等问题留给仿真去发现。开发者写代码 → 跑仿真 → 看波形 → 定位 → 修复，每个循环持续数十分钟到数小时。
+
+**类型安全 HDL 的层次（Chisel / SpinalHDL / Syl）。** 编译器（或类似编译器的通行）在生成网表之前检查宽度、端口连接、驱动规则。开发者写代码 → 编译 → 看错误 → 修复，不需要仿真就能捕获大量问题。
+
+Syl 和 Chisel／SpinalHDL 都落在这个层次。但"做静态分析"和"怎么做静态分析"是两个问题。
+
+## 嵌入式 DSL 怎么做静态分析
+
+Chisel 和 SpinalHDL 的静态分析过程经过三层：
+
+1. **Scala 编译器**检查 Scala 语法和类型。`RegInit(0.U(8.W))` 通过了，因为 Scala 看到的是合法的表达式
+2. **硬件库运行时**执行 Scala 代码，构建内部图结构。宽度检查、多驱动检测在这个阶段进行
+3. **后端通行**（FIRRTL 等）再做一层硬件规则检查
+
+每经过一层，错误信息就要翻译一次。一个宽度不匹配的错误，在 Scala 编译器里可能是：
+
+```
+type mismatch;
+ found   : chisel3.core.UInt
+ required: chisel3.core.UInt
+```
+
+两个类型都叫 `UInt`，但来自不同的硬件生成上下文。开发者需要读懂 Scala 编译器的输出，理解硬件库的类型层级，才能把错误定位到自己的代码。
+
+## Syl 怎么做静态分析
+
+Syl 从解析到代码生成全程在 Syl 语义下进行。编译器内建理解以下概念：
+
+- **cell**：一个硬件单元，有端口、内部信号、连接规则
+- **interface / view**：一组端口及其方向关系
+- **Clock\<D\> / Reset\<D\>**：时钟域是类型的一部分
+- **driver**：信号的驱动源，同一个信号只能有一个驱动
+- **port connection**：实例化时的端口绑定必须完整
+
+因为语言原生支持这些概念，编译器报错时直接说硬件术语：
+
+```
+error[E_MIDDLE_TYPE_MISMATCH]: expected 'UInt<8>', found 'Bit'
+  ┌─ input.syl:2:9
+  │
+2 │     y := x
+  │         ^ expected 'UInt<8>', found 'Bit'
+```
+
+报错路径：解析 → 语义分析 → 类型检查 → 硬件规则检查，全部在 Syl 编译器内部完成，不经过宿主语言的翻译层。
+
+## Syl 在编译期检查什么
+
+### 类型检查
+
+```syl
+cell Bad(x: in UInt<8>, y: out UInt<16>) {
+    y := x
+}
+```
+
+`x` 是 8 位，`y` 是 16 位。编译器报告类型不匹配。在 Verilog 中，这条赋值不会报错，`x` 的值被赋值到 `y` 的低 8 位，高 8 位自动补零。如果设计者本意是高 8 位应该拼接其他信号，这个 bug 要等仿真时才能发现。
+
+### 多驱动检查
+
+```syl
+cell DoubleDrive(y: out UInt<8>) {
+    y := 1
+    y := 2
+}
+```
+
+同一个输出 `y` 被赋值两次。编译器报告多驱动冲突。在 Verilog 中，多驱动在仿真中表现为 `X`（未知值），设计者需要从波形中反向定位问题。
+
+### 端口连接检查
+
+```syl
+cell Sub(a: in UInt<8>, b: out UInt<8>) { }
+
+cell Top(y: out UInt<8>) {
+    let inst = place Sub(a: y)
+}
+```
+
+实例化 `Sub` 时只连接了端口 `a`，没有连接端口 `b`。编译器报告缺失连接。在 Verilog 中，未连接的端口默认为高阻态（`Z`），这可能不是设计者期望的行为。
+
+### 信号驱动方向检查
+
+```syl
+cell Top(x: in UInt<8>, y: out UInt<8>) {
+    x := 1
+}
+```
+
+`x` 声明为 `in` 方向，但模块内部对它赋值。编译器报告能力违规：`in` 端口只能被读取，不能被驱动。
+
+### 常量求值检查
+
+```syl
+const W: Nat = 4
+
+cell Top(y: out UInt<W>) {
+    y := 1
+}
+```
+
+`W` 在编译期求值为 4，生成的端口宽度是 `UInt<4>`。如果 `W` 的值无法确定（比如依赖一个运行时值），编译器会报告错误。
+
+### 选择表达式分支检查
+
+```syl
+signal s: UInt<8> := select priority {
+    a => 1,
+    b => 2,
+    default => 3,
+}
+```
+
+编译器检查所有分支的返回值类型一致。如果某个分支返回 `UInt<16>`，编译器报告类型不匹配。
+
+在 Verilog 中，`case` 语句的不同分支可以赋值不同宽度的值，不会有编译错误。
+
+### 枚举匹配完整性检查
+
+```syl
+enum State {
+    Idle,
+    Run,
+    Done,
+}
+
+signal next_state: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+}
+```
+
+编译器检查 `match` 表达式是否覆盖了所有枚举变体。上面的例子缺少 `Done` 分支，编译器报告匹配不完整。
+
+在 Verilog 中，`case` 语句不要求覆盖所有分支，默认情况下会保持原值，这可能不是设计者期望的行为。
+
+枚举变体在表达式中必须使用限定名引用（`State.Idle`），而不是裸名（`Idle`），这样编译器可以从表达式结构直接确定变体所属的枚举类型。
+
+### 枚举编码布局
+
+Syl 的 `enum` 支持声明显式判别值和硬件表示宽度：
+
+```syl
+enum Opcode: UInt<4> {
+    Nop = 0,
+    Load,
+    Store = 8,
+    Halt,
+}
+```
+
+- 未显式赋值的变体沿用前一个值加 1：`Load = 1`，`Halt = 9`
+- `: UInt<4>` 指定硬件宽度为 4 位，所有判别值必须能放入该宽度
+- 编译器按最大判别值推导最小宽度，不依赖变体数量
+
+此外内置 `@layout` 属性支持两种专用编码模式：
+
+```syl
+@layout(flags)
+enum Access: Bits<4> {
+    Read,
+    Write,
+    Exec,
+    Admin,
+}
+```
+
+`@layout(flags)` 自动分配 one-hot 值（`Read = 0b0001`，`Write = 0b0010`），支持位运算组合。`@layout(onehot)` 的编码值分配相同，但语义是互斥状态集合，不允许组合。
+
+## 静态可分析性的代价
+
+静态可分析性不是免费的。不同类型的静态分析有不同的代价。
+
+**传统 HDL 的代价：** 几乎没有编译期约束，但需要设计者自己承担检查责任。每个模块连接都要人工或通过 lint 工具验证。仿真时间随设计规模线性增长。
+
+**嵌入式 DSL 的代价：** 需要学习和维护宿主语言（Scala）及其工具链。Scala 编译器的错误信息需要额外经验才能解读。展开阶段的副作用（文件读写、可变状态）增加了调试维度。
+
+**Syl 的代价：** 需要学一门新语言的语法和类型系统。标准库比 Chisel/SpinalHDL 小。工具链的成熟度不如 Scala 生态。但作为交换，编译器可以直接用硬件语义和你对话，展开阶段是纯函数式的、可预测的。
+
+## 具体的例子：一个完整的对比
+
+假设你要设计一个简单的累加器：每个时钟周期将一个 8 位输入加到内部累加器上，输出当前累加值。
+
+Verilog 版本的写法：
+
+```verilog
+module Accumulator(
+    input clk,
+    input rst,
+    input [7:0] din,
+    output reg [7:0] dout
+);
+    always @(posedge clk) begin
+        if (rst)
+            dout <= 0;
+        else
+            dout <= dout + din;
+    end
+endmodule
+```
+
+这段代码可以通过编译，但它有几个潜在问题：如果 `rst` 是高有效还是低有效？如果 `din` 的位宽变成 16 位，`dout` 会自动扩展吗？加法溢出会怎样？
+
+Syl 版本的写法：
+
+```syl
+cell Accumulator<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    din: in UInt<8>,
+    dout: out UInt<8>,
+) {
+    reg value: UInt<8> reset(rst, 0)
+
+    signal next_value: UInt<8> := value + din
+    next value := next_value
+    dout := value
+}
+```
+
+- 端口方向是明确的。编译器检查 `dout` 只能被驱动，不能被读取
+- 位宽是显式的。如果将 `din` 改为 `UInt<16>`，加法结果类型改变，编译器要求你明确处理宽度变化
+- `reset(rst, 0)` 明确指定复位信号和复位值。编译器检查复位信号类型和值类型是否匹配

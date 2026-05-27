@@ -1,0 +1,14 @@
+{
+  "title": "静态检查",
+  "icon": "checks",
+  "pages": [
+    "index",
+    "driver-overlap",
+    "missing-drivers",
+    "capability-violations",
+    "width-and-type-mismatches",
+    "bounds-and-indexing",
+    "aggregate-completeness",
+    "diagnostic-index"
+  ]
+}

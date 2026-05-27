@@ -1,0 +1,74 @@
+---
+title: Rust 嵌入
+description: 在 Rust 应用中使用 Syl 编译器。
+---
+
+# Rust 嵌入
+
+Syl 编译器使用 Rust 编写，可以作为库嵌入到 Rust 应用中。本文说明如何通过 Rust API 使用编译器的功能。
+
+---
+
+## 使用方式
+
+在 Rust 项目中添加依赖：
+
+```toml
+[dependencies]
+syl_session = { git = "..." }
+```
+
+## 基本使用
+
+```rust
+use syl_session::{AnalysisHost, DocumentUri, DocumentVersion};
+
+let mut host = AnalysisHost::new();
+let uri = DocumentUri::new("example.syl");
+host.open_document(uri.clone(), source_code.to_string(), DocumentVersion::new(1));
+let snapshot = host.snapshot()?;
+```
+
+## 编译代码
+
+```rust
+use syl_emit::SystemVerilogBackend;
+use syl_sema::SemanticCompiler;
+use syl_elab::HardwareCompiler;
+use syl_syntax::SourceParser;
+
+let file = SourceParser::new(source).parse_file()?;
+let sema = SemanticCompiler::new().session(&[file]);
+let hir = sema.resolve_hir()?;
+let tir = hir.check_tir()?;
+let hwir = HardwareCompiler::new().compile_tir(&tir)?;
+let sv = SystemVerilogBackend::new().emit(&hwir)?;
+```
+
+## 获取诊断信息
+
+```rust
+let snapshot = host.snapshot()?;
+let diagnostics = snapshot.diagnostics();
+for diagnostic in &diagnostics {
+    println!("{}", diagnostic);
+}
+```
+
+## 查询 API
+
+```rust
+use syl_query::AnalysisQueries;
+
+let snapshot = host.snapshot()?;
+let hover = snapshot.hover_at(uri, position)?;
+let definition = snapshot.definition_at(uri, position)?;
+let completions = snapshot.completions_at(uri, position)?;
+```
+
+## 适用场景
+
+- 自定义构建工具
+- 持续集成集成
+- 编辑器插件
+- 测试框架

@@ -1,0 +1,12 @@
+{
+  "title": "Interop and Tooling",
+  "icon": "tooling",
+  "pages": [
+    "sylc",
+    "systemverilog-emission",
+    "extern-and-ip",
+    "lsp-and-editors",
+    "rust-embedding",
+    "session-and-query"
+  ]
+}
