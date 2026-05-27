@@ -25,6 +25,10 @@ pnpm install
 pnpm dev        # starts the dev server at http://localhost:3000
 ```
 
+`pnpm dev` uses webpack in development. The default Turbopack path currently
+has a tendency to hit OOM on this repository's full documentation corpus. Use
+`pnpm dev:turbo` only if you specifically want to test that path.
+
 ### Directory overview
 
 | Directory | Purpose |

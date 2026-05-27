@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev --turbopack",
     "start": "next start",
     "prepare": "simple-git-hooks",
     "typecheck": "fumadocs-mdx && next typegen && tsc --noEmit",
