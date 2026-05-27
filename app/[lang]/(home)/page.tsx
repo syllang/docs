@@ -1,5 +1,11 @@
-import { DynamicLink } from 'fumadocs-core/dynamic-link';
 import type { Metadata } from 'next';
+import { DynamicLink } from 'fumadocs-core/dynamic-link';
+import { ServerCodeBlock } from 'fumadocs-ui/components/codeblock.rsc';
+import {
+  AnimatedTerminal,
+  RevealGroup,
+  CircuitLines,
+} from './page.client';
 
 export const metadata: Metadata = {
   title: 'Syl',
@@ -9,11 +15,12 @@ export const metadata: Metadata = {
 
 const copy = {
   en: {
+    subtitle: 'Hardware description language with compile-time checks.',
     intro:
-      'Syl is a hardware description language. You write digital logic, the compiler checks widths, ports, and drivers at compile time, and outputs SystemVerilog for existing simulation and synthesis flows.',
+      'Syl is a hardware description language built for static analyzability. You write digital logic, the compiler checks widths, ports, and drivers before simulation. Output is standard SystemVerilog.',
     cta: 'Get started',
-    ctaSecondary: 'Install',
-    codePanelTitle: 'A working counter in Syl',
+    ctaSecondary: 'Quick start',
+    codePanelTitle: 'counter.syl',
     code: `cell Counter<W: Nat = 16, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
@@ -33,34 +40,33 @@ const copy = {
     features: [
       {
         title: 'Compile-time checks',
-        body: 'Width mismatches, unconnected ports, and multi-driver conflicts are compiler errors, not simulation surprises.',
+        body: 'Width mismatches, unconnected ports, multi-driver conflicts — caught before simulation.',
       },
       {
         title: 'Standard output',
-        body: 'Syl emits SystemVerilog. The same simulation and synthesis tools still work.',
+        body: 'Syl emits SystemVerilog. The same simulators and synthesis tools still work.',
       },
       {
         title: 'One tool, no runtime',
-        body: 'Install sylc via cargo. No JVM, no Scala build tool, no host language runtime.',
+        body: 'Install sylc via cargo. No JVM, no Scala, no host language runtime.',
       },
     ],
-    install: 'cargo install sylc',
     paths: [
       {
-        title: 'Quick start',
-        body: 'Install the compiler, compile the example designs, see the output.',
+        title: 'Try the compiler',
+        body: 'Install sylc, compile the example designs, see the SystemVerilog output.',
         href: '/docs',
-        cta: 'Start here',
+        cta: 'Quick start',
       },
       {
-        title: 'Language overview',
-        body: 'Read about Syl, its design, and how it differs from Verilog, Chisel, and SpinalHDL.',
+        title: 'What is Syl?',
+        body: 'Read the overview and how Syl differs from Verilog, Chisel, and SpinalHDL.',
         href: '/docs/introduction/what-is-syl',
         cta: 'Read overview',
       },
       {
         title: 'Reference',
-        body: 'CLI flags, type system, built-in functions, and diagnostic codes.',
+        body: 'CLI flags, type system, grammar, and diagnostic codes.',
         href: '/docs/reference/cli',
         cta: 'Browse reference',
       },
@@ -68,11 +74,12 @@ const copy = {
     footer: 'Syl is in early development. Standard library and some features are still being built.',
   },
   zh: {
+    subtitle: '硬件描述语言，编译期检查。',
     intro:
-      'Syl 是一门硬件描述语言。你用 Syl 写数字电路，编译器在编译期检查位宽、端口和驱动是否匹配，输出 SystemVerilog 给现有的仿真和综合工具使用。',
-    cta: '快速开始',
-    ctaSecondary: '安装',
-    codePanelTitle: '一个可以工作的计数器',
+      'Syl 是一门面向静态可分析性的硬件描述语言。你用 Syl 写数字电路，编译器在编译期检查位宽、端口和驱动是否匹配。输出标准 SystemVerilog，接入现有流程。',
+    cta: '开始使用',
+    ctaSecondary: '快速开始',
+    codePanelTitle: 'counter.syl',
     code: `cell Counter<W: Nat = 16, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
@@ -92,7 +99,7 @@ const copy = {
     features: [
       {
         title: '编译期检查',
-        body: '位宽不匹配、端口未连接、多驱动冲突——这些是编译错误，不是仿真阶段的意外。',
+        body: '位宽不匹配、端口未连接、多驱动冲突——在仿真之前就被编译器捕获。',
       },
       {
         title: '输出标准格式',
@@ -100,26 +107,25 @@ const copy = {
       },
       {
         title: '单一工具，零运行时',
-        body: '通过 cargo 安装 sylc。不需要 JVM、不需要 Scala、不需要宿主语言运行时。',
+        body: '通过 cargo 安装 sylc。不需要 JVM、不需要 Scala。',
       },
     ],
-    install: 'cargo install sylc',
     paths: [
       {
-        title: '快速开始',
-        body: '安装编译器、编译内附的示例设计、查看输出结果。',
+        title: '试用编译器',
+        body: '安装 sylc，编译内附的示例设计，查看输出的 SystemVerilog。',
         href: '/zh/docs',
-        cta: '从这里开始',
+        cta: '快速开始',
       },
       {
-        title: '语言总览',
-        body: '了解 Syl 的设计目标，以及和 Verilog、Chisel、SpinalHDL 的区别。',
+        title: '理解 Syl',
+        body: '阅读语言总览，了解 Syl 和 Verilog、Chisel、SpinalHDL 的设计差异。',
         href: '/zh/docs/introduction/what-is-syl',
         cta: '阅读总览',
       },
       {
         title: '参考文档',
-        body: 'CLI 参数、类型系统、内置函数和诊断代码。',
+        body: 'CLI 参数、类型系统、语法和诊断代码。',
         href: '/zh/docs/reference/cli',
         cta: '浏览参考',
       },
@@ -143,13 +149,47 @@ function SylLogo({ className }: { className?: string }) {
       <circle cx="8" cy="12" r="1.5" fill="#fff" fillOpacity="0.4" />
       <circle cx="8" cy="36" r="1.5" fill="#fff" fillOpacity="0.4" />
       <circle cx="30" cy="8" r="1.5" fill="#fff" fillOpacity="0.4" />
-      <path
-        d="M26 4L12 26h10l-4 18 16-22h-10l4-18z"
-        fill="#fff"
-      />
+      <path d="M26 4L12 26h10l-4 18 16-22h-10l4-18z" fill="#fff" />
     </svg>
   );
 }
+
+function ChipIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M8 4V2" />
+      <path d="M16 4V2" />
+      <path d="M8 20v2" />
+      <path d="M16 20v2" />
+      <path d="M4 8H2" />
+      <path d="M4 16H2" />
+      <path d="M20 8h2" />
+      <path d="M20 16h2" />
+      <path d="M9 9h6v6H9z" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function TerminalIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  );
+}
+
+const featureIcons = [ShieldIcon, TerminalIcon, ChipIcon];
 
 export default async function HomePage({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
@@ -157,87 +197,112 @@ export default async function HomePage({ params }: PageProps<'/[lang]'>) {
   const isChinese = lang === 'zh';
 
   return (
-    <main className="relative flex w-full flex-1 overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] bg-[radial-gradient(circle_at_30%_20%,rgba(27,94,32,0.15),transparent_40%),radial-gradient(circle_at_80%_40%,rgba(59,130,246,0.08),transparent_30%)]" />
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-24 pt-16 sm:pt-24">
+    <main className="relative flex w-full flex-1 flex-col overflow-hidden">
+      {/* Background gradient */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[42rem] bg-[radial-gradient(circle_at_20%_15%,rgba(27,94,32,0.12),transparent_42%),radial-gradient(circle_at_85%_25%,rgba(59,130,246,0.07),transparent_32%)]" />
+
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-24 pt-12 sm:pt-16">
 
         {/* ── Hero ── */}
-        <section className="flex flex-col items-center text-center">
-          <SylLogo className="mb-6 h-14 w-14" />
-          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight md:text-5xl">
+        <section className="relative flex flex-col items-center text-center">
+          {/* Decorative circuit traces */}
+          <CircuitLines className="absolute -left-20 top-0 h-48 w-48 opacity-60 max-md:hidden" />
+          <CircuitLines className="absolute -right-20 bottom-0 h-48 w-48 scale-x-[-1] opacity-60 max-md:hidden" />
+
+          <SylLogo className="mb-6 h-16 w-16" />
+
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
             Syl
           </h1>
-          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-fd-muted-foreground">
+          <p className="mx-auto mt-4 max-w-2xl text-xl font-medium text-fd-muted-foreground/80">
+            {content.subtitle}
+          </p>
+          <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-fd-muted-foreground">
             {content.intro}
           </p>
           <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
             <DynamicLink
               href={isChinese ? '/zh/docs' : '/docs'}
-              className="rounded-full bg-fd-primary px-6 py-3 text-sm font-semibold text-fd-primary-foreground"
+              className="inline-flex items-center gap-2 rounded-full bg-fd-primary px-6 py-3 text-sm font-semibold text-fd-primary-foreground transition-all hover:brightness-110"
             >
               {content.cta}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </DynamicLink>
             <DynamicLink
               href={isChinese ? '/zh/docs' : '/docs'}
-              className="rounded-full border px-6 py-3 text-sm font-semibold"
+              className="inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition-colors hover:bg-fd-accent"
             >
               {content.ctaSecondary}
             </DynamicLink>
           </div>
         </section>
 
-        {/* ── Code + install in one row ── */}
-        <section className="mt-16 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <div className="rounded-[1.5rem] border bg-fd-card p-5 shadow-sm">
-            <p className="text-sm font-semibold text-fd-muted-foreground">
-              {content.codePanelTitle}
-            </p>
-            <pre className="mt-4 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-sm leading-6 whitespace-pre-wrap text-zinc-100">
-              <code>{content.code}</code>
-            </pre>
-          </div>
-          <div className="rounded-[1.5rem] border bg-fd-card p-5 shadow-sm">
-            <p className="text-sm font-semibold text-fd-muted-foreground">Install</p>
-            <div className="mt-4 overflow-x-auto rounded-xl bg-zinc-950 p-4">
-              <code className="text-sm leading-6 text-zinc-100">$ {content.install}</code>
+        {/* ── Code panels section ── */}
+        <RevealGroup className="mt-20">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="overflow-hidden rounded-xl border bg-fd-card shadow-md">
+              <div className="flex items-center gap-1.5 border-b px-4 py-2.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
+                <span className="ml-2 text-xs font-medium text-fd-muted-foreground">
+                  {content.codePanelTitle}
+                </span>
+              </div>
+              <ServerCodeBlock
+                code={content.code}
+                lang="syl"
+              />
             </div>
-            <p className="mt-4 text-xs leading-6 text-fd-muted-foreground">
-              {isChinese
-                ? '需要 Rust 工具链。安装后 sylc 可以直接使用。'
-                : 'Requires the Rust toolchain. sylc is available on PATH after install.'}
-            </p>
+            <AnimatedTerminal />
           </div>
-        </section>
+        </RevealGroup>
 
-        {/* ── Three features ── */}
-        <section className="mt-20 grid gap-4 md:grid-cols-3">
-          {content.features.map((feature) => (
-            <article key={feature.title} className="rounded-[1.5rem] border bg-fd-card p-6">
-              <h2 className="text-lg font-semibold tracking-tight">{feature.title}</h2>
-              <p className="mt-3 text-sm leading-7 text-fd-muted-foreground">{feature.body}</p>
-            </article>
-          ))}
-        </section>
+        {/* ── Features ── */}
+        <RevealGroup delay={150} className="mt-24">
+          <div className="grid gap-4 md:grid-cols-3">
+            {content.features.map((feature, i) => {
+              const Icon = featureIcons[i];
+              return (
+                <article
+                  key={feature.title}
+                  className="group rounded-2xl border bg-fd-card p-6 transition-all hover:shadow-md"
+                >
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border bg-fd-secondary text-fd-muted-foreground transition-colors">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-lg font-semibold tracking-tight">{feature.title}</h2>
+                  <p className="mt-2 text-sm leading-7 text-fd-muted-foreground">{feature.body}</p>
+                </article>
+              );
+            })}
+          </div>
+        </RevealGroup>
 
         {/* ── Paths ── */}
-        <section className="mt-20 grid gap-4 md:grid-cols-3">
-          {content.paths.map((path) => (
-            <DynamicLink
-              key={path.title}
-              href={path.href}
-              className="group rounded-[1.5rem] border bg-fd-card p-6 transition-colors hover:bg-fd-accent"
-            >
-              <h3 className="text-lg font-semibold tracking-tight">{path.title}</h3>
-              <p className="mt-2 text-sm leading-7 text-fd-muted-foreground">{path.body}</p>
-              <p className="mt-4 text-sm font-semibold underline-offset-4 group-hover:underline">
-                {path.cta} →
-              </p>
-            </DynamicLink>
-          ))}
-        </section>
+        <RevealGroup delay={300} className="mt-24">
+          <h2 className="text-center text-2xl font-semibold tracking-tight md:text-3xl">
+            {isChinese ? '从合适的起点开始' : 'Choose a starting point'}
+          </h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {content.paths.map((path) => (
+              <DynamicLink
+                key={path.title}
+                href={path.href}
+                className="group rounded-2xl border bg-fd-card p-6 transition-all hover:shadow-md hover:bg-fd-accent"
+              >
+                <h3 className="text-lg font-semibold tracking-tight">{path.title}</h3>
+                <p className="mt-2 text-sm leading-7 text-fd-muted-foreground">{path.body}</p>
+                <p className="mt-4 text-sm font-semibold underline-offset-4 transition-all group-hover:underline">
+                  {path.cta} →
+                </p>
+              </DynamicLink>
+            ))}
+          </div>
+        </RevealGroup>
 
         {/* ── Footer ── */}
-        <p className="mt-20 text-center text-xs text-fd-muted-foreground/60">
+        <p className="mt-24 text-center text-xs text-fd-muted-foreground/50">
           {content.footer}
         </p>
       </div>
