@@ -66,8 +66,8 @@ cell AddOne(x: in UInt<8>, y: out UInt<8>) {
 ```
 
 编译器报错时这样说：
-- `expected 'UInt<8>', found 'UInt<16>'` —— 而不是 `type mismatch; found: chisel3.core.UInt, required: chisel3.core.UInt` 加上 Scala 栈追踪
-- `multiple drivers for signal 'y'` —— 经过编译器硬件语义分析后报告，而不是综合时才暴露
+- `expected 'UInt<8>', found 'UInt<16>'` —— 错误信息直接给出期望类型和实际类型，没有无关的栈追踪
+- `multiple drivers for signal 'y'` —— 编译器在硬件语义分析阶段就能报告
 - `port 'b' not connected in instance 'inst'` —— 编译器知道什么是"端口连接"，不需要额外工具
 
 每条错误都直说硬件术语。

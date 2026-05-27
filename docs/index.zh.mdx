@@ -210,7 +210,7 @@ sylc examples/mvp/comb_alu.syl
 
 ## 保存输出到文件
 
-如果你想把编译结果保存到文件而不是打印到终端，用 `-o` 参数：
+用 `-o` 参数把编译结果保存到文件：
 
 ```bash
 sylc examples/mvp/counter.syl -o counter.sv
@@ -245,7 +245,7 @@ error[E_DRIVER_OVERLAP]: multiple drivers for signal 'y'
   │   ----- second driver here
 ```
 
-错误信息告诉你：信号 `y` 被两个来源驱动，分别是第 2 行的 `y := 0` 和第 3 行的 `y := 1`。编译器知道一个信号只能有一个驱动源。如果你需要多个条件赋值，用 `select` 语句，而不是多条赋值。
+错误信息告诉你：信号 `y` 被两个来源驱动，分别是第 2 行的 `y := 0` 和第 3 行的 `y := 1`。编译器知道一个信号只能有一个驱动源。多个条件赋值请用 `select` 语句。
 
 ### 类型不匹配
 
