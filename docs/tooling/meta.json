@@ -6,6 +6,7 @@
     "systemverilog-emission",
     "extern-and-ip",
     "lsp-and-editors",
+    "ai-prompt",
     "rust-embedding",
     "session-and-query"
   ]

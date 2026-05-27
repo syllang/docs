@@ -151,8 +151,8 @@ assert(W > 0, "width must be positive")
 标准库代码和其他 Syl 代码一样经过完整编译。这意味着标准库中的错误也会被编译器捕获。
 
 ```syl
-# 标准库中的 Stream 接口定义在 examples/std/stream.syl 中
-# 使用 use 导入后，它和其他接口定义没有区别
+// 标准库中的 Stream 接口定义在 examples/std/stream.syl 中
+// 使用 use 导入后，它和其他接口定义没有区别
 ```
 
 编译器从 `--std` 参数指定的目录加载标准库。默认值是 `examples/std/`。
@@ -183,8 +183,8 @@ use std.stage.Stage
 ### 标准库导入路径错误
 
 ```syl
-# use stream.Stream    # 错误
-use std.stream.Stream   # 正确
+# use stream.Stream    // 错误
+use std.stream.Stream   // 正确
 ```
 
 标准库路径以 `std.` 开头。
@@ -192,7 +192,7 @@ use std.stream.Stream   # 正确
 ### 忘记导入接口
 
 ```syl
-# cell Top(stream: out Stream<UInt<8>>.source) { }  # 错误：Stream 未定义
+# cell Top(stream: out Stream<UInt<8>>.source) { }  // 错误：Stream 未定义
 ```
 
 使用标准库类型之前必须先 `use` 导入。
@@ -200,7 +200,7 @@ use std.stream.Stream   # 正确
 ### 类型参数不匹配
 
 ```syl
-# let s = place stage_link<UInt<8>>(up: input)  # 错误：缺少 D: Domain 参数
+# let s = place stage_link<UInt<8>>(up: input)  // 错误：缺少 D: Domain 参数
 ```
 
 Stage 组件需要时钟域参数。实例化时确保所有类型参数都正确指定。

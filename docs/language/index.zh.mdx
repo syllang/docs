@@ -99,19 +99,19 @@ Syl 的信号赋值有三种形式，每种用于不同的场景：
 **连续赋值 `:=`。** 赋值持续生效。右侧值变化时左侧立即更新。对应 Verilog 的 `assign`。
 
 ```syl
-y := x and enable    # y 持续跟随 x and enable 的值
+y := x and enable    // y 持续跟随 x and enable 的值
 ```
 
 **寄存器下一状态 `next`。** 值在时钟边沿采样到寄存器。对应 Verilog 的时序逻辑。
 
 ```syl
-next count := count + 1    # 每个时钟周期 count 加 1
+next count := count + 1    // 每个时钟周期 count 加 1
 ```
 
 **绑定赋值 `let`。** 创建一个名字别名，不生成硬件。
 
 ```syl
-let sum = a + b            # sum 是 a + b 的别名，不占用硬件
+let sum = a + b            // sum 是 a + b 的别名，不占用硬件
 ```
 
 ## 条件选择

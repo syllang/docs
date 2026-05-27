@@ -149,7 +149,7 @@ let inst = place Counter<8>(
 
 ```syl
 let cnt = place Counter<8>(enable: en, count: cnt_val)
-signal val: UInt<8> := cnt.count    # 访问实例的输出端口
+signal val: UInt<8> := cnt.count    // 访问实例的输出端口
 ```
 
 ### 无绑定实例化
@@ -166,8 +166,8 @@ place Driver(clk: clk, data: data_out)
 
 ```syl
 let inst = place Add(
-    y: b,        # 顺序不重要
-    x: a,        # 和声明顺序不同也可以
+    y: b,        // 顺序不重要
+    x: a,        // 和声明顺序不同也可以
     result: r,
 )
 ```
@@ -196,7 +196,7 @@ extern cell VendorIP(
 
 ```syl
 cell Bad(x: in Bit) {
-    x := 1    # 错误：in 端口不能被赋值
+    x := 1    // 错误：in 端口不能被赋值
 }
 ```
 
@@ -206,7 +206,7 @@ cell Bad(x: in Bit) {
 
 ```syl
 cell Bad(y: out Bit) {
-    signal s: Bit := y    # 错误：out 端口不能被读取
+    signal s: Bit := y    // 错误：out 端口不能被读取
 }
 ```
 
@@ -217,7 +217,7 @@ cell Bad(y: out Bit) {
 ```syl
 cell Sub(a: in Bit, b: out Bit) { }
 cell Top(y: out Bit) {
-    let s = place Sub(a: y)    # 错误：b 未连接
+    let s = place Sub(a: y)    // 错误：b 未连接
 }
 ```
 
@@ -228,7 +228,7 @@ cell Top(y: out Bit) {
 ```syl
 cell Sub(data: in Bit) { }
 cell Top {
-    let s = place Sub(dat: 1)    # 错误：Sub 没有名为 dat 的端口
+    let s = place Sub(dat: 1)    // 错误：Sub 没有名为 dat 的端口
 }
 ```
 

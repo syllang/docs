@@ -195,7 +195,7 @@ interface Request<T> {
 ### 视图方向不匹配
 
 ```syl
-# 发送方的 source 视图必须连接接收方的 sink 视图
+// 发送方的 source 视图必须连接接收方的 sink 视图
 # source → sink，不能 source → source
 ```
 
@@ -206,7 +206,7 @@ interface Bad {
     a: Bit
     b: Bit
     view v { out a }
-    # 错误：b 没有被 view v 包含
+    // 错误：b 没有被 view v 包含
 }
 ```
 

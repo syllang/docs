@@ -83,11 +83,11 @@ next count := select {
 - `:=` 是连续赋值。值立即更新。对应 Verilog 的 `assign`。
 
 ```syl
-signal s: UInt<8>           # 组合信号
+signal s: UInt<8>           // 组合信号
 reg r: UInt<8> reset(rst, 0)
 
-s := count + 1              # s 立即跟随 count + 1
-next r := count + 1         # r 在下一个时钟边沿更新
+s := count + 1              // s 立即跟随 count + 1
+next r := count + 1         // r 在下一个时钟边沿更新
 ```
 
 ## 寄存器使用模式
@@ -227,17 +227,17 @@ cell MixedExample<D: Domain>(
 ) {
     reg count: UInt<8> reset(rst, 0)
 
-    # 组合逻辑：计算下一状态
+    // 组合逻辑：计算下一状态
     signal next_count: UInt<8> := select {
         inc => count + 1,
         dec => count - 1,
         default => count,
     }
 
-    # 时序逻辑：更新寄存器
+    // 时序逻辑：更新寄存器
     next count := next_count
 
-    # 组合逻辑：输出
+    // 组合逻辑：输出
     value := count
 }
 ```
@@ -276,7 +276,7 @@ cell DualDomain(
 
 ```syl
 reg count: UInt<8> reset(rst, 0)
-# 缺少 next count := ...
+// 缺少 next count := ...
 ```
 
 寄存器必须有 `next` 赋值，否则编译器无法确定它的下一状态。
@@ -285,7 +285,7 @@ reg count: UInt<8> reset(rst, 0)
 
 ```syl
 reg count: UInt<8> reset(rst, 0)
-# count := count + 1    # 应该是 next count := count + 1
+# count := count + 1    // 应该是 next count := count + 1
 ```
 
 使用 `next` 而不是 `:=` 来定义寄存器的下一状态。
@@ -294,7 +294,7 @@ reg count: UInt<8> reset(rst, 0)
 
 ```syl
 cell Top(clk: in Bit) {
-    reg count: UInt<8> reset(clk, 0)    # 错误：clk 不是 Reset<D> 类型
+    reg count: UInt<8> reset(clk, 0)    // 错误：clk 不是 Reset<D> 类型
 }
 ```
 

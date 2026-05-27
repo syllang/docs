@@ -53,8 +53,8 @@ cell Counter<W: Nat = 8>(
     count: out UInt<W>,
 )
 
-let cnt = place Counter(enable: en, count: out)  # W = 8
-let cnt32 = place Counter<32>(enable: en, count: out)  # W = 32
+let cnt = place Counter(enable: en, count: out)  // W = 8
+let cnt32 = place Counter<32>(enable: en, count: out)  // W = 32
 ```
 
 有默认值的参数在实例化时可以省略。
@@ -95,11 +95,11 @@ cell FlipFlop<D: Domain>(
 ```syl
 cell Top(
     clk_a: in Clock<A>,
-    rst_b: in Reset<B>,    # A 和 B 是不同域
+    rst_b: in Reset<B>,    // A 和 B 是不同域
     d: in Bit,
     q: out Bit,
 ) {
-    # reg r: Bit reset(rst_b, 0)  # 错误：时钟是 A，复位是 B
+    // reg r: Bit reset(rst_b, 0)  // 错误：时钟是 A，复位是 B
 }
 ```
 
@@ -208,7 +208,7 @@ cell ComputeUnit<T>(
 ### 值参数不是 Nat
 
 ```syl
-# cell Bad<W>(enable: in Bit) { }  # 错误：W 缺少类型
+# cell Bad<W>(enable: in Bit) { }  // 错误：W 缺少类型
 ```
 
 值参数必须显式声明为 `Nat`。
@@ -218,7 +218,7 @@ cell ComputeUnit<T>(
 ```syl
 cell Counter<W: Nat>(enable: in Bit, count: out UInt<W>)
 
-# let c = place Counter(enable: en, count: out)  # 错误：缺少 W
+# let c = place Counter(enable: en, count: out)  // 错误：缺少 W
 ```
 
 没有默认值的参数在实例化时必须指定。
@@ -230,7 +230,7 @@ cell Mem<W: Nat>(data: in UInt<W>) {
     if W > 64 { compile_error("width too large") }
 }
 
-# let m = place Mem<128>(data: d)  # 编译错误：width too large
+# let m = place Mem<128>(data: d)  // 编译错误：width too large
 ```
 
 参数值在实例化时检查。
