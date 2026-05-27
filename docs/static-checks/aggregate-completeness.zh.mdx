@@ -1,0 +1,89 @@
+---
+title: 聚合完整性
+description: Syl 编译器对 bundle 字段和 interface 视图的完整性检查。
+---
+
+# 聚合完整性
+
+Syl 编译器检查 `bundle` 构造、`interface` 字段和 `match` 表达式的完整性。本文说明检查规则。
+
+---
+
+## bundle 构造完整性
+
+构造 bundle 时必须提供所有字段：
+
+```syl
+bundle Pair { left: Bit, right: Bit }
+
+signal p: Pair := Pair { left: 1, right: 0 }    # 正确
+# signal q: Pair := Pair { left: 1 }             # 错误：缺少 right
+```
+
+## interface 视图完整性
+
+interface 的所有字段必须被视图包含：
+
+```syl
+interface Bad {
+    a: Bit
+    b: Bit
+    view v { out a }
+    # 错误：b 没有被 view v 包含
+}
+```
+
+每个视图应该包含或排除所有接口字段。
+
+## match 完整性
+
+`match` 表达式必须覆盖所有枚举变体：
+
+```syl
+enum State { Idle, Run, Done }
+
+signal next: State := match state {
+    .Idle => .Run,
+    .Run => .Done,
+    # 错误：缺少 .Done 分支
+}
+```
+
+## 实例化连接完整性
+
+实例化时所有端口必须连接：
+
+```syl
+cell Sub(a: in Bit, b: out Bit)
+cell Top(y: out Bit) {
+    let s = place Sub(a: y)
+    # 错误：Sub 的 b 端口未连接
+}
+```
+
+## 常见错误
+
+### bundle 字段缺少
+
+```syl
+bundle Wide { a: Bit, b: Bit, c: Bit }
+signal w: Wide := Wide { a: 1, b: 0 }    # 错误：缺少 c
+```
+
+### match 分支缺少
+
+```syl
+enum State { A, B, C }
+signal next: State := match state {
+    .A => .B,
+    .B => .C,
+    # 错误：缺少 .C
+}
+```
+
+### 实例化端口缺少
+
+```syl
+cell Inst(x: in Bit, y: out Bit, z: in Bit)
+let i = place Inst(x: 1, y: out_sig)    # 错误：z 未连接
+```

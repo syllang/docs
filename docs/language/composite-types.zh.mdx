@@ -1,0 +1,346 @@
+---
+title: 复合类型
+description: bundle（结构体）、enum（枚举）和数组类型的使用方法。
+---
+
+# 复合类型
+
+Syl 的复合类型将多个值组合为一个整体。有三种复合类型：`bundle`（类似结构体）、`enum`（枚举）和 `[N] T`（数组）。
+
+---
+
+## bundle
+
+`bundle` 将多个字段组合为一个数据结构。它类似于 Verilog 的 `struct` 或 Chisel 的 `Bundle`。
+
+### 声明
+
+```syl
+bundle Packet {
+    data: UInt<8>,
+    last: Bit,
+    valid: Bit,
+}
+
+bundle AluCmd<W: Nat> {
+    op: AluOp,
+    a: UInt<W>,
+    b: UInt<W>,
+}
+```
+
+`bundle` 可以携带泛型参数，字段类型可以使用这些参数。
+
+### 构造
+
+使用聚合语法创建 bundle 值：
+
+```syl
+signal pkt: Packet := Packet {
+    data: 42,
+    last: 1,
+    valid: 1,
+}
+```
+
+所有字段都必须赋值。编译器检查每个字段的类型是否匹配。
+
+### 访问
+
+使用点号访问字段：
+
+```syl
+signal d: UInt<8> := pkt.data
+signal v: Bit := pkt.valid
+```
+
+### bundle 作为端口类型
+
+bundle 可以用作模块端口的类型：
+
+```syl
+cell ProcessPacket(
+    pkt_in: in Packet,
+    pkt_out: out Packet,
+) {
+    pkt_out.data := pkt_in.data + 1
+    pkt_out.last := pkt_in.last
+    pkt_out.valid := pkt_in.valid
+}
+```
+
+## enum
+
+`enum` 定义一组命名的值。它用于状态机、指令解码和模式选择。
+
+### 声明
+
+```syl
+enum State {
+    Idle,
+    Running,
+    Done,
+}
+
+enum AluOp {
+    Add,
+    Sub,
+    Xor,
+    Or,
+}
+```
+
+枚举变体是名称，没有关联数据。
+
+### 使用
+
+```syl
+signal state: State := State.Idle
+
+signal next_state: State := match state {
+    State.Idle => State.Running,
+    State.Running => State.Done,
+    State.Done => State.Idle,
+}
+
+signal result: UInt<8> := match op {
+    AluOp.Add => a + b,
+    AluOp.Sub => a - b,
+    AluOp.Xor => a xor b,
+    AluOp.Or => a or b,
+}
+```
+
+引用枚举变体时必须使用限定名，例如 `State.Idle`。编译器从基础表达式确定变体所属的枚举类型，不支持和 Verilog 类似的裸变体名引用。
+
+### 匹配完整性检查
+
+`match` 表达式必须覆盖所有枚举变体：
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Running,
+    State.Running => State.Done,
+    # 错误：缺少 State.Done 分支
+}
+```
+
+编译器检查匹配是否完整。缺少分支会导致编译错误。
+
+## 数组
+
+`[N] T` 包含 N 个类型为 T 的元素。N 在编译期确定。
+
+### 声明
+
+```syl
+signal arr: [4] UInt<8>          # 4 个 8 位无符号整数
+signal matrix: [16] [16] Bit     # 16x16 的 Bit 矩阵
+```
+
+### 访问
+
+使用索引访问数组元素：
+
+```syl
+signal first: UInt<8> := arr[0]
+signal second: UInt<8> := arr[1]
+arr[2] := 42
+```
+
+索引必须是编译期常量，或者在展开阶段可确定的表达式。
+
+### 遍历
+
+使用 `for` 在编译期展开遍历：
+
+```syl
+signal results: [4] UInt<8> := for i in 0..4 {
+    compute(inputs[i])
+}
+```
+
+`for` 循环在编译期展开，生成 4 份独立的 `compute` 实例。
+
+### 数组作为端口
+
+```syl
+cell Crossbar<W: Nat, N: Nat>(
+    inputs: in [N] UInt<W>,
+    sel: in UInt<8>,
+    output: out UInt<W>,
+) {
+    output := inputs[sel]
+}
+```
+
+数组端口在多通道设计中很有用。
+
+## 组合使用
+
+复合类型可以嵌套使用：
+
+```syl
+enum Color { Red, Green, Blue }
+
+bundle Pixel {
+    color: Color,
+    intensity: UInt<8>,
+}
+
+signal line: [64] Pixel
+signal first_pixel: Pixel := line[0]
+signal first_color: Color := first_pixel.color
+```
+
+## bundle 的布局控制
+
+Syl 默认按字段声明顺序排列 bundle 的位布局。可以通过属性控制布局：
+
+```syl
+@layout(packed)
+bundle PackedWord<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+```
+
+`@layout(packed)` 确保字段在内存中连续排列，没有填充位。这对于需要精确控制位布局的协议接口很有用。
+
+## 使用模式：状态机
+
+状态机是 enum 和 bundle 配合使用的常见场景：
+
+```syl
+enum State {
+    Idle,
+    Read,
+    Write,
+    Error,
+}
+
+bundle Control {
+    state: State,
+    addr: UInt<16>,
+    data: UInt<8>,
+}
+
+cell SimpleFSM(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    start: in Bit,
+    done: out Bit,
+) {
+    reg ctrl: Control
+    signal next_state: State := match ctrl.state {
+        State.Idle =>
+            select { start => State.Read, default => State.Idle },
+        State.Read => State.Write,
+        State.Write => State.Done,
+        State.Done => State.Idle,
+    }
+    next ctrl.state := next_state
+    done := ctrl.state == State.Done
+}
+```
+
+## 使用模式：寄存 bundle
+
+bundle 可以整体存到寄存器中：
+
+```syl
+bundle Channel {
+    data: UInt<8>,
+    valid: Bit,
+}
+
+cell ChannelReg(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_ch: in Channel,
+    out_ch: out Channel,
+) {
+    reg saved: Channel reset(rst, Channel { data: 0, valid: 0 })
+
+    next saved := in_ch
+    out_ch := saved
+}
+```
+
+整个 bundle 作为寄存器值，所有字段同时更新。
+
+## 使用模式：流数据包
+
+```syl
+bundle Packet<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+
+cell PacketBuffer<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_stream: in Stream<Packet<W>>.sink,
+    out_stream: out Stream<Packet<W>>.source,
+) {
+    # 处理 Packet 数据
+    out_stream.payload.data := in_stream.payload.data + 1
+    out_stream.payload.last := in_stream.payload.last
+    out_stream.valid := in_stream.valid
+    in_stream.ready := out_stream.ready
+}
+```
+
+`Packet<W>` 作为 `Stream` 接口的负载类型，展示复合类型和接口的配合使用。
+
+## 常见错误
+
+### 未覆盖的枚举分支
+
+```syl
+signal next: State := match state {
+    .Idle => .Running,
+    # 缺少 .Running 和 .Done
+}
+```
+
+编译器报告匹配不完整。需要添加所有分支，或添加 `default` 分支。
+
+### 数组越界
+
+```syl
+signal arr: [4] UInt<8>
+signal x: UInt<8> := arr[4]    # 错误：索引超出范围 0-3
+```
+
+数组索引必须小于数组长度。编译器检查编译期可见的越界索引。
+
+### bundle 字段类型不匹配
+
+```syl
+bundle Pair { left: UInt<8>, right: UInt<8> }
+signal p: Pair := Pair { left: 42, right: 1 }    # 正确
+
+bundle Wide { value: UInt<16> }
+# signal p: Pair := Pair { left: 42, right: Wide { value: 1 } }  # 错误：类型不匹配
+```
+
+构造 bundle 时每个字段的类型必须匹配声明。

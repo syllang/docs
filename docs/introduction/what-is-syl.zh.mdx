@@ -1,0 +1,185 @@
+---
+title: Syl 是什么
+description: 认识 Syl——一门独立于宿主语言、原生支持硬件语义的数字电路描述语言。
+---
+
+# Syl 是什么
+
+Syl 是一门用于数字电路设计的硬件描述语言。你可以用 Syl 描述寄存器、组合逻辑、流水线和接口连接。Syl 编译器将你的设计转换为 SystemVerilog 代码，交给下游工具综合和验证。
+
+本文从第一性原理说明 Syl 的设计选择，以及它和现有 HDL 的根本区别。
+
+---
+
+## 现有 HDL 的两种路径
+
+数字硬件描述的语言目前走两条路。
+
+**传统 HDL：Verilog / VHDL。** 这类语言直接描述硬件结构，但类型系统弱。把 8 位信号连到 16 位端口上编译器不报错；同一个信号被两个赋值驱动也不报错。错误在仿真阶段才暴露。
+
+**嵌入式 DSL：Chisel / SpinalHDL。** 这类语言内嵌在 Scala 中，利用 Scala 的类型系统在编译期做检查。Scala 的类型检查捕获了一部分宽度和端口错误，FIRRTL 后端（Chisel）或 Scala 运行时（SpinalHDL）再做进一步的硬件规则检查。
+
+两条路径都源于同一个历史原因：硬件行业没有一个既具备强类型系统、又专为硬件设计而生的独立语言。
+
+Syl 走第三条路：**一门独立的、硬件语义原生的类型安全语言。**
+
+## Syl vs 嵌入式 DSL 的根本差异
+
+"内嵌在 Scala 中"不是一种实现细节，它决定了工具的每一层体验。
+
+| 维度 | Chisel / SpinalHDL | Syl |
+|------|-------------------|-----|
+| **宿主依赖** | 需要 Scala 工具链（sbt、JVM）、Scala 版本管理 | `sylc input.syl`，静态链接的单个二进制 |
+| **硬件错误的信息路径** | Scala 类型错误 → FIRRTL 通行 → 硬件语义错误，跨三层翻译 | 编译器以 Syl 术语直接报告，一步到位 |
+| **展开模型** | Scala 运行时执行，支持任意 Scala 代码（含副作用） | `fn` / `const` 编译期求值，纯函数，无副作用 |
+| **语言学习路径** | 先学 Scala，再学硬件库的用法 | 直接学一门专为硬件设计的语言 |
+| **时钟域语义** | 时钟只是普通 wire，跨域连接无语言级检查 | `Clock<D>` / `Reset<D>` 是类型参数，跨域连接编译期拒绝 |
+| **层次控制** | Component（SpinalHDL）或 Module（Chisel），无内联展开的独立语法 | `cell`（默认独立层次）、`inplace` 标记内联展开，实例化时决定 |
+| **接口方向** | `Flipped` / `IMasterSlave` 通过运行期方法调用设置 | `view source / sink` 在语法层面声明，编译期固定 |
+
+这张表的核心信息是：**嵌入 DSL 的每个优势（复用宿主语言的能力）都有对应的代价（宿主语言泄漏到硬件语义中）。** Syl 不接受这种打包交易。
+
+## Syl 解决什么问题
+
+### 嵌入 DSL 引入的新问题
+
+Chisel 和 SpinalHDL 解决了传统 HDL 的类型安全问题，但它们引入了另一类问题。
+
+**宿主语言泄漏。** 你在 Chisel 中写 `RegInit(0.U(8.W))`，这行代码通过了 Scala 的类型检查，但真正的问题是："0.U(8.W) 这个 Scala 表达式生成的硬件语义是什么？" 当出问题时，错误信息先经过 Scala 编译器，然后经过 FIRRTL 通行，最后才到达你的代码。多层翻译意味着多层噪音。
+
+**展开的不可预测性。** 因为展开阶段是 Scala 运行时，它可以执行任意代码——包括文件读写、网络请求、可变状态。这意味着同一个 Chisel 模块，在不同上下文下实例化可能产生不同的硬件。定位问题需要同时理解 Scala 执行路径和硬件生成逻辑。
+
+**工具链启动成本。** 搭建 Chisel 项目需要安装 sbt、JVM、正确版本的 Scala，配置 `build.sbt`。从 git clone 到看到第一个错误，通常需要 10-30 分钟。Syl 从下载编译器到编译第一个文件，按秒计算。
+
+### Syl 的解法：把硬件语义放在语言里
+
+Syl 不做的事：不把 Scala 当作元语言来生成代码。
+
+Syl 做的事：设计一门语言，让**编译器从一开始就理解什么是 hardware module、什么是 clock、什么是 reset、什么是 valid-ready 握手**。
+
+这意味着：
+
+```syl
+cell AddOne(x: in UInt<8>, y: out UInt<8>) {
+    y := x + 1
+}
+```
+
+编译器报错时这样说：
+- `expected 'UInt<8>', found 'UInt<16>'` —— 而不是 `type mismatch; found: chisel3.core.UInt, required: chisel3.core.UInt` 加上 Scala 栈追踪
+- `multiple drivers for signal 'y'` —— 经过编译器硬件语义分析后报告，而不是综合时才暴露
+- `port 'b' not connected in instance 'inst'` —— 编译器知道什么是"端口连接"，不需要额外工具
+
+每条错误都直说硬件术语。
+
+## Syl 不是
+
+**Syl 不是综合工具。** Syl 编译器输出 SystemVerilog，你需要用标准的综合工具（如 Yosys、Design Compiler）将 SV 转换为网表。
+
+**Syl 不是验证框架。** Syl 做静态检查，但不提供形式化验证或仿真环境。验证仍然使用现有的 SV 仿真流程。
+
+**Syl 不通用。** Syl 专为数字硬件设计，不适合模拟电路、混合信号或软件编程。
+
+**Syl 不是 Chisel/SpinalHDL 的替代品。** Syl 是一个不同的设计选择：如果你接受独立语言的代价（需要学新语法、标准库小、工具链早期），你能得到的是更直接的错误信息、无副作用的编译期求值、和零宿主依赖的编译器。
+
+## Syl 与 Verilog 的关键差异
+
+| 特性 | Verilog | Syl |
+|------|---------|-----|
+| 端口连接 | 不检查类型和宽度 | 编译期检查 |
+| 多驱动检测 | 不检查 | 编译期报告错误 |
+| 位宽自动推导 | 部分支持 | 显式声明或推断 |
+| 泛型参数 | parameter 字符串替换 | 类型安全的泛型 |
+
+Syl 和 Verilog 的差异是传统 HDL 和类型安全 HDL 的差异，这部分 Chisel/SpinalHDL 也能做到。Syl 和嵌入 DSL 的差异才是 Syl 独有的。
+
+## 当前状态
+
+Syl 处于早期开发阶段。编译器可以处理小型到中型的数字设计，可以生成可综合的 SystemVerilog。标准库提供流接口、流水线阶段等基本构造。
+
+适合用于：评估语言设计、尝试新项目原型、学习硬件描述语言的新思路。
+
+## 更多示例
+
+### 带泛型参数的模块
+
+```syl
+cell Counter<W: Nat>(
+    enable: in Bit,
+    load: in UInt<W>,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W>
+    signal next_value: UInt<W> :=
+        select {
+            enable => value + 1,
+            default => value,
+        }
+    next value := next_value
+    count := value
+}
+```
+
+`<W: Nat>` 声明一个类型参数 W，它必须是一个自然数。实例化时指定具体值：
+
+```syl
+let cnt8 = place Counter<8>(enable: en, count: cnt_val)
+```
+
+### 使用接口和视图
+
+Syl 的 `interface` 将相关端口组合在一起。`view` 定义从不同角度看到的端口方向：
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+发送方的视图是 `source`（输出数据和控制信号，接收反馈信号）。接收方的视图是 `sink`（接收数据和控制信号，发送反馈信号）。
+
+### 寄存器与下一状态
+
+```syl
+cell ShiftRegister(clk: in Clock<D>, rst: in Reset<D>, data: in Bit, q: out Bit) {
+    reg r0: Bit reset(rst, 0)
+    reg r1: Bit reset(rst, 0)
+    reg r2: Bit reset(rst, 0)
+
+    next r0 := data
+    next r1 := r0
+    next r2 := r1
+    q := r2
+}
+```
+
+三个寄存器串联成移位寄存器。每个时钟周期数据向右移动一位。
+
+## 如何开始
+
+Syl 编译器使用 Rust 构建。在安装了 Rust 工具链的系统上，克隆仓库后运行：
+
+```
+cargo build --release
+./target/release/sylc input.syl
+```
+
+编译器接受一个或多个 `.syl` 源文件，输出 SystemVerilog 代码到标准输出。
+
+详细的安装和使用说明在 [CLI 参考](/zh/docs/reference/cli) 中。
+
+如果你有 Syl 相关的使用问题或设计反馈，可以在项目仓库中提交 issue 讨论。

@@ -1,0 +1,80 @@
+---
+title: 类型与宽度不匹配
+description: Syl 编译器对类型和位宽一致性的检查规则。
+---
+
+# 类型与宽度不匹配
+
+Syl 编译器检查每个赋值和表达式中的类型和位宽是否一致。本文说明检查规则和常见错误。
+
+---
+
+## 检查规则
+
+### 赋值类型匹配
+
+赋值左侧和右侧的类型必须一致：
+
+```syl
+signal a: UInt<8> := 42       # 正确：UInt<8> = UInt<8>
+signal b: UInt<16> := a       # 错误：UInt<16> ≠ UInt<8>
+```
+
+编译器不会自动扩展或截断位宽。
+
+### 二元运算类型匹配
+
+二元运算的两个操作数必须类型一致：
+
+```syl
+signal r: UInt<8> := a + b    # 正确：两者都是 UInt<8>
+# signal s: UInt<8> := x + y  # 错误：x 是 UInt<8>，y 是 UInt<16>
+```
+
+### 选择分支类型一致
+
+`select` 和 `match` 的所有分支必须返回相同类型：
+
+```syl
+signal s: UInt<8> := select {
+    a => 1,                    # UInt<8>
+    b => 2,                    # UInt<8>
+    default => 0,              # UInt<8>
+}
+```
+
+## Bit 和 UInt 的区别
+
+`Bit` 和 `UInt<1>` 是不同的类型：
+
+```syl
+signal b: Bit
+signal u: UInt<1>
+
+# u := b    # 错误
+# b := u    # 错误
+```
+
+## 常见错误
+
+### 隐式宽度扩展
+
+```syl
+signal narrow: UInt<4> := 15
+signal wide: UInt<8>
+wide := narrow    # 错误：UInt<8> ≠ UInt<4>
+```
+
+### 字面量超出范围
+
+```syl
+signal a: UInt<4> := 16    # 错误：超出 0-15 范围
+```
+
+### 函数调用参数类型不匹配
+
+```syl
+fn add(a: UInt<8>, b: UInt<8>) -> UInt<8> { return a + b }
+signal x: UInt<16>
+# add(x, 1)    # 错误：UInt<16> ≠ UInt<8>
+```

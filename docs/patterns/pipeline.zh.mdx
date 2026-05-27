@@ -1,0 +1,249 @@
+---
+title: 流水线
+description: 多级流水线的构建和控制——使用标准库的 Stage 和 Pipeline 组件。
+---
+
+# 流水线
+
+流水线是数字硬件设计中的常见模式。它将一个处理过程拆分为多个阶段，每个阶段在一个时钟周期内完成一部分工作。多个阶段同时工作，提高整体吞吐量。
+
+本文说明如何使用 Syl 标准库的 Stage 组件构建流水线。
+
+---
+
+## 流水线的概念
+
+非流水线设计：每个操作需要 N 个时钟周期完成，下一个操作必须等前一个完成才能开始。
+
+流水线设计：每个操作需要 N 个时钟周期完成，但每周期可以开始一个新的操作。N 个操作同时在不同阶段进行。
+
+流水线的关键是每一级保存自己的状态，级与级之间传递数据。
+
+## 标准库 Stage 组件
+
+标准库提供流水线阶段组件，位于 `std.stage` 包中。
+
+```syl
+use std.stage.Stage
+use std.stage.stage_from_stream
+use std.stage.stage_to_stream
+use std.stage.stage_link
+use std.stage.halt_link
+use std.stage.drop_link
+```
+
+### Stage 接口
+
+`Stage` 是一个基本的流水线阶段。它有输入和输出，数据在时钟边沿从输入传递到输出。
+
+### stage_from_stream
+
+从 Stream 创建流水线输入阶段。它将 Stream 的 valid-ready 握手转换为流水线内部的传递信号。
+
+```syl
+use std.stream.Stream
+use std.stage.stage_from_stream
+
+let in_stage = place stage_from_stream<UInt<8>>(
+    stream: input_stream,
+)
+```
+
+### stage_to_stream
+
+从流水线输出阶段创建 Stream。它将流水线内部的传递信号转换回 valid-ready 握手。
+
+```syl
+use std.stage.stage_to_stream
+
+let out_stream = place stage_to_stream<UInt<8>>(
+    stage: last_stage,
+)
+```
+
+### stage_link
+
+连接两个流水线阶段。数据在时钟边沿从上游传递到下游。两个阶段之间可以插入组合逻辑。
+
+```syl
+use std.stage.stage_link
+
+let linked = place stage_link<UInt<8>, D>(
+    clk: clk,
+    rst: rst,
+    up: in_stage,
+)
+```
+
+### halt_link
+
+可暂停的流水线连接。`halt` 信号为 1 时，流水线的上游阶段暂停，保持当前数据不变。
+
+```syl
+let halted = place halt_link<UInt<8>>(
+    up: in_stage,
+    halt: stall_signal,
+)
+```
+
+### drop_link
+
+可丢弃数据的流水线连接。`drop` 信号为 1 时，当前数据被丢弃，不传递到下游。
+
+```syl
+let dropped = place drop_link<UInt<8>>(
+    up: in_stage,
+    drop: flush_signal,
+)
+```
+
+## 完整示例：流水线 ALU
+
+下面是一个完整的流水线 ALU 示例。它有三个阶段：指令解码、执行和结果输出。
+
+```syl
+use std.stream.Stream
+use std.stage.stage_from_stream
+use std.stage.stage_link
+use std.stage.stage_to_stream
+
+# 数据类型定义
+bundle AluCmd<W: Nat> {
+    op: UInt<4>,
+    a: UInt<W>,
+    b: UInt<W>,
+}
+
+bundle Decoded<W: Nat> {
+    add: Bit,
+    a: UInt<W>,
+    b: UInt<W>,
+}
+
+bundle AluRsp<W: Nat> {
+    data: UInt<W>,
+}
+
+# 组合逻辑：指令解码
+map decode_cmd<W: Nat>(cmd: AluCmd<W>) -> Decoded<W> =
+    Decoded<W> {
+        add: cmd.op == 0,
+        a: cmd.a,
+        b: cmd.b,
+    }
+
+# 组合逻辑：执行
+map execute_cmd<W: Nat>(cmd: Decoded<W>) -> UInt<W> =
+    select unique {
+        cmd.add => cmd.a + cmd.b,
+        default => cmd.a xor cmd.b,
+    }
+
+# 流水线 ALU 主模块
+cell PipelinedAlu<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    stall_decode: in Bit,
+    cmd_in: in Stream<AluCmd<W>>.sink,
+    rsp_out: out Stream<AluRsp<W>>.source,
+) {
+    # 阶段 1：输入
+    let in_stage = place stage_from_stream<AluCmd<W>>(
+        stream: cmd_in,
+    )
+
+    # 阶段 1→2：可暂停的连接
+    let decode_ctrl = place halt_link<AluCmd<W>>(
+        up: in_stage,
+        halt: stall_decode,
+    )
+
+    # 阶段 2：执行（带时钟的流水线级）
+    let execute_stage = place stage_link<AluCmd<W>, D>(
+        clk: clk,
+        rst: rst,
+        up: decode_ctrl,
+    )
+
+    # 阶段 3：输出
+    let out_stream = place stage_to_stream<AluCmd<W>>(
+        stage: execute_stage,
+    )
+
+    # 组合逻辑：在阶段间处理数据
+    rsp_out.valid := out_stream.valid
+    rsp_out.payload := AluRsp<W> {
+        data: execute_cmd<W>(decode_cmd<W>(out_stream.payload)),
+    }
+    out_stream.ready := rsp_out.ready
+}
+```
+
+## 流水线的控制
+
+### 暂停
+
+暂停流水线意味着保持所有级的状态不变。暂停通常由下游的 backpressure 引起。
+
+```syl
+let ctrl = place halt_link<Cmd>(
+    up: in_stage,
+    halt: downstream_busy,
+)
+```
+
+`halt` 为 1 时，上游数据不会进入下一级。
+
+### 刷新
+
+刷新（flush）意味着丢弃当前数据。刷新通常由分支预测错误或异常引起。
+
+```syl
+let ctrl = place drop_link<Cmd>(
+    up: execute_stage,
+    drop: flush_signal,
+)
+```
+
+`drop` 为 1 时，当前级的数据被丢弃。
+
+## 多个流水线级
+
+可以通过串联多个 `stage_link` 实现多级流水线：
+
+```syl
+let s1 = place stage_link<T, D>(clk: clk, rst: rst, up: input)
+let s2 = place stage_link<T, D>(clk: clk, rst: rst, up: s1)
+let s3 = place stage_link<T, D>(clk: clk, rst: rst, up: s2)
+```
+
+三级流水线，每级一个时钟周期。
+
+## 流水线深度和吞吐量
+
+流水线深度（阶段数量）和吞吐量（每周期处理的数据量）之间的关系：
+
+- 三级流水线：每周期可以开始一个新操作，但每个操作需要 3 个周期完成
+- 延迟增加了，但吞吐量提高了
+
+Syl 的流水线组件通过 valid-ready 握手处理背压。当下游无法接收时，上游自动暂停。这种设计让流水线的控制逻辑由握手协议自动管理。
+
+## 常见错误
+
+### 阶段间数据丢失
+
+每个 `stage_link` 保存一个时钟周期的数据。如果两个阶段之间的组合逻辑需要多个时钟周期完成，需要额外的流水线级。
+
+### 暂停和刷新同时使用
+
+```syl
+# halt 和 drop 可以串联使用
+let ctrl = place halt_link<T>(up: input, halt: stall)
+let drop_ctrl = place drop_link<T>(up: ctrl, drop: flush)
+```
+
+`halt` 在 `drop` 之前。暂停优先于刷新。
+
+### 复位不当
+
+所有流水线阶段（`stage_link`）都需要时钟和复位信号。如果某个阶段缺少复位，它的初始状态不确定。

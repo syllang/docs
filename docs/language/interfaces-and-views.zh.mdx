@@ -1,0 +1,260 @@
+---
+title: 接口与视图
+description: interface 和 view 的声明与使用——端口分组和连接方向管理。
+---
+
+# 接口与视图
+
+Syl 的 `interface` 和 `view` 用于将相关端口组合在一起。`interface` 声明一组字段，`view` 定义从不同连接方向看到的端口集合。这种设计减少了模块端口列表的长度，同时保证了连接的正确性。
+
+---
+
+## 为什么需要接口
+
+在数字硬件设计中，模块之间的连接经常遵循固定的模式。一个常见的例子是 valid-ready 握手：
+
+```syl
+# 没有接口时，每个模块需要声明独立的握手端口
+cell Producer(
+    data_out: out UInt<8>,
+    valid_out: out Bit,
+    ready_in: in Bit,
+)
+
+cell Consumer(
+    data_in: in UInt<8>,
+    valid_in: in Bit,
+    ready_out: out Bit,
+)
+```
+
+两个模块之间有 3 个信号，每个模块声明了 3 个独立的端口。如果有一组信号需要被多个模块使用，每个模块都要重复声明。
+
+`interface` 解决这个问题：将相关端口组合为一个类型，模块只需要声明一个接口端口。
+
+## 声明 interface
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+}
+```
+
+接口可以携带泛型参数。`Stream<T>` 的负载类型 `T` 由使用者指定。
+
+### 声明 view
+
+`view` 定义从不同角度看到的端口方向：
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+- `source` 视图：发送方看到 `payload` 和 `valid` 是输出（发送数据和控制信号），`ready` 是输入（接收反馈）
+- `sink` 视图：接收方看到 `payload` 和 `valid` 是输入（接收数据和控制信号），`ready` 是输出（发送反馈）
+
+### 使用 interface 端口
+
+模块端口使用 `InterfaceName.ViewName` 语法：
+
+```syl
+cell Producer(
+    stream: out Stream<UInt<8>>.source,
+)
+
+cell Consumer(
+    stream: in Stream<UInt<8>>.sink,
+)
+```
+
+`sylc` 编译时展开接口，生成独立的端口。例如 `Producer` 的实际端口是：
+
+- `stream_payload: out UInt<8>`
+- `stream_valid: out Bit`
+- `stream_ready: in Bit`
+
+## 连接接口
+
+### 模块间连接
+
+```syl
+cell Top(y: out UInt<8>) {
+    signal data_out: UInt<8>
+
+    let prod = place Producer(stream: ???)
+    let cons = place Consumer(stream: prod.stream)
+}
+```
+
+发送方的 `source` 视图连接到接收方的 `sink` 视图。编译器检查视图方向是否匹配。
+
+### 内部使用
+
+```syl
+cell Processor(
+    cmd_in: in Stream<AluCmd>.sink,
+    rsp_out: out Stream<AluRsp>.source,
+) {
+    # 读取输入接口
+    signal op: AluOp := cmd_in.payload.op
+    signal valid: Bit := cmd_in.valid
+
+    # 驱动输出接口
+    rsp_out.payload := compute(op)
+    rsp_out.valid := valid
+    cmd_in.ready := rsp_out.ready
+}
+```
+
+## 字段声明规则
+
+接口内部的字段声明和 view 内部的端口声明有不同规则。
+
+**接口字段**声明接口包含哪些数据。字段可以没有方向修饰，方向由 view 指定。
+
+**视图端口**声明从该视角看到的端口方向和名称。视图端口名必须对应接口中的字段名。
+
+```syl
+interface Channel<T> {
+    data: T              # 接口字段
+    enable: Bit          # 接口字段
+    ready: Bit           # 接口字段
+
+    view master {        # 主设备视角
+        out data
+        out enable
+        in ready
+    }
+
+    view slave {         # 从设备视角
+        in data
+        in enable
+        out ready
+    }
+}
+```
+
+## 嵌套接口
+
+接口可以作为其他接口的字段类型：
+
+```syl
+interface PacketStream<T> {
+    header: UInt<8>
+    stream: Stream<T>
+}
+```
+
+这种嵌套在分层协议中很常见。
+
+## 使用示例：valid-ready 流
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+
+cell PipelineStage<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    upstream: in Stream<T>.sink,
+    downstream: out Stream<T>.source,
+) {
+    reg saved: T reset(rst, zero<T>())
+    reg valid_reg: Bit reset(rst, 0)
+
+    signal stall: Bit := downstream.valid and not downstream.ready
+    signal pass: Bit := upstream.valid and (not valid_reg or downstream.ready)
+
+    next saved := select {
+        pass => upstream.payload,
+        default => saved,
+    }
+    next valid_reg := select {
+        stall => 1,
+        pass => 1,
+        default => 0,
+    }
+
+    downstream.payload := saved
+    downstream.valid := valid_reg
+    upstream.ready := not stall
+}
+```
+
+这个流水线阶段模块展示了接口的典型使用模式：输入使用 `.sink` 视图，输出使用 `.source` 视图。
+
+## 为什么使用 interface
+
+interface 和 view 提供的不仅仅是端口分组。它们在编译期提供了额外的检查：
+
+- **视图方向检查。** 编译器检查 `source` 视图的 `out` 端口是否连接到了 `sink` 视图的 `in` 端口。方向错误会被捕获。
+- **字段完整性检查。** 视图定义了哪些字段对外可见。编译器检查连接是否覆盖了所有可见字段。
+- **能力检查。** 视图端口的读写能力和实际连接方向一致。
+
+这些检查减少了连接错误，特别是在复杂的分层模块中。
+
+## 使用建议
+
+- 保持接口字段数量适中。字段过多的接口可以考虑拆分为多个独立的接口。
+- 为每个接口定义 master/source 和 slave/sink 视图。这符合大多数硬件连接模式。
+- 接口的负载类型使用泛型参数，提高复用性。
+
+## 常见错误
+
+### 视图方向不匹配
+
+```syl
+# 错误：source 视图的 valid 是 out，不能连接到 source 视图的 valid（也是 out）
+# 需要 source 连 sink
+```
+
+连接接口时，发送方的 `source` 视图必须连接接收方的 `sink` 视图。
+
+### 未使用的视图字段
+
+接口视图中的所有字段在连接时都必须被处理。未连接的视图字段会导致编译器警告或错误。
+
+### 跨接口类型赋值
+
+```syl
+interface A { field: Bit; view v { out field } }
+interface B { field: Bit; view v { out field } }
+
+signal a: A.v
+# signal b: B.v := a    # 错误：A.v 和 B.v 是不同类型
+```
+
+不同的接口类型即使结构相同，也是不同的类型，不能直接赋值。

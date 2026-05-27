@@ -1,0 +1,13 @@
+{
+  "title": "模式和标准库",
+  "icon": "patterns",
+  "pages": [
+    "index",
+    "stream",
+    "pipeline",
+    "parameterization",
+    "interfaces",
+    "examples",
+    "standard-library"
+  ]
+}

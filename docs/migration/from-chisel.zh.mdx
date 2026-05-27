@@ -1,0 +1,197 @@
+---
+title: 从 Chisel 迁移
+description: 面向 Chisel 开发者的 Syl 快速入门。
+---
+
+# 从 Chisel 迁移
+
+如果你熟悉 Chisel，这篇文章帮助你将 Chisel 知识映射到 Syl。Chisel 和 Syl 在设计理念上有些相似之处（类型安全、参数化），但语法和实现方式不同。
+
+---
+
+## 基本类型对比
+
+| Chisel | Syl |
+|--------|-----|
+| `Bool()` | `Bit` |
+| `UInt(width.W)` | `UInt<W>` |
+| `Vec(n, t)` | `[N] T` |
+
+Chisel 使用 `UInt(8.W)` 指定位宽，Syl 使用泛型参数 `UInt<8>`。Syl 的位宽是类型的一部分，`UInt<8>` 和 `UInt<16>` 是不同的类型。UInt 的位宽参数在编译期确定，类型安全由编译器保障。
+
+## 模块声明
+
+### Chisel
+
+```scala
+class Counter(width: Int) extends Module {
+    val io = IO(new Bundle {
+        val en = Input(Bool())
+        val count = Output(UInt(width.W))
+    })
+    val value = RegInit(0.U(width.W))
+    when(io.en) {
+        value := value + 1.U
+    }
+    io.count := value
+}
+```
+
+### Syl
+
+```syl
+cell Counter<W: Nat>(
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W> reset(rst, 0)
+    next value := select { enable => value + 1, default => value }
+    count := value
+}
+```
+
+主要区别：
+
+- Chisel 使用 Scala 类继承 `Module`，Syl 使用 `cell` 关键字
+- Chisel 的 IO 通过 `IO(...)` 创建，Syl 端口在括号中声明
+- Chisel 使用 `RegInit` 创建寄存器，Syl 使用 `reg ... reset(...)`
+- Chisel 使用 `when`，Syl 使用 `select`
+
+## 信号声明
+
+| Chisel | Syl |
+|--------|-----|
+| `Wire(UInt(8.W))` | `signal x: UInt<8>` |
+| `RegInit(0.U(8.W))` | `reg x: UInt<8> reset(rst, 0)` |
+| `val x = y` | `let x = y` |
+
+Chisel 的 `Wire` 和 `Reg` 创建硬件对象。Syl 的 `signal` 和 `reg` 也是创建硬件对象。Chisel 的 `val` 绑定在 Scala 中，Syl 的 `let` 是别名。
+
+## 条件赋值
+
+### Chisel
+
+```scala
+when(cond1) {
+    result := 1.U
+}.elsewhen(cond2) {
+    result := 2.U
+}.otherwise {
+    result := 0.U
+}
+```
+
+### Syl
+
+```syl
+signal result: UInt<8> := select priority {
+    cond1 => 1,
+    cond2 => 2,
+    default => 0,
+}
+```
+
+Chisel 的 `when`/`elsewhen`/`otherwise` 链对应 Syl 的 `select priority`。Syl 的 `select` 是一个表达式，返回值给左侧的信号。
+
+## Bundle 和接口
+
+### Chisel
+
+```scala
+class Packet extends Bundle {
+    val data = UInt(8.W)
+    val last = Bool()
+}
+```
+
+### Syl
+
+```syl
+bundle Packet {
+    data: UInt<8>,
+    last: Bit,
+}
+```
+
+Syl 的 `bundle` 类似 Chisel 的 `Bundle`。Syl 的 `interface` 和 `view` 对应 Chisel 的 `Flipped` 和方向标记。
+
+## 参数化
+
+### Chisel
+
+```scala
+class Queue[T <: Data](width: Int) extends Module {
+    // ...
+}
+```
+
+### Syl
+
+```syl
+cell Queue<T, W: Nat>(
+    // ...
+)
+```
+
+Chisel 使用 Scala 泛型，Syl 使用自己的泛型参数语法。两者都支持类型参数。
+
+## 编译期计算
+
+### Chisel
+
+Chisel 的编译期计算利用 Scala 本身的表达能力：
+
+```scala
+def clog2(x: Int): Int = {
+    // Scala 代码
+}
+```
+
+### Syl
+
+Syl 使用 `fn` 定义编译期函数：
+
+```syl
+fn clog2(x: Nat) -> Nat {
+    // Syl 代码
+}
+```
+
+## Chisel 到 Syl 的映射表
+
+| Chisel | Syl |
+|--------|-----|
+| `class Foo extends Module` | `cell Foo` |
+| `IO(Bundle(...))` | 括号内端口声明 |
+| `Input(Bool())` | `in Bit` |
+| `Output(UInt(8.W))` | `out UInt<8>` |
+| `Wire(UInt(8.W))` | `signal x: UInt<8>` |
+| `RegInit(0.U(8.W))` | `reg x: UInt<8> reset(rst, 0)` |
+| `when(c) { }.otherwise { }` | `select { c => ..., default => ... }` |
+| `switch(c) { is(v) { } }` | `match` |
+| `Mux(c, a, b)` | `select { c => a, default => b }` |
+| `Cat(a, b)` | bundle 构造 |
+| `Vec(n, t)` | `[N] T` |
+
+## 迁移实践建议
+
+从 Chisel 迁移到 Syl 的步骤：
+
+1. 理解 Chisel 的类型对应关系。`UInt(8.W)` 对应 `UInt<8>`，`Bool()` 对应 `Bit`。
+2. Chisel 的 `when`/`elsewhen`/`otherwise` 对应 Syl 的 `select priority`。
+3. Chisel 的 `RegInit` 对应 Syl 的 `reg ... reset(...)`。
+4. Chisel 的 `Module` 对应 Syl 的 `cell`。
+
+Chisel 和 Syl 在设计理念上相似度最高。两者都强调类型安全和参数化。关键区别在于实现方式：Chisel 用 Scala 类库包装硬件概念，Syl 把这些概念直接放在语言层面。这意味着 Chisel 中需要隐式转换和反射才能实现的功能，在 Syl 中可能是语法原生支持的。
+
+## 关键差异总结
+
+| 特性 | Chisel | Syl | 对设计者的实际影响 |
+|------|--------|-----|-------------------|
+| 宿主语言 | Scala | 独立语言 | Chisel 需要 Scala 工具链（sbt + JVM），Syl 只有一个二进制文件 |
+| 模块声明 | 类继承 Module | cell 关键字 | Chisel 的继承机制受 Scala 类层次约束；Syl 的 `cell` 是语法层级概念 |
+| 端口声明 | IO(Bundle(...)) | 括号内声明 | Chisel 通过 Scala 构造器创建端口，出错时看到的是 Scala 类的错误信息 |
+| 寄存器 | RegInit | reg ... reset(...) | Chisel 的 `RegInit` 是库函数调用，Syl 的 `reg` 是语言关键词 |
+| 条件赋值 | when/elsewhen | select | Chisel 是语句，Syl 是表达式（可以赋值给信号） |
+| 位宽指定 | 8.W 方法调用 | `UInt<8>` 类型参数 | Chisel 通过 Scala 方法调用设置宽度，错误信息经过 Scala 类型推断；Syl 的宽度是类型的一部分 |
+| 接口方向 | Flipped | view source/sink | Chisel 通过编译期反射标记方向；Syl 在语法层面声明 |

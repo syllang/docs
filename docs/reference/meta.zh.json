@@ -1,0 +1,13 @@
+{
+  "title": "参考",
+  "icon": "reference",
+  "pages": [
+    "lexical-syntax",
+    "grammar",
+    "builtins",
+    "attributes",
+    "cli",
+    "lsp",
+    "diagnostics"
+  ]
+}

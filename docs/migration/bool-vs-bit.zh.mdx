@@ -1,0 +1,133 @@
+---
+title: Bool 与 Bit
+description: 理解 Syl 中编译期布尔值和硬件电平的区别。
+---
+
+# Bool 与 Bit
+
+Syl 中有两个相似的名称：`Bool` 和 `Bit`。它们经常被混淆。本文说明两者的区别和使用场景。
+
+---
+
+## Bool
+
+`Bool` 是编译期布尔值。它有两个值：`true` 和 `false`。
+
+```syl
+const debug: Bool = true
+const is_valid: Bool = (W > 0)
+```
+
+**使用场景：**
+
+- 编译期 `if` 条件
+- 编译期断言
+- `fn` 函数的参数和返回值
+
+**运算：**
+
+```syl
+const a: Bool = true and false
+const b: Bool = true or false
+const c: Bool = not true
+const d: Bool = (8 > 4)
+```
+
+`Bool` 的运算在编译期执行，不生成硬件。
+
+## Bit
+
+`Bit` 是硬件信号的电平值。它有两个值：`0` 和 `1`。
+
+```syl
+signal valid: Bit := 1
+signal ready: Bit
+```
+
+**使用场景：**
+
+- 模块端口
+- 信号声明
+- 寄存器
+
+**运算：**
+
+```syl
+signal a: Bit := x and y
+signal b: Bit := x or y
+signal c: Bit := x xor y
+signal d: Bit := not x
+```
+
+`Bit` 的运算生成硬件逻辑门。
+
+## 关键区别
+
+| 特性 | Bool | Bit |
+|------|------|-----|
+| 执行阶段 | 编译期 | 硬件期 |
+| 值 | true / false | 0 / 1 |
+| 生成硬件 | 否 | 是 |
+| 适用声明 | const, fn | signal, reg, port |
+| 运算符 | and, or, not | and, or, not |
+
+虽然运算符写法相同（`and`、`or`、`not`），但编译器根据操作数类型选择正确的运算。
+
+## 常见错误
+
+### Bool 赋值给 Bit
+
+```syl
+# signal s: Bit := true  # 错误
+signal s: Bit := 1        # 正确
+```
+
+### Bit 赋值给 Bool
+
+```syl
+# const c: Bool = some_signal  # 错误：Bit 不能赋值给 Bool
+```
+
+### Bool 在硬件中使用
+
+```syl
+# signal result: Bit := a and debug_flag  # 错误：debug_flag 是 Bool
+```
+
+## 转换
+
+Syl 没有提供 `Bool` 和 `Bit` 之间的隐式转换。需要转换时使用 `fn`：
+
+```syl
+fn bool_to_bit(b: Bool) -> Bit {
+    if b { return 1 } else { return 0 }
+}
+
+const enable_debug: Bool = true
+signal debug_en: Bit := bool_to_bit(enable_debug)
+```
+
+## 为什么会混淆
+
+Bool 和 Bit 的混淆很常见，因为两种值在概念上有对应关系：`true` 对应 `1`，`false` 对应 `0`。在 Verilog 中，这两者没有区别。`reg` 既可以存 `true`/`false` 也可以存 `0`/`1`。
+
+Syl 区分两者是为了让编译器能够判断：如果一段代码操作 `Bool`，它应该在展开期执行；如果操作 `Bit`，它应该生成硬件。这种设计让编译器可以在不运行仿真的情况下发现类型错误。在大型项目中，这种区分减少了调试时间。
+
+## 在实际代码中识别
+
+阅读 Syl 代码时，可以通过以下方式快速区分 `Bool` 和 `Bit`：
+
+- `const` 声明中的值通常是 `Bool` 或 `Nat`
+- `signal` 或 `reg` 声明中的值通常是 `Bit` 或 `UInt<W>`
+- `fn` 的返回值类型是 `Bool` 或 `Nat`
+- `map` 的返回值类型是 `Bit` 或 `UInt<W>`
+- 编译期 `if` 的条件是 `Bool`，硬件期 `select` 的条件是 `Bit`
+
+## 设计原则
+
+Syl 区分 `Bool` 和 `Bit` 是为了明确计算阶段：
+
+- 编译期的条件选择使用 `Bool`，不生成硬件
+- 硬件的条件选择使用 `select` 或 `match`，生成组合逻辑
+
+如果两者混用，编译器无法确定一段代码应该在展开期执行还是生成硬件。

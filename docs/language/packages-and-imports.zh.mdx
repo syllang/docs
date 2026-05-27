@@ -1,0 +1,265 @@
+---
+title: 包与导入
+description: Syl 的文件组织——package、use 和模块间引用。
+---
+
+# 包与导入
+
+Syl 使用包（package）组织代码。每个源文件属于一个包。包之间通过 `use` 导入引用。本文说明包的规则、导入语法和文件组织方式。
+
+---
+
+## 包的概念
+
+每个 `.syl` 文件属于一个包。包名从文件路径推断。
+
+```
+project/
+├── src/
+│   ├── top.syl        # 包: project.src.top
+│   └── counter.syl    # 包: project.src.counter
+└── lib/
+    └── utils.syl      # 包: project.lib.utils
+```
+
+包名用于导入（`use`）时引用其他文件中的声明。
+
+## use 导入
+
+`use` 导入其他包中的声明。
+
+### 基本语法
+
+```syl
+use project.src.counter.Counter
+```
+
+导入 `project.src.counter` 包中的 `Counter` 声明。之后可以直接使用 `Counter` 名字。
+
+### 导入多个声明
+
+```syl
+use project.src.counter.Counter
+use project.src.counter.Config
+```
+
+### 导入包中所有声明
+
+```syl
+use project.src.counter.*
+```
+
+导入 `project.src.counter` 包中的所有公共声明。
+
+### 导入标准库
+
+```syl
+use std.stream.Stream
+use std.stage.Stage
+use std.stage.stage_from_stream
+```
+
+标准库的包以 `std.` 开头。
+
+## 包结构建议
+
+### 按功能组织
+
+```
+project/
+├── alu.syl            # ALU 相关类型和模块
+├── counter.syl        # 计数器相关
+├── stream.syl         # 流接口定义
+└── top.syl            # 顶层模块
+```
+
+每个文件包含一个功能领域内的声明。文件中的声明可以被其他文件通过 `use` 导入。
+
+### 类型定义和实现分离
+
+将类型定义放在一个文件中，实现它们的模块放在另一个文件中：
+
+```syl
+# types.syl
+enum State { Idle, Running, Done }
+bundle Control { state: State, data: UInt<8> }
+
+# fsm.syl
+use types.State
+use types.Control
+
+cell FSM(ctrl: out Control) { ... }
+```
+
+### 避免循环导入
+
+包 A 导入包 B，包 B 不能导入包 A。Syl 编译器会检测并报告循环导入。
+
+## 文件之间的引用
+
+### 示例
+
+```syl
+# counter.syl
+cell Counter<W: Nat>(enable: in Bit, count: out UInt<W>) {
+    reg value: UInt<W>
+    next value := value + 1
+    count := value
+}
+```
+
+```syl
+# top.syl
+use counter.Counter
+
+cell Top(enable: in Bit, result: out UInt<8>) {
+    let cnt = place Counter<8>(enable: enable, count: result)
+}
+```
+
+编译时同时指定两个文件：
+
+```
+sylc counter.syl top.syl
+```
+
+编译器解析 `use counter.Counter`，在 `counter.syl` 文件中找到 `Counter` 模块。
+
+### 子目录引用
+
+```syl
+# src/sub/counter.syl
+cell Counter(enable: in Bit, count: out UInt<8>) { ... }
+```
+
+```syl
+# src/top.syl
+use sub.counter.Counter
+```
+
+导入路径使用相对于包根的路径。
+
+## 标准库包
+
+Syl 的标准库提供以下包：
+
+```syl
+use std.stream.Stream          # 流接口
+use std.stage.Stage            # 流水线阶段
+use std.stage.stage_from_stream  # 从流创建阶段
+use std.stage.stage_to_stream  # 从阶段创建流
+use std.stage.stage_link       # 连接两个流水线阶段
+use std.stage.halt_link        # 带暂停的流水线连接
+use std.stage.drop_link        # 带丢弃的流水线连接
+use std.pipeline.*             # 多级流水线
+use std.bundle.*               # bundle 工具
+use std.logic.*                # 逻辑函数
+use std.assert.*               # 断言
+```
+
+标准库代码在 `examples/std/` 目录下，可以作为 Syl 代码编写的参考。
+
+## 标准库包详解
+
+```syl
+use std.stream.Stream
+```
+
+`std.stream.Stream` 定义了 valid-ready 握手协议的接口。它是 Syl 中最常用的接口类型。
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+使用示例：
+
+```syl
+use std.stream.Stream
+
+cell PipelineStage<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    upstream: in Stream<T>.sink,
+    downstream: out Stream<T>.source,
+)
+```
+
+## 包设计建议
+
+### 保持文件粒度适中
+
+一个文件包含 100 到 500 行 Sy 代码比较合适。太大的文件难以导航，太小的文件增加导入负担。
+
+### 公共接口放在文件顶部
+
+将模块的公共类型（bundle、interface、enum）放在文件顶部，模块实现放在后面。这方便阅读者快速了解文件提供哪些类型。
+
+### 按依赖顺序编译
+
+编译时先编译被依赖的文件。Syl 不要求编译顺序，但指定顺序可以加快编译速度。
+
+## 编译顺序
+
+Syl 不要求编译顺序，但了解编译器的处理方式有助于理解导入错误。
+
+编译器在解析阶段收集所有文件的顶层声明。然后执行名字解析，将 `use` 导入的名字和对应的声明关联起来。
+
+如果编译器找不到 `use` 路径对应的文件，报告错误。常见的原因为：文件未包含在编译命令中、路径拼写错误、文件名不匹配。
+
+## 常见错误
+
+### 导入路径错误
+
+```syl
+# use counter.Counter    # 如果文件在 src/ 子目录下
+```
+
+导入路径必须使用完整的包路径。
+
+### 名字冲突
+
+```syl
+# file1.syl
+cell Counter { ... }
+
+# file2.syl
+use file1.Counter
+# cell Counter { ... }    # 错误：Counter 名字冲突
+```
+
+导入的声明和本地声明不能重名。如果冲突，使用 `as` 别名（尚未实现）或重命名本地声明。
+
+### 循环导入
+
+```
+包 A 导入包 B
+包 B 导入包 A
+# 错误：循环导入
+```
+
+编译器检测循环导入并报告错误。解决方案是将共同依赖的类型提取到第三个包中。
+
+### 未导入直接使用
+
+```syl
+# 错误：未导入 Stream 就使用
+cell Top(stream: in Stream<UInt<8>>.sink) { ... }
+```
+
+跨文件引用需要使用 `use` 导入。文件内部的引用不需要导入。

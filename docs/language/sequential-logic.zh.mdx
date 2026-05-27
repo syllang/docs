@@ -1,0 +1,301 @@
+---
+title: 时序逻辑
+description: reg 寄存器声明、next 下一状态赋值和复位。
+---
+
+# 时序逻辑
+
+Syl 使用 `reg` 声明寄存器，使用 `next` 定义寄存器的下一状态。本文说明寄存器声明、复位方式和时序赋值的使用方法。
+
+---
+
+## 寄存器声明
+
+### 基本声明
+
+```syl
+reg count: UInt<8>
+```
+
+声明一个 8 位寄存器 `count`。寄存器在每个时钟边沿采样输入值。
+
+### 带复位的声明
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+```
+
+`reset(rst, 0)` 指定复位信号 `rst` 和复位值 `0`。复位时 `count` 被设置为 `0`。
+
+复位值是编译期常量或表达式：
+
+```syl
+const INIT: UInt<8> = 42
+reg value: UInt<8> reset(rst, INIT)
+```
+
+### 复位类型
+
+复位信号 `rst` 必须是 `Reset<D>` 类型。`D` 必须和模块的时钟域参数一致。
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+) {
+    reg count: UInt<8> reset(rst, 0)
+}
+```
+
+## next 赋值
+
+`next` 定义寄存器的下一时钟周期的值。
+
+### 基本用法
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+next count := count + 1
+```
+
+每个时钟周期 `count` 增加 1。`reset` 信号有效时将 `count` 置为 0。
+
+### 条件 next
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+next count := select {
+    clear => 0,
+    enable => count + 1,
+    default => count,
+}
+```
+
+- `clear` 为 1 时清零
+- `enable` 为 1 时加 1
+- 其他情况保持原值
+
+### next 和 := 的区别
+
+`next` 和 `:=` 是两种不同的赋值：
+
+- `next` 赋值给寄存器。值在时钟边沿更新。对应 Verilog 的 `always @(posedge clk)` 中的非阻塞赋值。
+- `:=` 是连续赋值。值立即更新。对应 Verilog 的 `assign`。
+
+```syl
+signal s: UInt<8>           # 组合信号
+reg r: UInt<8> reset(rst, 0)
+
+s := count + 1              # s 立即跟随 count + 1
+next r := count + 1         # r 在下一个时钟边沿更新
+```
+
+## 寄存器使用模式
+
+### 移位寄存器
+
+```syl
+cell ShiftReg<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    data_in: in Bit,
+    data_out: out Bit,
+) {
+    reg r0: Bit reset(rst, 0)
+    reg r1: Bit reset(rst, 0)
+    reg r2: Bit reset(rst, 0)
+
+    next r0 := data_in
+    next r1 := r0
+    next r2 := r1
+    data_out := r2
+}
+```
+
+数据每时钟周期向右移动一位。
+
+### 累加器
+
+```syl
+cell Accumulator<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    din: in UInt<W>,
+    dout: out UInt<W>,
+) {
+    reg acc: UInt<W> reset(rst, 0)
+
+    next acc := acc + din
+    dout := acc
+}
+```
+
+每个时钟周期将输入加到累加器上。
+
+### 状态机
+
+```syl
+enum State { Idle, Busy, Done }
+
+cell FSM<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    start: in Bit,
+    done: out Bit,
+) {
+    reg state: State
+
+    signal next_state: State := match state {
+        State.Idle => select { start => State.Busy, default => State.Idle },
+        State.Busy => State.Done,
+        State.Done => State.Idle,
+    }
+
+    next state := next_state
+    done := state == State.Done
+}
+```
+
+状态寄存器 `state` 保存当前状态。`next` 在每个时钟周期更新它。
+
+### 带使能的计数器
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    clear: in Bit,
+) -> value: UInt<W> {
+    reg count: UInt<W> reset(rst, 0)
+
+    next count := select priority {
+        clear => 0,
+        enable => count + 1,
+        default => count,
+    }
+    value := count
+}
+```
+
+使能信号控制是否计数，清除信号无条件置零。
+
+## 寄存器初始化
+
+### 显式初始化
+
+寄存器声明时使用 `reset(rst, value)` 指定复位值和复位信号。复位信号有效时，寄存器被设置为指定值。
+
+### 隐式初始值
+
+如果声明时没有 `reset`：
+
+```syl
+reg count: UInt<8>
+```
+
+寄存器的初始值未定义。在大多数综合工具中，这对应一个没有复位输入的寄存器。
+
+## 多个寄存器
+
+同一个模块中可以有多个寄存器，每个寄存器有自己的 `next`：
+
+```syl
+cell DualCounter<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+) {
+    reg cnt1: UInt<8> reset(rst, 0)
+    reg cnt2: UInt<8> reset(rst, 0)
+
+    next cnt1 := cnt1 + 1
+    next cnt2 := cnt2 + 2
+}
+```
+
+## 时序逻辑和组合逻辑的混合
+
+在一个模块中，时序逻辑和组合逻辑可以混合使用。寄存器提供状态存储，组合逻辑处理状态转换和输出。
+
+```syl
+cell MixedExample<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    inc: in Bit,
+    dec: in Bit,
+    value: out UInt<8>,
+) {
+    reg count: UInt<8> reset(rst, 0)
+
+    # 组合逻辑：计算下一状态
+    signal next_count: UInt<8> := select {
+        inc => count + 1,
+        dec => count - 1,
+        default => count,
+    }
+
+    # 时序逻辑：更新寄存器
+    next count := next_count
+
+    # 组合逻辑：输出
+    value := count
+}
+```
+
+组合逻辑部分（`signal`、`select`）描述值如何计算。时序逻辑部分（`reg`、`next`）描述值何时更新。两者共同描述一个完整的状态更新周期。
+
+## 寄存器和时钟域
+
+寄存器时钟信号来自模块的 `Clock<D>` 端口。同一时钟域下的寄存器使用同一个时钟信号。
+
+```syl
+cell DualDomain(
+    clk_a: in Clock<A>,
+    rst_a: in Reset<A>,
+    clk_b: in Clock<B>,
+    rst_b: in Reset<B>,
+    data: in UInt<8>,
+    result: out UInt<8>,
+) {
+    reg reg_a: UInt<8> reset(rst_a, 0)
+    reg reg_b: UInt<8> reset(rst_b, 0)
+
+    next reg_a := data
+    next reg_b := reg_a
+    result := reg_b
+}
+```
+
+这里的 `A` 和 `B` 是两个不同的时钟域。`reg_a` 使用 `clk_a`，`reg_b` 使用 `clk_b`。
+
+跨时钟域传递数据需要额外的同步逻辑，编译器不自动处理。
+
+## 常见错误
+
+### 缺少 next
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+# 缺少 next count := ...
+```
+
+寄存器必须有 `next` 赋值，否则编译器无法确定它的下一状态。
+
+### reg 使用 := 赋值
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+# count := count + 1    # 应该是 next count := count + 1
+```
+
+使用 `next` 而不是 `:=` 来定义寄存器的下一状态。
+
+### 复位信号类型不匹配
+
+```syl
+cell Top(clk: in Bit) {
+    reg count: UInt<8> reset(clk, 0)    # 错误：clk 不是 Reset<D> 类型
+}
+```
+
+复位信号必须是 `Reset<D>` 类型。

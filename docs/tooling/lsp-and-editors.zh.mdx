@@ -1,0 +1,91 @@
+---
+title: LSP 与编辑器
+description: Syl 语言服务器的使用和编辑器配置。
+---
+
+# LSP 与编辑器
+
+Syl 语言服务器（LSP）为编辑器提供代码补全、悬停提示和诊断信息。本文说明如何配置和使用。
+
+---
+
+## 启动语言服务器
+
+LSP 服务器在 `syl_lsp` crate 中实现。编译后启动：
+
+```
+syl-lsp
+```
+
+服务器通过标准输入输出和编辑器通信。
+
+## 支持的功能
+
+### 悬停提示
+
+将鼠标悬停在表达式上，显示类型信息。
+
+```syl
+signal data: UInt<8>
+# 悬停在 data 上显示：UInt<8>
+```
+
+### 跳转定义
+
+点击名字跳转到它的声明位置。支持跨文件跳转。
+
+### 自动补全
+
+在光标位置提供可用的符号名：模块端口、信号名、局部变量、关键字。
+
+### 诊断信息
+
+在文件中标记错误位置。错误信息包含错误代码和描述。诊断在文件修改时自动更新。
+
+## 编辑器配置
+
+### VS Code
+
+安装支持自定义 LSP 的扩展。配置语言服务器路径：
+
+```json
+{
+    "lsp": {
+        "syl": {
+            "command": ["syl-lsp"]
+        }
+    }
+}
+```
+
+### Neovim
+
+```lua
+vim.lsp.start({
+    name = "syl",
+    cmd = { "syl-lsp" },
+    root_dir = vim.fn.getcwd(),
+})
+```
+
+### Helix
+
+在 `languages.toml` 中添加：
+
+```toml
+[language-server.syl]
+command = "syl-lsp"
+
+[[language]]
+name = "syl"
+language-servers = ["syl"]
+scope = "source.syl"
+file-types = ["syl"]
+```
+
+## 当前限制
+
+- 大型文件的补全响应可能较慢
+- 不支持重命名操作
+- 不支持代码动作
+- 不支持签名帮助

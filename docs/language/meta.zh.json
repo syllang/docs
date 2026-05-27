@@ -1,0 +1,16 @@
+{
+  "title": "语言",
+  "icon": "language",
+  "pages": [
+    "index",
+    "basic-types",
+    "numeric-word-types",
+    "composite-types",
+    "interfaces-and-views",
+    "structural-constructs",
+    "compile-time-constructs",
+    "hardware-semantics",
+    "sequential-logic",
+    "packages-and-imports"
+  ]
+}

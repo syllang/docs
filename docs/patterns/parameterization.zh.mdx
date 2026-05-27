@@ -1,0 +1,236 @@
+---
+title: 参数化设计
+description: 使用泛型参数创建可复用的硬件模块。
+---
+
+# 参数化设计
+
+参数化设计是创建可复用硬件模块的关键技术。通过泛型参数，一个模块可以适应不同的位宽、深度和配置。参数化是硬件设计中最常用的复用技术。一个参数化设计良好的模块可以在多个项目中直接使用。参数化设计的关键是选择合适的参数粒度和默认值，让模块在常见配置下不需要指定参数。参数太少限制复用性，参数太多增加使用复杂度。在设计中平衡参数的数量和使用便利性是一个重要的考虑。好的参数化设计可以显著提高模块的复用价值。参数化是 Syl 模块设计中不可或缺的技术。掌握参数化设计可以大幅提高模块的复用效率。参数化设计的关键是选择合适的参数粒度和默认值。一个参数化设计良好的模块可以在多个项目中直接使用，不需要修改源码。本文说明 Syl 泛型参数的使用模式和设计方法。
+
+---
+
+## 泛型参数的种类
+
+Syl 支持三种泛型参数：
+
+**值参数。** 类型为 `Nat`，编译期确定的自然数。用于指定位宽、数组大小、深度等。
+
+**域参数。** 类型为 `Domain`，用于关联时钟、复位和寄存器到同一个时钟域。
+
+**类型参数。** 直接使用类型作为参数，例如 `T` 在 `Stream<T>` 中表示的负载类型。
+
+## 值参数
+
+### 基本用法
+
+```syl
+cell Counter<W: Nat>(
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W>
+    next value := value + 1
+    count := value
+}
+```
+
+实例化时指定 `W`：
+
+```syl
+let cnt8 = place Counter<8>(enable: en, count: cnt8_out)
+let cnt16 = place Counter<16>(enable: en, count: cnt16_out)
+```
+
+`W = 8` 和 `W = 16` 生成两个不同的硬件实例。
+
+### 默认值
+
+泛型参数可以有默认值：
+
+```syl
+cell Counter<W: Nat = 8>(
+    enable: in Bit,
+    count: out UInt<W>,
+)
+
+let cnt = place Counter(enable: en, count: out)  # W = 8
+let cnt32 = place Counter<32>(enable: en, count: out)  # W = 32
+```
+
+有默认值的参数在实例化时可以省略。
+
+### 参数计算
+
+参数值可以是编译期表达式：
+
+```syl
+const DATA_W: Nat = 32
+const ADDR_W: Nat = clog2(16)
+
+cell Memory(
+    data: in UInt<DATA_W>,
+    addr: in UInt<ADDR_W>,
+)
+```
+
+## 域参数
+
+域参数 `D: Domain` 将时钟、复位和寄存器关联到同一个时钟域。
+
+```syl
+cell FlipFlop<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    d: in Bit,
+    q: out Bit,
+) {
+    reg stored: Bit reset(rst, 0)
+    next stored := d
+    q := stored
+}
+```
+
+不同域的时钟和复位不能混用：
+
+```syl
+cell Top(
+    clk_a: in Clock<A>,
+    rst_b: in Reset<B>,    # A 和 B 是不同域
+    d: in Bit,
+    q: out Bit,
+) {
+    # reg r: Bit reset(rst_b, 0)  # 错误：时钟是 A，复位是 B
+}
+```
+
+## 类型参数
+
+类型参数允许模块操作任意数据类型：
+
+```syl
+cell Passthrough<T>(
+    input: in T,
+    output: out T,
+) {
+    output := input
+}
+```
+
+类型参数通常和 interface 配合使用：
+
+```syl
+cell Buffer<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    upstream: in Stream<T>.sink,
+    downstream: out Stream<T>.source,
+)
+```
+
+`T` 是数据的负载类型，`D` 是时钟域。两个参数独立。
+
+## 参数约束
+
+### 值参数约束
+
+可以在模块体内检查参数合法性：
+
+```syl
+cell FIFO<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    data_in: in UInt<W>,
+    data_out: out UInt<W>,
+) {
+    if W == 0 {
+        compile_error("FIFO width must be greater than 0")
+    }
+    if W > 1024 {
+        compile_error("FIFO width exceeds implementation limit")
+    }
+}
+```
+
+### 类型参数约束
+
+类型参数没有显式约束语法。如果实例化时类型参数不满足使用要求，编译器在展开时报告错误。
+
+## 参数化设计模式
+
+### 位宽参数化
+
+最常见的参数化模式：
+
+```syl
+cell Adder<W: Nat>(
+    a: in UInt<W>,
+    b: in UInt<W>,
+    result: out UInt<W>,
+) {
+    result := a + b
+}
+```
+
+### 深度参数化
+
+```syl
+cell PipelineStage<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    upstream: in Stream<T>.sink,
+    downstream: out Stream<T>.source,
+)
+```
+
+### 组件参数化
+
+将子模块的类型作为参数：
+
+```syl
+cell ComputeUnit<T>(
+    input: in T,
+    output: out T,
+)
+```
+
+## 参数化模块的测试
+
+参数化模块的测试需要覆盖不同的参数值组合。基本方法：
+
+1. 使用最小参数值测试边界
+2. 使用典型参数值测试正常功能
+3. 使用非法参数值测试错误检查
+
+测试时实例化不同参数值的模块，验证每种组合的行为。
+
+## 常见错误
+
+### 值参数不是 Nat
+
+```syl
+# cell Bad<W>(enable: in Bit) { }  # 错误：W 缺少类型
+```
+
+值参数必须显式声明为 `Nat`。
+
+### 实例化时省略必选参数
+
+```syl
+cell Counter<W: Nat>(enable: in Bit, count: out UInt<W>)
+
+# let c = place Counter(enable: en, count: out)  # 错误：缺少 W
+```
+
+没有默认值的参数在实例化时必须指定。
+
+### 参数值不合法
+
+```syl
+cell Mem<W: Nat>(data: in UInt<W>) {
+    if W > 64 { compile_error("width too large") }
+}
+
+# let m = place Mem<128>(data: d)  # 编译错误：width too large
+```
+
+参数值在实例化时检查。

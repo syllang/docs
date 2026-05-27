@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "forbidden_scopes": [
+    ".",
+    "workspace",
+    "repo",
+    "all",
+    "misc",
+    "multi",
+    "cross"
+  ],
+  "scope_expression": {
+    "separator": "+",
+    "max_members": 3,
+    "deduplicate_members": true
+  },
+  "selection_policy": {
+    "prefer_atomic_over_composite": true,
+    "prefer_explicit_combinations_when_member_count_lte": 3,
+    "reject_broader_covering_scope_when_narrower_exists": true
+  },
+  "atomic_scopes": {
+    "app": {
+      "kind": "path",
+      "paths": [
+        "app"
+      ]
+    },
+    "components": {
+      "kind": "path",
+      "paths": [
+        "components"
+      ]
+    },
+    "lib": {
+      "kind": "path",
+      "paths": [
+        "lib"
+      ]
+    },
+    "scripts": {
+      "kind": "path",
+      "paths": [
+        "scripts"
+      ]
+    },
+    ".githooks": {
+      "kind": "path",
+      "paths": [
+        ".githooks"
+      ]
+    },
+    ".github": {
+      "kind": "path",
+      "paths": [
+        ".github"
+      ]
+    },
+    "source": {
+      "kind": "path",
+      "paths": [
+        ".source"
+      ]
+    },
+    "project": {
+      "kind": "path-set",
+      "paths": [
+        "CONTRIBUTING.md",
+        ".gitignore",
+        "GUIDELINE_CHECK.md",
+        "TODO.md"
+      ]
+    },
+    "site-config": {
+      "kind": "path-set",
+      "paths": [
+        ".commit-scope.json",
+        "commitlint.config.mjs",
+        "next-env.d.ts",
+        "next.config.mjs",
+        "package.json",
+        "pnpm-lock.yaml",
+        "postcss.config.mjs",
+        "proxy.ts",
+        "source.config.ts",
+        "tsconfig.json"
+      ]
+    },
+    "docs/introduction": {
+      "kind": "path",
+      "paths": [
+        "docs/introduction"
+      ]
+    },
+    "docs/language": {
+      "kind": "path",
+      "paths": [
+        "docs/language"
+      ]
+    },
+    "docs/reference": {
+      "kind": "path",
+      "paths": [
+        "docs/reference"
+      ]
+    },
+    "docs/static-checks": {
+      "kind": "path",
+      "paths": [
+        "docs/static-checks"
+      ]
+    },
+    "docs/tooling": {
+      "kind": "path",
+      "paths": [
+        "docs/tooling"
+      ]
+    },
+    "docs/patterns": {
+      "kind": "path",
+      "paths": [
+        "docs/patterns"
+      ]
+    },
+    "docs/migration": {
+      "kind": "path",
+      "paths": [
+        "docs/migration"
+      ]
+    },
+    "docs/project": {
+      "kind": "path",
+      "paths": [
+        "docs/project"
+      ]
+    },
+    "docs/internals": {
+      "kind": "path",
+      "paths": [
+        "docs/internals"
+      ]
+    }
+  },
+  "composite_scopes": {
+    "site": {
+      "kind": "domain",
+      "tier": "tight",
+      "members": [
+        "app",
+        "components",
+        "lib",
+        "source"
+      ]
+    },
+    "tooling": {
+      "kind": "domain",
+      "tier": "tight",
+      "members": [
+        "scripts",
+        ".githooks",
+        ".github",
+        "project",
+        "site-config"
+      ]
+    },
+    "content": {
+      "kind": "domain",
+      "tier": "broad",
+      "members": [
+        "docs/introduction",
+        "docs/language",
+        "docs/reference",
+        "docs/static-checks",
+        "docs/tooling",
+        "docs/patterns",
+        "docs/migration",
+        "docs/project",
+        "docs/internals"
+      ]
+    }
+  }
+}

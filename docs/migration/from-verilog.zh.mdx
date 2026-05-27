@@ -1,0 +1,229 @@
+---
+title: 从 Verilog 迁移
+description: 面向 Verilog 开发者的 Syl 快速入门。
+---
+
+# 从 Verilog 迁移
+
+如果你熟悉 Verilog，这篇文章帮助你快速将已有的 Verilog 知识映射到 Syl。Syl 的很多概念有对应的 Verilog 概念，但语法和检查规则不同。
+
+---
+
+## 模块声明
+
+### Verilog
+
+```verilog
+module counter #(
+    parameter W = 8
+) (
+    input clk,
+    input rst,
+    input enable,
+    output reg [W-1:0] count
+);
+    always @(posedge clk) begin
+        if (rst)
+            count <= 0;
+        else if (enable)
+            count <= count + 1;
+    end
+endmodule
+```
+
+### Syl
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W> reset(rst, 0)
+    next value := select { enable => value + 1, default => value }
+    count := value
+}
+```
+
+主要区别：
+
+- Verilog 使用 `parameter`，Syl 使用 `<W: Nat>` 泛型参数
+- Verilog 的端口方向（`input`/`output`）放在端口名前，Syl 放在端口名后（`x: in Bit`）
+- Syl 需要显式声明时钟域 `D: Domain`
+- Syl 的 `reg` 需要 `reset` 指定复位信号和值
+
+## 赋值
+
+### 连续赋值
+
+| Verilog | Syl |
+|---------|-----|
+| `assign y = a & b;` | `y := a and b` |
+| `assign y = a + b;` | `y := a + b` |
+
+### 时序赋值
+
+| Verilog | Syl |
+|---------|-----|
+| `always @(posedge clk) q <= d;` | `next q := d` |
+| `if (rst) q <= 0;` | `reg q reset(rst, 0)` + `next q := ...` |
+
+Verilog 的 `always` 块同时包含敏感列表和赋值逻辑。Syl 将这两者分离：时钟连接由模块端口的 `Clock<D>` 处理，赋值由 `next` 处理。这种分离让每个声明的职责更清晰。Syl 的 `reg` 声明和 `next` 赋值分离。时钟信号从模块的 `Clock<D>` 端口隐式连接。
+
+## 信号类型
+
+| Verilog | Syl |
+|---------|-----|
+| `wire [7:0] data;` | `signal data: UInt<8>` |
+| `reg [7:0] data;` | `reg data: UInt<8> reset(...)` |
+| `wire valid;` | `signal valid: Bit` |
+
+Verilog 中 `wire` 和 `reg` 的区别主要在赋值方式。Syl 中 `signal` 和 `reg` 的区别在是否存储状态。
+
+## 模块实例化
+
+### Verilog
+
+```verilog
+counter #(.W(8)) u_counter (
+    .clk(clk),
+    .rst(rst),
+    .enable(enable),
+    .count(count)
+);
+```
+
+### Syl
+
+```syl
+let u_counter = place Counter<8>(
+    clk: clk,
+    rst: rst,
+    enable: enable,
+    count: count,
+)
+```
+
+Syl 使用 `place` 关键字实例化，使用命名参数连接端口。
+
+## 条件生成
+
+### Verilog
+
+```verilog
+generate
+    if (W > 8) begin
+        // ...
+    end
+endgenerate
+```
+
+### Syl
+
+```syl
+if W > 8 {
+    // ...
+}
+```
+
+Syl 的编译期 `if` 直接使用，不需要 `generate` 包围。条件必须是编译期可确定的 `Bool` 表达式。
+
+## 循环生成
+
+### Verilog
+
+```verilog
+generate
+    for (i = 0; i < N; i = i + 1) begin
+        // ...
+    end
+endgenerate
+```
+
+### Syl
+
+```syl
+for i in 0..N {
+    // ...
+}
+```
+
+Syl 的 `for` 循环在编译期展开，不需要 `generate`。
+
+## 参数
+
+### Verilog
+
+```verilog
+localparam W = 8;
+```
+
+### Syl
+
+```syl
+const W: Nat = 8
+```
+
+Syl 使用 `const` 声明编译期常量。常量的类型必须显式声明。
+
+## 接口
+
+Verilog 没有原生的接口概念（SystemVerilog 有 `interface`）。Syl 的 `interface` 和 `view` 提供了比 SystemVerilog interface 更强的类型检查。
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source { out payload, out valid, in ready }
+    view sink { in payload, in valid, out ready }
+}
+```
+
+## Verilog 到 Syl 的映射表
+
+以下表格列出了最常见的 Verilog 构造和对应的 Syl 构造：
+
+| Verilog | Syl |
+|---------|-----|
+| `module foo(input clk)` | `module foo(clk: in Clock<D>)` |
+| `parameter W = 8` | `<W: Nat = 8>` |
+| `wire [7:0] data` | `signal data: UInt<8>` |
+| `reg [7:0] data` | `reg data: UInt<8> reset(...)` |
+| `assign y = a & b` | `y := a and b` |
+| `always @(posedge clk)` | `reg` + `next` |
+| `if (rst) q <= 0` | `reg q reset(rst, 0)` |
+| `case (sel)` | `select` 或 `match` |
+| `generate for` | 编译期 `for` |
+| `generate if` | 编译期 `if` |
+| `function` | `fn` 或 `map` |
+
+## 迁移实践建议
+
+从 Verilog 迁移到 Syl 时，建议按以下步骤：
+
+1. 从最小的模块开始迁移。选择一个功能独立的模块（如计数器、加法器），用 Syl 重写。
+2. 编译并修复编译器报告的错误。Syl 的错误信息包含错误位置和类型，可以帮助定位问题。
+3. 对比 Verilog 和 Syl 的输出。确保生成的 SystemVerilog 行为一致。
+4. 逐步迁移更大的模块。
+
+常见迁移问题：
+- Verilog 中隐式的位宽扩展在 Syl 中需要显式处理
+- Verilog 中未连接的端口默认为高阻态，Syl 中编译器会报告错误
+- Verilog 中 `reg` 类型的读取限制在 Syl 中不适用
+
+## 关键差异总结
+
+| 特性 | Verilog | Syl |
+|------|---------|-----|
+| 端口方向 | input/output 在名字前 | in/out 在名字后 |
+| 参数 | parameter 字符串替换 | 类型安全的泛型参数 |
+| 连续赋值 | assign | `:=` |
+| 时序赋值 | always @(posedge clk) | `reg` + `next` |
+| 接口 | interface（SystemVerilog） | interface + view |
+| 条件生成 | generate if | 编译期 `if` |
+| 循环生成 | generate for | 编译期 `for` |
+| 类型检查 | 宽松，自动扩展 | 严格，必须匹配 |
+| 多驱动检测 | 不检查 | 编译期检查 |

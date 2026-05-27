@@ -1,0 +1,10 @@
+{
+  "title": "Project",
+  "icon": "project",
+  "pages": [
+    "roadmap",
+    "versioning-and-compatibility",
+    "release-policy",
+    "changelog"
+  ]
+}

@@ -1,0 +1,235 @@
+---
+title: 结构构造
+description: cell、port 的声明和 place 实例化。
+---
+
+# 结构构造
+
+Syl 的结构构造定义了硬件设计的层次结构：模块、端口、实例化和连接。本文说明 `module` 和 `cell` 的声明方式、端口声明规则和 `place` 实例化的用法。
+
+---
+
+## cell
+
+`cell` 定义一个可实例化的硬件单元。它是 Syl 中基本的层次单元。
+
+### 基本声明
+
+```syl
+cell AddOne(x: in UInt<8>, y: out UInt<8>) {
+    y := x + 1
+}
+```
+
+- `cell AddOne` 声明硬件单元名字
+- `(x: in UInt<8>, y: out UInt<8>)` 声明端口列表
+- `{ y := x + 1 }` 是模块体
+
+### 带泛型参数的 cell
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W> reset(rst, 0)
+    signal next_value: UInt<W> := value + 1
+    next value := next_value
+    count := value
+}
+```
+
+泛型参数写在模块名后的 `<...>` 中。实例化时指定具体值。
+
+### 带结果绑定的 cell
+
+Syl 支持模块返回值语法：
+
+```syl
+cell Counter<W: Nat>(
+    enable: in Bit,
+) -> count: UInt<W> {
+    reg value: UInt<W>
+    next value := value + 1
+    count := value
+}
+```
+
+结果绑定 `-> count: UInt<W>` 声明模块的输出。在模块体中对 `count` 赋值。
+
+## cell
+
+`cell` 和内联展开的硬件单元。它和 `module` 的语法相同，但行为不同：
+
+- `cell` 被实例化时，内部逻辑直接展开到父模块中
+- `module` 被实例化时，生成的 SV 代码中保持独立的模块层次
+
+```syl
+cell Add(x: in UInt<8>, y: in UInt<8>) -> result: UInt<8> {
+    result := x + y
+}
+
+cell Top(a: in UInt<8>, b: in UInt<8>, c: out UInt<8>) {
+    let adder = place Add(x: a, y: b)
+    c := adder.result
+}
+```
+
+`Add` 是 `cell`，生成的 SV 代码中不会有一个独立的 `Add` 模块。`Add` 的逻辑直接出现在 `Top` 模块中。
+
+何时使用 `cell`：当内联展开不会影响功能，且你希望减少模块层次时。何时使用 `module`：当你需要独立的模块层次（例如在不同位置实例化同一模块时复用逻辑）。
+
+## 端口声明
+
+### 端口方向
+
+每个端口必须声明方向：
+
+- `in`：输入。模块内部可以读取，不能赋值。
+- `out`：输出。模块内部可以赋值，不能读取。
+- `inout`：双向。模块内部可以读取和赋值。用于三态总线。
+
+```syl
+cell IO(
+    addr: in UInt<16>,
+    data: out UInt<8>,
+    bidir: inout Bit,
+)
+```
+
+### 端口类型
+
+端口类型可以是任意 Syl 类型：
+
+```syl
+cell Processor(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    cmd: in UInt<8>,
+    stream: out Stream<Packet>.source,
+)
+```
+
+### 驱动能力
+
+端口可以附加驱动能力声明，控制信号的读写权限：
+
+```syl
+cell Top(
+    x: in Bit,
+    y: out Bit,
+    z: inout Bit,
+)
+```
+
+编译器检查模块内部对每个端口的操作是否和方向一致。
+
+## place 实例化
+
+`place` 关键字实例化一个 `module` 或 `cell`。它创建一个硬件实例，占用实际的硬件资源。
+
+### 基本实例化
+
+```syl
+let inst = place Counter<8>(
+    clk: clk,
+    rst: rst,
+    enable: en,
+    count: cnt,
+)
+```
+
+- `Counter<8>` 实例化泛型参数 `W = 8` 的 `Counter`
+- `(clk: clk, rst: rst, ...)` 使用命名参数连接端口
+- `let inst` 绑定实例，后续可以访问实例的端口和结果
+
+### 访问实例的端口
+
+```syl
+let cnt = place Counter<8>(enable: en, count: cnt_val)
+signal val: UInt<8> := cnt.count    # 访问实例的输出端口
+```
+
+### 无绑定实例化
+
+如果不需要访问实例的输出，可以省略 `let`：
+
+```syl
+place Driver(clk: clk, data: data_out)
+```
+
+### 命名参数连接
+
+实例化时使用命名参数。参数的顺序不重要：
+
+```syl
+let inst = place Add(
+    y: b,        # 顺序不重要
+    x: a,        # 和声明顺序不同也可以
+    result: r,
+)
+```
+
+编译器根据端口名字匹配连接。
+
+## extern cell
+
+`extern cell` 声明一个外部模块的签名。它没有实现体，只有端口声明。
+
+```syl
+extern cell VendorIP(
+    clk: in Clock<D>,
+    data_in: in UInt<8>,
+    data_out: out UInt<8>,
+)
+```
+
+外部模块的实现不在 Syl 代码中。编译器根据签名生成正确的实例化和连接。
+
+外部模块可以与不透明摘要配合使用。摘要描述外部模块的内部行为（例如驱动哪些信号），供编译器的设计规则检查使用。
+
+## 常见错误
+
+### in 端口被赋值
+
+```syl
+cell Bad(x: in Bit) {
+    x := 1    # 错误：in 端口不能被赋值
+}
+```
+
+`in` 端口由外部驱动，模块内部只能读取。
+
+### out 端口被读取
+
+```syl
+cell Bad(y: out Bit) {
+    signal s: Bit := y    # 错误：out 端口不能被读取
+}
+```
+
+`out` 端口驱动外部信号，模块内部不能读取它的值。如果需要读取当前值，在模块内部定义一个 `signal`。
+
+### 实例化时漏接端口
+
+```syl
+cell Sub(a: in Bit, b: out Bit) { }
+cell Top(y: out Bit) {
+    let s = place Sub(a: y)    # 错误：b 未连接
+}
+```
+
+实例化时必须连接所有端口。如果某个端口不需要连接，可以考虑拆分模块设计。
+
+### 端口名拼写错误
+
+```syl
+cell Sub(data: in Bit) { }
+cell Top {
+    let s = place Sub(dat: 1)    # 错误：Sub 没有名为 dat 的端口
+}
+```
+
+实例化时端口名字必须匹配模块声明。
