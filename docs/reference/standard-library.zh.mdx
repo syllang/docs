@@ -1,0 +1,24 @@
+---
+title: 标准库全量参考（13 个模块）
+description: std.logic 到 std.fifo 全部 13 个纯 Syl 标准库模块的公开组件参考。
+---
+
+Syl 的纯 Syl 标准库（`examples/std/*.syl`）共包含 **13 个模块**：
+
+| 模块 | 公开组件（`cell` / `bundle` / `interface` / `map`） |
+| --- | --- |
+| `std.logic` | `map bit_mux`、`map bit_enable`、`map word_increment` |
+| `std.bundle` | `bundle ReadyValidWord<W>`、`bundle MaybeWord<W>`、`map valid_word`、`map invalid_word` |
+| `std.stream` | `interface Stream<T>`、`map stream_fire`、`cell stream_connect`、`cell stream_skid_buffer` |
+| `std.stage` | `interface Stage<T>`、`map fire`、`map moving`、`cell stage_from_stream`、`cell stage_to_stream`、`cell direct_link`、`cell map_stage`、`cell stage_link`、`cell halt_link`、`cell drop_link` |
+| `std.pipeline` | `interface Stage<T>`、`map fire`、`map moving`、`cell stage_from_stream`、`cell stage_to_stream`、`cell direct_link`、`cell map_stage`、`cell stage_link`、`cell halt_link`、`cell drop_link` |
+| `std.assert` | `map assert_pass`、`cell observe_stream`、`cell vendor_assert_stream_fire` |
+| `std.vendor` | `extern cell VendorReadyValidSlice`、`extern cell VendorAssertBit` |
+| `std.pulse` | `cell RisingEdgeDetector`、`cell FallingEdgeDetector`、`cell EdgeDetector`、`cell PulseStretcher` |
+| `std.skid` | `cell SkidBuffer`、`cell WordSkidBuffer` |
+| `std.arbiter` | `map first_request`、`cell FixedPriorityArbiter4`、`cell RoundRobinArbiter4` |
+| `std.cdc` | `cell Sync2FF`、`cell Sync2FFAsyncLow`、`cell PulseSynchronizer` |
+| `std.mem` | `cell SinglePortRam`、`cell SimpleDualPortRam`、`cell DistributedRam` |
+| `std.fifo` | `cell SyncFifo`、`cell StreamSyncFifo` |
+
+其中 `pulse`、`skid`、`arbiter`、`cdc`、`mem`、`fifo` 共 6 个核心时序/存储包已通过 `scripts/check_std_sim.sh` 中的 13 个 C++17 Verilator 仿真与 4 项 Yosys 综合验证。

@@ -1,0 +1,52 @@
+---
+title: 3. 用 syl.toml 组织多文件工程
+description: 配置工作区与 std.* 标准库，生成拓扑有序的 SystemVerilog 与 filelist.f。
+---
+
+真实硬件工程通常包含多个 `.syl` 文件并依赖标准库（`std.*`）。本教程将带你创建 `syl.toml` 项目清单，并生成多文件 SystemVerilog 输出与拓扑有序的 `filelist.f`。
+
+## 第一步：创建 `syl.toml`
+
+在项目根目录创建 `syl.toml`：
+
+```toml
+[project]
+name = "my_soc"
+version = "0.1.0"
+
+[paths]
+workspace_roots = ["src"]
+std_roots = ["examples/std"]
+package_roots = []
+opaque_summaries = []
+```
+
+`sylc` 与 `syl_lsp` 会从当前文件或工作目录自动向上发现 `syl.toml`。
+
+## 第二步：导入标准库模块
+
+在 `src/top.syl` 中导入 `std.pulse.RisingEdgeDetector`：
+
+```syl
+use std.pulse.RisingEdgeDetector
+
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    sig_in: in Bit,
+) -> pulse_out: Bit {
+    place RisingEdgeDetector<D>(clk: clk, rst: rst, level: sig_in, rising: pulse_out)
+}
+```
+
+## 第三步：发射多文件 SystemVerilog 与 `filelist.f`
+
+```bash
+sylc emit src/top.syl --out-dir build/sv --filelist build/sv/filelist.f --source-comments
+```
+
+`sylc emit` 会解析跨模块依赖、在必要时执行确定性命名消歧，并输出各模块的 `.sv` 文件及拓扑有序的 `filelist.f`，可直接交给 Verilator 或商业仿真器使用。
+
+## 下一步
+
+继续阅读 [4. 跨时钟域同步与同步 FIFO](/zh/docs/tutorials/cdc-and-fifo)。

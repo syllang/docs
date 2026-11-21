@@ -1,0 +1,33 @@
+---
+title: syl.toml 与 Opaque Summary Schema
+description: 项目清单字段与 schema_version = 1 JSON/TOML 外部黑盒摘要格式。
+---
+
+## `syl.toml` 结构规范
+
+```toml
+[project]
+name = "string"
+version = "semver"
+
+[paths]
+workspace_roots = ["src"]
+std_roots = ["examples/std"]
+package_roots = ["vendor/pkg"]
+opaque_summaries = ["vendor/ip.json"]
+```
+
+- 从输入文件或当前工作目录自动向上发现。
+- 可通过 `--manifest <path>` 显式指定。
+
+## Opaque Summary Schema（`schema_version = 1`）
+
+同时支持 JSON 与 TOML 格式（`RawDocument` 启用 `deny_unknown_fields`）：
+
+- `schema_version`：必须为 `1`。
+- `summaries`：`RawSummary` 列表：
+  - `kind`：例如 `"extern_cell"`
+  - `callable`：完整可调用路径（非空字符串）
+  - `endpoints`：可选 `RawEndpoint` 列表
+  - `driven_fields`、`consumed_fields`：可选字段列表
+  - `domain_behavior`（`"unknown"`、`"clockless"` 或 `{ "kind": "explicit", "clock_inputs": [...], "reset_inputs": [...] }`）、`latency_class`、`protocol_preservation`、`trust_boundary`、`backend_constraints`：可选元数据字段

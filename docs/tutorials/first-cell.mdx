@@ -1,0 +1,57 @@
+---
+title: 1. Quick Start & First Cell
+description: Install sylc, write your first combinational cell, and emit SystemVerilog.
+---
+
+In this tutorial you will build a minimal combinational `cell`, run static checks with `sylc check`, and emit SystemVerilog with `sylc emit`.
+
+## Prerequisites
+
+- Rust toolchain (`rustc` / `cargo`)
+- `sylc` built from `syllang/syl` (`origin/main` `7608b0d`):
+
+```bash
+cargo install --path crates/sylc
+sylc --version
+```
+
+## Step 1: Write `adder.syl`
+
+Create a file named `adder.syl`:
+
+```syl
+cell Adder8(
+    a: in UInt<8>,
+    b: in UInt<8>,
+) -> sum: UInt<8> {
+    sum := a + b
+}
+```
+
+Every `cell` declares typed directional ports (`in` / `out` / return port) and assigns each output exactly once (`:=`).
+
+## Step 2: Run `sylc check`
+
+```bash
+sylc check adder.syl
+```
+
+If there are no width mismatches, missing drivers, or driver overlaps, `sylc check` exits with status `0`.
+
+To inspect machine-readable diagnostics:
+
+```bash
+sylc check --diagnostics-format json adder.syl
+```
+
+## Step 3: Emit SystemVerilog
+
+```bash
+sylc emit adder.syl --out adder.sv
+```
+
+`sylc emit` lowers the checked HWIR into deterministic SystemVerilog-2012/2017 output.
+
+## Next Steps
+
+Continue to [2. Sequential Counter & Verilator](/docs/tutorials/sequential-counter-sim) to add `Clock`, `Reset`, registers, and cycle-accurate simulation.

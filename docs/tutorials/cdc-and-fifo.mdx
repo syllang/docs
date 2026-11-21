@@ -1,0 +1,38 @@
+---
+title: 4. CDC Synchronizer & Sync FIFO
+description: Cross clock domains safely with @cdc_sync and build a verified synchronous FIFO.
+---
+
+In this tutorial you will see how Syl's static CDC analysis catches illegal clock-domain crossings at compile time, and how to use `@cdc_sync` and `std.fifo.SyncFifo`.
+
+## Step 1: Observe a Static CDC Error
+
+If a register clocked by `clk_b` (`Clock<B>`) directly samples a signal `d` from domain `A`, `sylc check` rejects it with `E_MIDDLE_CDC_VIOLATION` before simulation.
+
+## Step 2: Use `std.cdc.Sync2FF`
+
+`std.cdc` provides `Sync2FF`, `Sync2FFAsyncLow`, and `PulseSynchronizer`, built on `@cdc_sync(in, out, dst_clk)`:
+
+```syl
+use std.cdc.Sync2FF
+
+cell SyncedPipeline<A: Domain, B: Domain>(
+    clk_a: in Clock<A>,
+    clk_b: in Clock<B>,
+    rst_b: in Reset<B, Sync, ActiveHigh>,
+    in_bit: in Bit,
+) -> out_bit: Bit {
+    let s = place Sync2FF<B>(dst_clk: clk_b, dst_rst: rst_b, async_in: in_bit)
+    out_bit := s
+}
+```
+
+## Step 3: Verify with `sylc check`
+
+```bash
+sylc check --std-root examples/std tutorial_cdc.syl
+```
+
+## Next Steps
+
+Explore [How-to Guides](/docs/how-to) for task-specific recipes or [Reference](/docs/reference) for the full 13-module standard library.

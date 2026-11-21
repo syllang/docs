@@ -1,0 +1,52 @@
+---
+title: 3. Multi-File Projects with syl.toml
+description: Organize packages, import std.* modules, and emit a topological filelist.f.
+---
+
+Real hardware projects span multiple `.syl` files and depend on the standard library (`std.*`). In this tutorial you will create a `syl.toml` manifest and emit a multi-file SystemVerilog bundle with a topologically ordered `filelist.f`.
+
+## Step 1: Create `syl.toml`
+
+In your project root, create `syl.toml`:
+
+```toml
+[project]
+name = "my_soc"
+version = "0.1.0"
+
+[paths]
+workspace_roots = ["src"]
+std_roots = ["examples/std"]
+package_roots = []
+opaque_summaries = []
+```
+
+`sylc` and `syl_lsp` automatically discover `syl.toml` by walking upward from the current file or working directory.
+
+## Step 2: Import Standard Library Modules
+
+In `src/top.syl`, import `std.pulse.RisingEdgeDetector`:
+
+```syl
+use std.pulse.RisingEdgeDetector
+
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    sig_in: in Bit,
+) -> pulse_out: Bit {
+    place RisingEdgeDetector<D>(clk: clk, rst: rst, level: sig_in, rising: pulse_out)
+}
+```
+
+## Step 3: Emit Multi-File SystemVerilog & `filelist.f`
+
+```bash
+sylc emit src/top.syl --out-dir build/sv --filelist build/sv/filelist.f --source-comments
+```
+
+`sylc emit` resolves cross-module dependencies, applies deterministic name disambiguation when needed, and writes each module along with a topologically sorted `filelist.f` ready for Verilator or commercial simulators.
+
+## Next Steps
+
+Continue to [4. CDC Synchronizer & Sync FIFO](/docs/tutorials/cdc-and-fifo).

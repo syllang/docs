@@ -1,0 +1,32 @@
+---
+title: Configure syl.toml & External Packages
+description: Set workspace_roots, std_roots, package_roots, and opaque_summaries in syl.toml.
+---
+
+`syl.toml` is the project manifest discovered automatically by walking upward from the target file or current working directory.
+
+## Minimal `syl.toml`
+
+```toml
+[project]
+name = "soc_core"
+version = "0.1.0"
+
+[paths]
+workspace_roots = ["src"]
+std_roots = ["examples/std"]
+package_roots = ["vendor/axi_pkg"]
+opaque_summaries = ["vendor/ip_summaries.json"]
+```
+
+## Explicit Overrides
+
+You can override discovery or add package roots on the command line:
+
+```bash
+sylc check --manifest path/to/syl.toml --package-root vendor/extra_pkg src/top.syl
+```
+
+## Hot Reload in `syl_lsp`
+
+`syl_lsp` watches `syl.toml` via `didChangeWatchedFiles` and reloads workspace roots, standard library roots, and opaque summaries without restarting the editor.

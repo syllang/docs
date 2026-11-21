@@ -1,0 +1,12 @@
+---
+title: Hardware Semantics & Driver Model
+description: Single-driver rules, capability tokens, and deterministic elaboration.
+---
+
+In Syl, `cell` bodies describe structural hardware connectivity rather than imperative control flow:
+
+- **Continuous assignment (`:=`)** binds a signal to a single combinational expression.
+- **Sequential registers (`reg ... reset(...)` + `next`)** bind state updates to a specific `Clock<D>` and `Reset<D, ...>`.
+- **Memories (`mem`)** use explicit `mem_write` and `mem_read_sync` / combinational indexing primitives.
+
+During elaboration, `syl_elab` builds driver facts for every net and verifies completeness and non-overlap before lowering to `syl_hw`.

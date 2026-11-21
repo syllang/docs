@@ -1,0 +1,15 @@
+---
+title: 原理解析
+description: Syl 的架构设计、编译器内部实现与语言设计哲学。
+---
+
+**原理解析（Explanation）** 以理解与深入为导向，阐明 Syl 背后的设计动机、编译管线与增量查询架构。
+
+<Cards>
+  <Card title="为什么追求静态可分析性" description="为什么 Syl 选择在编译期拦截位宽、多驱动与跨时钟域错误。" href="/zh/docs/explanation/why-static-analyzability" />
+  <Card title="硬件语义与驱动模型" description="单驱动约束、能力令牌与确定性展开。" href="/zh/docs/explanation/hardware-semantics-drivers" />
+  <Card title="Salsa 增量查询架构" description="Salsa 0.28.2 记忆化、AnalysisSnapshot 快照隔离与 50/100 文件压测。" href="/zh/docs/explanation/salsa-incremental-architecture" />
+  <Card title="编译管线" description="从 Syntax AST 到 HIR、TIR、EIR、HWIR 再到 SystemVerilog 的完整管线。" href="/zh/docs/explanation/compiler-pipeline" />
+  <Card title="循环语义与命名消歧" description="导入/常量/类型循环规则与确定性 FNV-1a SV 命名消歧。" href="/zh/docs/explanation/cycles-and-disambiguation" />
+  <Card title="仓库结构与贡献指南" description="Workspace crate 地图、conformance 测试集与 Verilator/Yosys 门禁。" href="/zh/docs/explanation/repository-and-contributing" />
+</Cards>

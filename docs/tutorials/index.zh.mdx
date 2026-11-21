@@ -1,0 +1,29 @@
+---
+title: 教程
+description: 从零开始学习 Syl 的手把手渐进式实战课程。
+---
+
+**教程（Tutorials）** 以学习为导向，带你一步步完成从编写第一个组合逻辑 Cell、时序仿真、多文件工程组织到跨时钟域与 FIFO 的完整实践。
+
+<Cards>
+  <Card
+    title="1. 快速开始与第一个 Cell"
+    description="安装 sylc，编写第一个组合逻辑 Cell，并生成 SystemVerilog。"
+    href="/zh/docs/tutorials/first-cell"
+  />
+  <Card
+    title="2. 时序计数器与 Verilator 仿真"
+    description="引入 Clock 与 Reset，编写同步计数器并使用 Verilator 进行周期级仿真。"
+    href="/zh/docs/tutorials/sequential-counter-sim"
+  />
+  <Card
+    title="3. 用 syl.toml 组织多文件工程"
+    description="配置工作区与 std.* 标准库，生成拓扑有序的 SystemVerilog 与 filelist.f。"
+    href="/zh/docs/tutorials/multi-file-project"
+  />
+  <Card
+    title="4. 跨时钟域同步与同步 FIFO"
+    description="使用 @cdc_sync 与 std.cdc 安全跨时钟域，并构建可综合的同步 FIFO。"
+    href="/zh/docs/tutorials/cdc-and-fifo"
+  />
+</Cards>

@@ -1,0 +1,32 @@
+---
+title: 配置 syl.toml 与外部包
+description: 在 syl.toml 中配置 workspace_roots、std_roots、package_roots 与 opaque_summaries。
+---
+
+`syl.toml` 是 Syl 的项目清单文件，`sylc` 与 `syl_lsp` 会从目标文件或当前工作目录自动向上发现它。
+
+## 标准 `syl.toml` 配置
+
+```toml
+[project]
+name = "soc_core"
+version = "0.1.0"
+
+[paths]
+workspace_roots = ["src"]
+std_roots = ["examples/std"]
+package_roots = ["vendor/axi_pkg"]
+opaque_summaries = ["vendor/ip_summaries.json"]
+```
+
+## 命令行显式覆盖
+
+可通过 CLI 参数显式指定清单或追加外部包根目录：
+
+```bash
+sylc check --manifest path/to/syl.toml --package-root vendor/extra_pkg src/top.syl
+```
+
+## `syl_lsp` 热重载
+
+`syl_lsp` 通过 `didChangeWatchedFiles` 监听 `syl.toml` 变更，无需重启编辑器即可自动重载工作区路径与外部摘要。

@@ -1,0 +1,31 @@
+---
+title: Integrate Vendor IP via Opaque Summary
+description: Describe blackbox extern cells with schema_version = 1 JSON/TOML summaries.
+---
+
+To integrate vendor blackbox IP (`extern cell`) without losing static CDC and driver checks, provide an external opaque summary (`schema_version = 1`) in JSON or TOML.
+
+## Example JSON Summary
+
+```json
+{
+  "schema_version": 1,
+  "summaries": [
+    {
+      "kind": "extern_cell",
+      "callable": "vendor.VendorAsyncFifo",
+      "endpoints": [],
+      "domain_behavior": "unknown"
+    }
+  ]
+}
+```
+
+## Register in `syl.toml`
+
+```toml
+[paths]
+opaque_summaries = ["vendor/ip_summaries.json"]
+```
+
+`sylc check --manifest syl.toml` validates `schema_version == 1` and loads each `RawSummary` into `OpaqueSummaryTable`.

@@ -1,0 +1,13 @@
+{
+  "title": "操作指南",
+  "pages": [
+    "index",
+    "configure-syl-toml",
+    "multi-file-sv-emit",
+    "opaque-summary-ip",
+    "editor-lsp-setup",
+    "cdc-and-async-reset",
+    "synthesizable-ram-fifo",
+    "verilator-and-yosys"
+  ]
+}

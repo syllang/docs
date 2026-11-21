@@ -1,0 +1,46 @@
+---
+title: Language Syntax & Type System
+description: Lexical syntax, types, Reset qualifiers, mem primitives, and @cdc_sync.
+---
+
+This reference summarizes Syl's core syntax and static type system as implemented in `origin/main` (`7608b0d`).
+
+## Primitive & Hardware Types
+
+- `Bit`: Single-bit hardware signal.
+- `UInt<W>` / `SInt<W>`: Unsigned and signed fixed-width integers (`W: nat`).
+- `Clock<D>`: Clock signal belonging to domain `D: Domain`.
+- `Reset<D, Mode, Polarity>`: Reset signal in domain `D`, where `Mode` is `Sync | Async` and `Polarity` is `ActiveHigh | ActiveLow`.
+- `struct` / `bundle` / `enum`: Composite types with finite value layout (recursive layouts are rejected with `E_MIDDLE_RECURSIVE_STRUCT` / `E_MIDDLE_RECURSIVE_BUNDLE`).
+
+## Sequential Logic & Reset Polarity
+
+```syl
+cell AsyncLowReg<D: Domain>(
+    clk: in Clock<D>,
+    rst_n: in Reset<D, Async, ActiveLow>,
+    d: in Bit,
+) -> q: Bit {
+    reg q_reg: UInt<8> reset(rst_n, 0)
+    next q_reg := d
+    q := d
+}
+```
+
+No new global keywords are introduced for `async` or `active_low`—they are parsed contextually inside `Reset<...>` and `reg ... reset(...)`.
+
+## Memory Primitives
+
+- `mem m: UInt<W>[DEPTH]`
+- `mem_write(m, clk, we, waddr, wdata)`
+- `mem_read_sync(m, clk, re, raddr)`
+- Combinational indexing `m[addr]` and `let` aliasing.
+
+## CDC Annotation
+
+- `@cdc_sync(in, out, dst_clk)` marks a legal clock-domain crossing (`inplace` is forbidden).
+
+## Function & Map Semantics
+
+- `fn` bodies undergo full type checking (`check_fn`), including local types, mutability, calls, conditions, and return paths.
+- `map` bodies enforce return-type consistency (`check_map`) and contextual polymorphism in nested expressions (`zero()`, `z()`, integer literals).
