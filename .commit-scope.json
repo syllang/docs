@@ -86,16 +86,22 @@
         "tsconfig.json"
       ]
     },
-    "docs/introduction": {
+    "docs": {
       "kind": "path",
       "paths": [
-        "docs/introduction"
+        "docs"
       ]
     },
-    "docs/language": {
+    "docs/tutorials": {
       "kind": "path",
       "paths": [
-        "docs/language"
+        "docs/tutorials"
+      ]
+    },
+    "docs/how-to": {
+      "kind": "path",
+      "paths": [
+        "docs/how-to"
       ]
     },
     "docs/reference": {
@@ -104,40 +110,10 @@
         "docs/reference"
       ]
     },
-    "docs/static-checks": {
+    "docs/explanation": {
       "kind": "path",
       "paths": [
-        "docs/static-checks"
-      ]
-    },
-    "docs/tooling": {
-      "kind": "path",
-      "paths": [
-        "docs/tooling"
-      ]
-    },
-    "docs/patterns": {
-      "kind": "path",
-      "paths": [
-        "docs/patterns"
-      ]
-    },
-    "docs/migration": {
-      "kind": "path",
-      "paths": [
-        "docs/migration"
-      ]
-    },
-    "docs/project": {
-      "kind": "path",
-      "paths": [
-        "docs/project"
-      ]
-    },
-    "docs/internals": {
-      "kind": "path",
-      "paths": [
-        "docs/internals"
+        "docs/explanation"
       ]
     }
   },
@@ -167,15 +143,10 @@
       "kind": "domain",
       "tier": "broad",
       "members": [
-        "docs/introduction",
-        "docs/language",
+        "docs/tutorials",
+        "docs/how-to",
         "docs/reference",
-        "docs/static-checks",
-        "docs/tooling",
-        "docs/patterns",
-        "docs/migration",
-        "docs/project",
-        "docs/internals"
+        "docs/explanation"
       ]
     }
   }

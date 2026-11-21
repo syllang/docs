@@ -36,10 +36,10 @@ const examples = {
     clk_b: in Clock<B>,
     d: in Bit,
 ) -> q: Bit {
-    reg r1: Bit reset(clk_b, 0)
+    reg r1: Bit reset(rst_b, 0)
     next r1 := d
 
-    reg r2: Bit reset(clk_a, 0)
+    reg r2: Bit reset(rst_a, 0)
     next r2 := r1
     q := r2
 }`,
@@ -113,11 +113,11 @@ const copy = {
     paths: [
       {
         label: 'I use Chisel / SpinalHDL / Verilog — what\'s different?',
-        href: '/docs/migration/from-chisel',
+        href: '/docs/tutorials',
       },
       {
         label: 'I\'m new — show me the language',
-        href: '/docs/language',
+        href: '/docs/reference',
       },
     ],
     footer: 'Syl is in early development. Standard library and some features are still being built.',
@@ -151,11 +151,11 @@ const copy = {
     paths: [
       {
         label: '我用 Chisel / SpinalHDL / Verilog — 有什么不同？',
-        href: '/zh/docs/migration/from-chisel',
+        href: '/zh/docs/tutorials',
       },
       {
         label: '我是新用户 — 带我看语言',
-        href: '/zh/docs/language',
+        href: '/zh/docs/reference',
       },
     ],
     footer: 'Syl 处于早期开发阶段。标准库和部分功能仍在实现中。',

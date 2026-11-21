@@ -26,8 +26,23 @@ export function baseOptions(locale: string): BaseLayoutProps {
     links: [
       {
         type: 'main',
-        text: isChinese ? '文档' : 'Docs',
-        url: isChinese ? '/zh/docs' : '/docs',
+        text: isChinese ? '教程' : 'Tutorials',
+        url: isChinese ? '/zh/docs/tutorials' : '/docs/tutorials',
+      },
+      {
+        type: 'main',
+        text: isChinese ? '指南' : 'How-to',
+        url: isChinese ? '/zh/docs/how-to' : '/docs/how-to',
+      },
+      {
+        type: 'main',
+        text: isChinese ? '参考' : 'Reference',
+        url: isChinese ? '/zh/docs/reference' : '/docs/reference',
+      },
+      {
+        type: 'main',
+        text: isChinese ? '原理' : 'Explanation',
+        url: isChinese ? '/zh/docs/explanation' : '/docs/explanation',
       },
     ],
     slots: {
