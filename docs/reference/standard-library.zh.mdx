@@ -13,7 +13,7 @@ Syl 的纯 Syl 标准库（`examples/std/*.syl`）共包含 **13 个模块**：
 | `std.stage` | `interface Stage<T>`、`map fire`、`map moving`、`cell stage_from_stream`、`cell stage_to_stream`、`cell direct_link`、`cell map_stage`、`cell stage_link`、`cell halt_link`、`cell drop_link` |
 | `std.pipeline` | `interface Stage<T>`、`map fire`、`map moving`、`cell stage_from_stream`、`cell stage_to_stream`、`cell direct_link`、`cell map_stage`、`cell stage_link`、`cell halt_link`、`cell drop_link` |
 | `std.assert` | `map assert_pass`、`cell observe_stream`、`cell vendor_assert_stream_fire` |
-| `std.vendor` | 厂商黑盒 IP 封装约定与 `extern cell` 模板 |
+| `std.vendor` | `extern cell VendorReadyValidSlice`、`extern cell VendorAssertBit` |
 | `std.pulse` | `cell RisingEdgeDetector`、`cell FallingEdgeDetector`、`cell EdgeDetector`、`cell PulseStretcher` |
 | `std.skid` | `cell SkidBuffer`、`cell WordSkidBuffer` |
 | `std.arbiter` | `map first_request`、`cell FixedPriorityArbiter4`、`cell RoundRobinArbiter4` |

@@ -20,7 +20,7 @@ const examples = {
     grant := req_b
 }`,
     diag: [
-      { text: 'error[E_DRIVER_OVERLAP]: multiple drivers for signal \'grant\'', kind: 'error' },
+      { text: 'error[E_MIDDLE_DUPLICATE_HARDWARE_DRIVER]: duplicate hardware driver for grant', kind: 'error' },
       { text: '  ┌─ arbiter.syl:5:5', kind: 'path' },
       { text: '  │', kind: 'plain' },
       { text: '5 │   grant := req_a', kind: 'code' },
@@ -44,7 +44,7 @@ const examples = {
     q := r2
 }`,
     diag: [
-      { text: 'error[E_DOMAIN]: clock domain mismatch', kind: 'error' },
+      { text: 'error[E_MIDDLE_CDC_VIOLATION]: CDC violation: r1 launched in clk_b sampled by r2 in clk_a', kind: 'error' },
       { text: '  ┌─ cross_domain.syl:6:30', kind: 'path' },
       { text: '  │', kind: 'plain' },
       { text: '6 │   reg r1: Bit reset(clk_b, 0)', kind: 'code' },
@@ -63,8 +63,8 @@ const examples = {
     b: in UInt<8>,
     c: in UInt<8>,
     d: in UInt<16>,
-) -> out: UInt<8> {
-    out := select {
+) -> res: UInt<8> {
+    res := select {
         sel eq 0 => a,
         sel eq 1 => b,
         sel eq 2 => c,
@@ -72,7 +72,7 @@ const examples = {
     }
 }`,
     diag: [
-      { text: 'error[E_TYPE_MISMATCH]: branch type mismatch in select', kind: 'error' },
+      { text: 'error[E_MIDDLE_TYPE_MISMATCH]: branch type mismatch in select', kind: 'error' },
       { text: '  ┌─ mux.syl:12:21', kind: 'path' },
       { text: '  │', kind: 'plain' },
       { text: '12│         default  => d,', kind: 'code' },

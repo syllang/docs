@@ -30,4 +30,4 @@ opaque_summaries = ["vendor/ip.json"]
   - `callable`：完整可调用路径（非空字符串）
   - `endpoints`：可选 `RawEndpoint` 列表
   - `driven_fields`、`consumed_fields`：可选字段列表
-  - `domain_behavior`、`latency_class`、`protocol_preservation`、`trust_boundary`、`backend_constraints`：可选元数据字段
+  - `domain_behavior`（`"unknown"`、`"clockless"` 或 `{ "kind": "explicit", "clock_inputs": [...], "reset_inputs": [...] }`）、`latency_class`、`protocol_preservation`、`trust_boundary`、`backend_constraints`：可选元数据字段

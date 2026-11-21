@@ -30,4 +30,4 @@ Supported in both JSON and TOML formats (`RawDocument` with `deny_unknown_fields
   - `callable`: Qualified callable path (non-blank string)
   - `endpoints`: Optional list of `RawEndpoint`
   - `driven_fields`, `consumed_fields`: Optional field lists
-  - `domain_behavior`, `latency_class`, `protocol_preservation`, `trust_boundary`, `backend_constraints`: Optional metadata fields
+  - `domain_behavior` (`"unknown"`, `"clockless"`, or `{ "kind": "explicit", "clock_inputs": [...], "reset_inputs": [...] }`), `latency_class`, `protocol_preservation`, `trust_boundary`, `backend_constraints`: Optional metadata fields
