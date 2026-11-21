@@ -1,0 +1,46 @@
+---
+title: 语言语法与类型系统
+description: 词法语法、类型、Reset 限定符、mem 原语与 @cdc_sync。
+---
+
+本参考页总结了 Syl `origin/main`（`7608b0d`）中的核心语法与静态类型系统。
+
+## 基础与硬件类型
+
+- `Bit`：单比特硬件信号。
+- `UInt<W>` / `SInt<W>`：无符号与有符号定宽整数（`W: nat`）。
+- `Clock<D>`：属于时钟域 `D: Domain` 的时钟信号。
+- `Reset<D, Mode, Polarity>`：属于时钟域 `D` 的复位信号，`Mode` 为 `Sync | Async`，`Polarity` 为 `ActiveHigh | ActiveLow`。
+- `struct` / `bundle` / `enum`：复合类型，要求有限值布局（递归布局会触发 `E_MIDDLE_RECURSIVE_STRUCT` / `E_MIDDLE_RECURSIVE_BUNDLE`）。
+
+## 时序逻辑与复位极性
+
+```syl
+cell AsyncLowReg<D: Domain>(
+    clk: in Clock<D>,
+    rst_n: in Reset<D, Async, ActiveLow>,
+    d: in Bit,
+) -> q: Bit {
+    reg q_reg: UInt<8> reset(rst_n, 0)
+    next q_reg := d
+    q := d
+}
+```
+
+`async` 与 `active_low` 仅在 `Reset<...>` 与 `reg ... reset(...)` 上下文中解析，不占用全局关键字。
+
+## 存储器原语
+
+- `mem m: UInt<W>[DEPTH]`
+- `mem_write(m, clk, we, waddr, wdata)`
+- `mem_read_sync(m, clk, re, raddr)`
+- 组合索引 `m[addr]` 与 `let` 别名。
+
+## 跨时钟域标注
+
+- `@cdc_sync(in, out, dst_clk)` 用于标注合法的跨时钟域边界（禁止 `inplace`）。
+
+## 函数与 Map 语义
+
+- `fn` 函数体执行完整类型检查（`check_fn`），涵盖局部变量类型、可变性、调用、条件与返回路径。
+- `map` 强制返回类型一致性（`check_map`），并在嵌套上下文中保留 `zero()`、`z()` 与整数字面量的多态性。

@@ -1,0 +1,17 @@
+---
+title: Model Synthesizable RAM & FIFO
+description: Use mem, mem_write, mem_read_sync, and std.mem / std.fifo.
+---
+
+Syl provides synthesizable memory primitives (`mem`, `mem_write`, `mem_read_sync`, combinational indexing, and `let` aliasing) that lower to standard SystemVerilog memory arrays inferred by Verilator and Yosys.
+
+## Memory Primitives
+
+- `mem m: UInt<W>[DEPTH]` declares a memory array.
+- `mem_write(m, clk, we, waddr, wdata)` performs synchronous write.
+- `mem_read_sync(m, clk, re, raddr)` performs synchronous read.
+- `m[addr]` performs combinational read (for distributed RAM).
+
+## Standard Library Wrappers
+
+For production designs, prefer `std.mem` (`SinglePortRam`, `SimpleDualPortRam`, `DistributedRam`) and `std.fifo` (`SyncFifo`, `StreamSyncFifo`), all verified with Verilator and Yosys.

@@ -1,0 +1,15 @@
+---
+title: Repository & Contributing
+description: Crate map, conformance suite, Verilator/Yosys gates, and workflow.
+---
+
+## Workspace Crates (`syllang/syl`)
+
+- `syl_span`, `syl_syntax`, `syl_hir`, `syl_sema`, `syl_elab`, `syl_hw`, `syl_emit`
+- `syl_query`, `syl_session` (Salsa 0.28.2 incremental engine)
+- `sylc` (CLI), `syl_lsp` (LSP server), `syl_fuzz` (fuzzing)
+
+## Verification Gates
+
+- `cargo test --workspace` (including file-driven `conformance/` suite)
+- `./scripts/check_std_sim.sh` (13 C++17 Verilator simulations + 4 Yosys synthesis checks)

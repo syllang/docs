@@ -1,0 +1,29 @@
+---
+title: 发射多文件 SystemVerilog 与 filelist.f
+description: 使用 sylc check / sylc emit、--out-dir、--filelist 与 --source-comments。
+---
+
+当设计跨越多个包时，`sylc emit` 会生成 `EmittedSvBundle`，为每个模块输出独立的 `.sv` 文件并生成拓扑有序的 `filelist.f`。
+
+## 发射多文件 Bundle
+
+```bash
+sylc emit src/top.syl \
+  --out-dir build/sv \
+  --filelist build/sv/filelist.f \
+  --source-comments
+```
+
+## 确定性命名消歧
+
+- 无冲突的 `cell` 与 `extern cell` 保留短名。
+- 跨包同名冲突项会确定性地消歧为 `pkg__Cell`，并在需要时附加 FNV-1a 二级后缀。
+
+## 人类可读与 JSON 诊断格式
+
+```bash
+sylc check --diagnostics-format human src/top.syl
+sylc check --diagnostics-format json src/top.syl
+```
+
+`human` 模式基于 `SourceMap` 渲染源码上下文；`json` 模式输出结构化诊断供 CI 解析。

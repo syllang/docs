@@ -1,13 +1,12 @@
 {
   "title": "Reference",
-  "icon": "reference",
   "pages": [
-    "lexical-syntax",
-    "grammar",
-    "builtins",
-    "attributes",
-    "cli",
-    "lsp",
-    "diagnostics"
+    "index",
+    "language-syntax-types",
+    "standard-library",
+    "manifest-and-opaque-schema",
+    "cli-and-json-diagnostics",
+    "lsp-protocol",
+    "diagnostic-codes"
   ]
 }

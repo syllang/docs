@@ -1,0 +1,50 @@
+---
+title: 2. Sequential Counter & Verilator Simulation
+description: Add Clock and Reset, model a synchronous counter, and simulate it with Verilator.
+---
+
+In this tutorial you will write a synchronous 8-bit counter with `Clock<D>` and `Reset<D, Sync, ActiveHigh>`, emit SystemVerilog, and verify it with Verilator.
+
+## Step 1: Write `counter.syl`
+
+```syl
+cell Counter8<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    en: in Bit,
+) -> count: UInt<8> {
+    reg q: UInt<8> reset(rst, 0)
+    next q := select {
+        en => q + 1,
+        default => q,
+    }
+    count := q
+}
+```
+
+Notice how `Clock<D>` and `Reset<D, Sync, ActiveHigh>` share the domain parameter `D`. The compiler verifies that `rst` belongs to the same clock domain as `clk`.
+
+## Step 2: Check and Emit
+
+```bash
+sylc check counter.syl
+sylc emit counter.syl --out counter.sv
+```
+
+## Step 3: Lint and Simulate with Verilator
+
+```bash
+verilator --lint-only --sv --top-module Counter8 counter.sv
+```
+
+Write a minimal C++17 testbench `counter_test.cpp` and run:
+
+```bash
+verilator --cc --exe --build -j 2 --sv --top-module Counter8 \
+  -CFLAGS "-std=c++17" counter.sv counter_test.cpp -o sim
+./obj_dir/sim
+```
+
+## Next Steps
+
+Continue to [3. Multi-File Projects with syl.toml](/docs/tutorials/multi-file-project).

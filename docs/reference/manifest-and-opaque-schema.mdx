@@ -1,0 +1,33 @@
+---
+title: syl.toml & Opaque Summary Schema
+description: Manifest fields and schema_version = 1 JSON/TOML opaque summaries.
+---
+
+## `syl.toml` Schema
+
+```toml
+[project]
+name = "string"
+version = "semver"
+
+[paths]
+workspace_roots = ["src"]
+std_roots = ["examples/std"]
+package_roots = ["vendor/pkg"]
+opaque_summaries = ["vendor/ip.json"]
+```
+
+- Discovered automatically by walking upward from the input file or current working directory.
+- Can be overridden via `--manifest <path>`.
+
+## Opaque Summary Schema (`schema_version = 1`)
+
+Supported in both JSON and TOML formats (`RawDocument` with `deny_unknown_fields`):
+
+- `schema_version`: Must be `1`.
+- `summaries`: List of `RawSummary` entries:
+  - `kind`: e.g. `"extern_cell"`
+  - `callable`: Qualified callable path (non-blank string)
+  - `endpoints`: Optional list of `RawEndpoint`
+  - `driven_fields`, `consumed_fields`: Optional field lists
+  - `domain_behavior`, `latency_class`, `protocol_preservation`, `trust_boundary`, `backend_constraints`: Optional metadata fields

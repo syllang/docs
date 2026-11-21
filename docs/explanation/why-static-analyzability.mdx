@@ -1,0 +1,10 @@
+---
+title: Why Static Analyzability
+description: Why Syl rejects width, driver, and CDC errors at compile time.
+---
+
+Hardware bugs caught only in gate-level simulation or on silicon are orders of magnitude more expensive than those caught at compile time. Syl is designed around **static analyzability**:
+
+- **Zero implicit width truncation**: `UInt<8>` and `UInt<16>` never silently truncate or zero-extend.
+- **Single-driver discipline**: Every signal has one deterministic driver; `E_DRIVER_OVERLAP` rejects last-connect-wins ambiguity.
+- **Domain-typed clocks and resets**: `Clock<D>` and `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` prevent accidental clock-domain crossings (`E_MIDDLE_CDC_VIOLATION`) and reset domain mismatches (`E_MIDDLE_RESET_DOMAIN_MISMATCH`).

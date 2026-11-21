@@ -1,0 +1,13 @@
+---
+title: Compiler Pipeline
+description: From Syntax AST through HIR, TIR, EIR, HWIR, to SystemVerilog.
+---
+
+Syl lowers source files through six deterministic stages:
+
+1. **Syntax (`syl_syntax`)**: Lossless lexer/parser producing `Arc<ParsedFileOutput>` with `SourceMap` spans.
+2. **HIR (`syl_hir`)**: Module resolution, `use` imports, and `E_DUPLICATE_MODULE_FILE` detection.
+3. **TIR (`syl_sema`)**: Type inference, `check_fn` / `check_map`, const evaluation (10,000-step limit), and recursive layout checks.
+4. **EIR (`syl_elab`)**: Per-module elaboration, map inlining, driver facts, CDC & reset domain DRC.
+5. **HWIR (`syl_hw`)**: Hardware-level netlist representation.
+6. **SystemVerilog (`syl_emit`)**: Multi-file `EmittedSvBundle`, deterministic name disambiguation, and topological `filelist.f`.

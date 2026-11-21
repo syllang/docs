@@ -1,0 +1,24 @@
+---
+title: 诊断错误码速查表
+description: Syl 编译器真实诊断错误码速查。
+---
+
+| 错误码 | 阶段 | 含义 |
+| --- | --- | --- |
+| `E_SYNTAX_PARSE` | Syntax | 语法解析错误 |
+| `E_DUPLICATE_MODULE_FILE` | HIR 组装 | 多个文件 URI 映射到同一模块路径 |
+| `E_MANIFEST_PARSE` | Manifest | 解析 `syl.toml` 失败 |
+| `E_OPAQUE_SUMMARY_PARSE` | Manifest | 解析 JSON/TOML Opaque Summary 失败 |
+| `E_MIDDLE_UNKNOWN_IMPORT` | HIR | 导入的符号在目标模块中不存在 |
+| `E_MIDDLE_UNRESOLVED_NAME` | HIR / TIR | 作用域内无法解析的标识符 |
+| `E_MIDDLE_TYPE_MISMATCH` | TIR | 类型或位宽不匹配 |
+| `E_MIDDLE_CONST_CYCLE` | TIR / EIR | `const` 定义存在循环依赖 |
+| `E_MIDDLE_CONST_STEP_LIMIT` | TIR | 常量求值器超过 10,000 步上限 |
+| `E_MIDDLE_RECURSIVE_STRUCT` | TIR | `struct` 值布局存在无限递归 |
+| `E_MIDDLE_RECURSIVE_BUNDLE` | TIR | `bundle` 值布局存在无限递归 |
+| `E_MIDDLE_REQUIRES_NAT` | TIR | 表达式必须求值为 `nat` |
+| `E_MIDDLE_UNSUPPORTED_HW_VALUE_EXPR` | EIR | 硬件值降级不支持的表达式（如 map 循环） |
+| `E_MIDDLE_DUPLICATE_HARDWARE_DRIVER` | Elaboration / DRC | 同一信号存在多个驱动源 |
+| `E_MIDDLE_UNDRIVEN_OUT` | Elaboration / DRC | 输出端口缺少驱动 |
+| `E_MIDDLE_CDC_VIOLATION` | Elaboration / DRC | 未经 `@cdc_sync` 的非法跨时钟域采样 |
+| `E_MIDDLE_RESET_DOMAIN_MISMATCH` | Elaboration / DRC | 复位信号与寄存器时钟域不匹配 |
