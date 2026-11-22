@@ -1,0 +1,107 @@
+---
+title: LSP and Editors
+description: Configure syl-lsp for VS Code, Neovim, and Helix, with syl.toml auto-discovery, hot-reload, incremental sync, and async DRC.
+---
+
+# LSP and Editors
+
+The Syl Language Server (`syl-lsp`) provides code completion, hover information, go-to-definition, and real-time diagnostics for editors. This guide covers setup, editor configuration, and architecture.
+
+---
+
+## Starting the Language Server
+
+The LSP server is implemented in the `syl_lsp` crate. Start it from your PATH:
+
+```bash
+syl-lsp
+```
+
+The server communicates with editors over `stdin`/`stdout` using JSON-RPC.
+
+## Supported Capabilities
+
+### Hover
+
+Hover over any expression or signal to inspect its inferred type, bit width, and clock domain:
+
+```syl
+signal data: UInt<8>
+// Hovering over `data` shows: UInt<8>
+```
+
+### Go to Definition & Find References
+
+Jump to declarations of signals, `cell`s, `bundle`s, and `enum`s across files, or find all references across the workspace.
+
+### Completions
+
+Provides context-aware completions at the cursor: module ports, local signals, `std.*` modules, and keywords.
+
+### Diagnostics
+
+Marks syntax, semantic, and elaboration DRC errors in real time with error codes and spans. Diagnostics update automatically as you type.
+
+### Document Symbols
+
+Outlines `cell`, `bundle`, `enum`, `fn`, and `map` definitions in the current file.
+
+## `syl.toml` Auto-Discovery & Hot-Reload
+
+On initialization, `syl-lsp` walks up from the workspace root to discover the nearest `syl.toml`. It watches `syl.toml` via `workspace/didChangeWatchedFiles`:
+
+- Saving changes to `workspace_roots`, `package_roots`, or `opaque_summaries` triggers an automatic workspace reload without restarting the editor.
+- If `syl.toml` contains a syntax error or unknown field (`deny_unknown_fields`), `syl-lsp` publishes the parse error directly on `syl.toml`.
+
+## Incremental Sync & Async Background DRC
+
+`syl-lsp` uses a two-tier diagnostic pipeline:
+
+1. **Incremental Document Sync**: Edits are synced incrementally to `syl_session::AnalysisHost` via `didChange`, avoiding re-parsing unchanged files.
+2. **Asynchronous Background DRC**: Fast syntax and type diagnostics are published immediately, while heavier elaboration DRC runs on a background worker channel so typing stays responsive.
+
+## Editor Configuration
+
+### VS Code
+
+Install a custom LSP client extension and configure `syl-lsp`:
+
+```json
+{
+    "lsp": {
+        "syl": {
+            "command": ["syl-lsp"]
+        }
+    }
+}
+```
+
+### Neovim
+
+```lua
+vim.lsp.start({
+    name = "syl",
+    cmd = { "syl-lsp" },
+    root_dir = vim.fs.root(0, { "syl.toml", ".git" }),
+})
+```
+
+### Helix
+
+Add to `~/.config/helix/languages.toml`:
+
+```toml
+[language-server.syl]
+command = "syl-lsp"
+
+[[language]]
+name = "syl"
+language-servers = ["syl"]
+scope = "source.syl"
+file-types = ["syl"]
+```
+
+## Current Limitations
+
+- Rename refactoring and code actions (quick fixes) are not yet supported.
+- Signature help for `cell` instantiations is not yet implemented.

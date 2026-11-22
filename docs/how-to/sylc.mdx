@@ -1,0 +1,78 @@
+---
+title: Using sylc
+description: How to run sylc check and sylc emit, configure manifests and package roots, and inspect human or JSON diagnostics.
+---
+
+`sylc` is the command-line driver for the Syl compiler. It validates Syl designs through parsing, semantic analysis, elaboration, and DRC, and emits synthesizable SystemVerilog.
+
+## Subcommands
+
+`sylc` provides two primary subcommands:
+
+- `sylc check`: Type-check and run elaboration DRC without emitting SystemVerilog.
+- `sylc emit`: Check and emit SystemVerilog to stdout, a single file (`--out`), or a directory (`--out-dir`).
+
+### Checking a Design
+
+```bash
+# Check a single file (auto-discovers syl.toml)
+sylc check src/top.syl
+
+# Check multiple files with explicit standard library and manifest
+sylc check --manifest syl.toml --std-root vendor/std src/top.syl src/counter.syl
+
+# Emit machine-readable JSON diagnostics for CI
+sylc check --diagnostics-format json src/top.syl
+```
+
+### Emitting SystemVerilog
+
+```bash
+# Print SystemVerilog to stdout
+sylc emit src/top.syl
+
+# Write a single SystemVerilog file
+sylc emit --out build/top.sv src/top.syl
+
+# Write one file per module plus a dependency-ordered filelist.f
+sylc emit --out-dir build/sv --source-comments src/top.syl
+```
+
+## Compilation Pipeline
+
+`sylc` executes four deterministic stages:
+
+1. **Parsing**: Reads `.syl` source files and builds the AST.
+2. **Semantic Analysis**: Performs name resolution, type checking, clock-domain/capability checks, and `OpaqueSummary` validation.
+3. **Elaboration & DRC**: Evaluates compile-time `const`/`fn`/`for`/`if` constructs, expands `cell` hierarchies, and runs Design Rule Checks (single-driver, exhaustiveness, CDC crossings, reset polarity).
+4. **Backend Emission**: Lowers HWIR to SystemVerilog AST, validates structural integrity, and renders `.sv` files with optional `SourceMap` comments.
+
+If any stage reports an error, `sylc` prints diagnostics to `stderr` and exits with a non-zero status code.
+
+## Diagnostics & `SourceMap` Rendering
+
+### Human Format (`--diagnostics-format human`)
+
+By default, `sylc` renders diagnostics with `SourceMap` spans pointing to the exact file, line, and column:
+
+- **Severity**: `error` or `warning`
+- **Diagnostic code**: e.g. `E_MIDDLE_TYPE_MISMATCH`
+- **Message**: Actionable description of the violation
+- **Source span**: File path, line, column, and highlighted source line
+
+### JSON Format (`--diagnostics-format json`)
+
+For CI pipelines and editor integrations, `--diagnostics-format json` outputs structured diagnostic records containing the code, severity, message, and primary/secondary spans.
+
+## Options Reference
+
+| Option | Subcommands | Description |
+| :--- | :--- | :--- |
+| `--manifest <PATH>` | `check`, `emit` | Path to `syl.toml` (overrides automatic upward discovery). |
+| `--std-root <PATH>` | `check`, `emit` | Path to the `std.*` standard library root. |
+| `--package-root <PATH>` | `check`, `emit` | Additional package root for external Syl libraries. |
+| `--diagnostics-format <FMT>` | `check`, `emit` | Output format: `human` (default) or `json`. |
+| `--out <OUTPUT>` | `emit` | Write a single SystemVerilog file. |
+| `--out-dir <DIR>` | `emit` | Write one SystemVerilog file per module and a dependency-ordered filelist. |
+| `--filelist <PATH>` | `emit` | Custom path for the generated filelist (defaults to `<out-dir>/filelist.f`). |
+| `--source-comments` | `emit` | Include Syl source file and line comments in generated SystemVerilog. |

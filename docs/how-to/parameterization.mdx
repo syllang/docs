@@ -1,0 +1,119 @@
+---
+title: Parameterization
+description: Compile-time generics, const parameters, check_fn/check_map constraints, and structural hardware generation.
+---
+
+Syl separates compile-time elaboration (`Nat`, `Bool`, `fn`, `const`, `for`, `if`) from runtime hardware (`Bit`, `UInt<W>`, `signal`, `reg`). This lets you write highly reusable, parameterized hardware generators that are statically checked before SystemVerilog emission.
+
+## Generic `cell` and `bundle` Parameters
+
+```syl
+cell RegisterFile<W: Nat, DEPTH: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    we: in Bit,
+    waddr: in UInt<clog2(DEPTH)>,
+    wdata: in UInt<W>,
+    raddr: in UInt<clog2(DEPTH)>,
+    rdata: out UInt<W>,
+) {
+    ...
+}
+```
+
+## Compile-Time Validation with `check_fn` and `check_map`
+
+Use `compile_error` inside `fn` or `check_fn` / `check_map` to enforce parameter invariants (such as power-of-two depths or minimum widths) at elaboration time:
+
+```syl
+fn is_pow2(n: Nat) -> Bool {
+    return n > 0 and (n & (n - 1)) == 0
+}
+
+check_fn require_pow2(n: Nat) {
+    if !is_pow2(n) {
+        compile_error("DEPTH must be a power of two")
+    }
+}
+```
+
+Similarly, `check_map` validates constraints on `map` combinational transforms before lowering.
+
+## Structural Generation with `for` and `if`
+
+- **`for i in 0..N`**: Unrolls at elaboration time, generating `N` independent hardware instances or wire connections.
+- **`if cond { ... } else { ... }`**: `cond` must be a compile-time `Bool`. Untaken branches generate zero hardware.
+
+```syl
+for i in 0..LANES {
+    let lane = place LaneCore<W, D>(clk: clk, rst: rst, din: din[i], dout: dout[i])
+}
+```
+
+## Best Practices
+
+1. **Validate early**: Guard every generic `cell` with `check_fn` or `compile_error` so invalid parameters fail with a clear message instead of downstream width mismatches.
+2. **Watch `for` loop area**: `for i in 0..1024` elaborates 1024 physical hardware copies.
+
+## Parameterized `bundle` and `map`
+
+Generics work on `bundle` and `map` as well as `cell`:
+
+```syl
+bundle Packet<W: Nat> {
+    data: UInt<W>,
+    parity: Bit,
+}
+
+map zero_packet<W: Nat>() -> Packet<W> = Packet<W> {
+    data: 0,
+    parity: 0,
+}
+```
+
+## Compile-Time `const` and `fn`
+
+Use `const` and `fn` to compute derived widths (such as `clog2`) at elaboration time:
+
+```syl
+fn clog2(n: Nat) -> Nat {
+    var v: Nat = n - 1
+    var r: Nat = 0
+    while v > 0 {
+        v = v >> 1
+        r = r + 1
+    }
+    return r
+}
+
+const ADDR_W: Nat = clog2(64) -- evaluates to 6
+```
+
+## Conditional Hardware Generation (`if` / `else`)
+
+Because `if` requires a compile-time `Bool`, untaken branches generate zero hardware:
+
+```syl
+cell OptionalRegister<W: Nat, BYPASS: Bool, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    din: in UInt<W>,
+    dout: out UInt<W>,
+) {
+    if BYPASS {
+        dout := din
+    } else {
+        reg r: UInt<W> reset(rst, 0)
+        next r := din
+        dout := r
+    }
+}
+```
+
+## Parameter Validation Summary
+
+| Mechanism | When Checked | Use Case |
+| :--- | :--- | :--- |
+| `check_fn` | Before `cell` elaboration | Enforce power-of-two depths, min/max widths |
+| `check_map` | Before `map` lowering | Validate bit-slice bounds |
+| `compile_error("...")` | During `fn` / `if` evaluation | Custom diagnostic messages for invalid configs |

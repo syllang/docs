@@ -1,0 +1,82 @@
+---
+title: From SpinalHDL
+description: Migrate from SpinalHDL to Syl, comparing Component, ClockDomain, RegInit, Stream, and Area.
+---
+
+SpinalHDL and Syl share many design philosophies: both treat clock domains as first-class concepts and provide `Stream` handshakes out of the box.
+
+## Concept Mapping
+
+| SpinalHDL | Syl | Notes |
+| :--- | :--- | :--- |
+| `Component` | `cell` | Structural hardware unit. |
+| `ClockDomain` | `Domain` + `Clock<D>` + `Reset<D, ...>` | Checked statically across `cell` boundaries. |
+| `Reg(UInt(8 bits)) init(0)` | `reg r: UInt<8> reset(rst, 0)` | Single `next r := ...` assignment. |
+| `Stream[T]` (`master`/`slave`) | `Stream<T>` (`source`/`sink`) | Directional `view`s. |
+| `switch` / `is` | `match` (on `enum`) / `select` | `match` is statically exhaustive. |
+| `BlackBox` | `extern cell` + Opaque Summary | Supports `domain_behavior` and `cdc_crossings`. |
+
+## Clock Domains
+
+In SpinalHDL, `ClockDomain` is passed implicitly via `ClockingArea`. In Syl, `D: Domain` is an explicit type parameter on `cell`, `Clock<D>`, and `Reset<D, Mode, Polarity>`, making cross-domain mistakes impossible to miss in code review or compilation.
+
+## `Stream` & `Flow` Comparison
+
+SpinalHDL's `Stream[T]` (`master`/`slave`) maps directly to Syl's `std.stream.Stream<T>` (`source`/`sink`). Both support pipelining (`stage_link` / `m2sPipe`), skid buffers (`SkidBuffer` / `s2mPipe`), and FIFOs (`SyncFifo` / `StreamFifo`).
+
+```syl
+use std.stream.Stream
+use std.skid.SkidBuffer
+
+cell StreamPipe<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_s: in Stream<UInt<16>>.sink,
+    out_s: out Stream<UInt<16>>.source,
+) {
+    let skid = place SkidBuffer<UInt<16>, D>(
+        clk: clk,
+        rst: rst,
+        input: in_s,
+        output: out_s,
+    )
+}
+```
+
+## `Area` vs. Sub-`cell`s
+
+In SpinalHDL, `new Area { ... }` groups logic inside a `Component` without creating a hierarchy boundary. In Syl, use `cell` + `place` for clean modular boundaries, or `map` for pure combinational helpers:
+
+```syl
+map saturating_add(a: UInt<8>, b: UInt<8>) -> UInt<8> = select {
+    (a + b) < a => 255,
+    default => a + b,
+}
+```
+
+## `ClockDomain` & Reset Polarity
+
+SpinalHDL configures reset polarity via `ClockDomainConfig(resetKind = ASYNC, resetActiveLevel = LOW)`. Syl encodes this directly in the port type `Reset<D, Async, ActiveLow>`:
+
+```syl
+cell AsyncLowReg<D: Domain>(
+    clk: in Clock<D>,
+    rst_n: in Reset<D, Async, ActiveLow>,
+    d: in UInt<8>,
+    q: out UInt<8>,
+) {
+    reg r: UInt<8> reset(rst_n, 0, async, active_low)
+    next r := d
+    q := r
+}
+```
+
+## Migration Summary
+
+| SpinalHDL | Syl |
+| :--- | :--- |
+| `Component` | `cell` |
+| `ClockDomain` | `Domain` + `Clock<D>` + `Reset<D, Mode, Pol>` |
+| `Reg(UInt(8 bits)) init(0)` | `reg r: UInt<8> reset(rst, 0)` |
+| `Stream[T]` (`master`/`slave`) | `Stream<T>` (`source`/`sink`) |
+| `BlackBox` | `extern cell` + Opaque Summary (`schema_version = 1`) |

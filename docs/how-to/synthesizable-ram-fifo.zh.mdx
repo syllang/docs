@@ -1,0 +1,115 @@
+---
+title: 可综合 RAM 与 FIFO
+description: 使用 mem、mem_write、mem_read_sync、std.mem 与 std.fifo 建模 BRAM、分布式 RAM 与同步 FIFO。
+---
+
+在大型存储器中使用寄存器数组（`reg arr: [DEPTH] UInt<W>`）会迫使综合工具将每个比特映射为触发器，迅速耗尽 FPGA 的 FF 资源。Syl 提供了专用的存储器原语（`mem`、`mem_write`、`mem_read_sync`）以及标准库封装（`std.mem`、`std.fifo`），能够稳定推断为 FPGA Block RAM（BRAM）或分布式 RAM。
+
+## 存储器原语：`mem`、`mem_write`、`mem_read_sync`
+
+使用 `mem` 声明存储器阵列：
+
+```syl
+cell SimpleDualPortRam<W: Nat, DEPTH: Nat, D: Domain>(
+    clk: in Clock<D>,
+    we: in Bit,
+    waddr: in UInt<clog2(DEPTH)>,
+    wdata: in UInt<W>,
+    re: in Bit,
+    raddr: in UInt<clog2(DEPTH)>,
+    rdata: out UInt<W>,
+) {
+    mem ram: [DEPTH] UInt<W>
+
+    mem_write(ram, waddr, wdata, we)
+    rdata := mem_read_sync(ram, raddr, re)
+}
+```
+
+### `sylc` 的降级规则
+
+- `mem ram: [DEPTH] UInt<W>` 生成标准 SystemVerilog 存储器数组 `logic [W-1:0] ram [0:DEPTH-1];`。
+- `mem_write(ram, waddr, wdata, we)` 生成同步写块 `always_ff @(posedge clk) if (we) ram[waddr] <= wdata;`。
+- `mem_read_sync(ram, raddr, re)` 生成同步寄存读 `always_ff @(posedge clk) if (re) rdata <= ram[raddr];`，完全符合 Vivado、Quartus 与 Yosys 的 BRAM 推断模板。
+
+## 使用 `std.mem`
+
+对于常见存储器拓扑，可直接导入 `std.mem`：
+
+- **单端口 RAM（Single-port RAM）**：读写共用地址总线。
+- **伪双端口 RAM（Simple Dual-port RAM）**：独立写端口与读端口（1W1R）。
+- **真双端口 RAM（True Dual-port RAM）**：两个独立读写端口。
+
+## 使用 `std.fifo` 构建同步 FIFO
+
+`std.fifo.SyncFifo` 将 `mem` 存储与读写指针、`Stream<T>` 握手接口封装在一起：
+
+```syl
+use std.stream.Stream
+use std.fifo.SyncFifo
+
+cell FifoWrapper<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_stream: in Stream<UInt<32>>.sink,
+    out_stream: out Stream<UInt<32>>.source,
+) {
+    let fifo = place SyncFifo<UInt<32>, 64, D>(
+        clk: clk,
+        rst: rst,
+        input: in_stream,
+        output: out_stream,
+    )
+}
+```
+
+## 综合建议
+
+1. **BRAM 必须使用同步读**：当深度 $\ge 64$ 时，始终使用 `mem_read_sync`，以确保 Yosys/Vivado 推断为 Block RAM 而非分布式 LUTRAM。
+2. **优先使用 2 的幂次深度**：这可以简化读写指针回绕逻辑，避免额外的比较器开销。
+3. **不要复位 `mem` 内容**：BRAM 不支持单周期清零，只需复位读写指针即可。
+
+## 读写冲突行为与常见问题排查
+
+| 场景 | 现象 / 原因 | 解决方法 |
+| :--- | :--- | :--- |
+| 同周期同地址读写 | 旧数据优先或写优先取决于目标 FPGA BRAM 架构 | 若需严格写优先，在外部增加旁路多路选择器（`waddr == raddr and we and re`）。 |
+| Yosys/Vivado 推断为触发器而非 BRAM | 使用了异步读或尝试复位 `mem` 数组 | 改用 `mem_read_sync`，且不要复位 `mem` 内容。 |
+| `SyncFifo` 空满标志差一拍 | `DEPTH` 非 2 的幂次 | 保持 `DEPTH` 为 2 的幂次（如 `16`、`64`、`256`）并用 `check_fn` 校验。 |
+
+## 完整参数化环形缓冲区示例
+
+```syl
+cell RingBuffer<W: Nat, DEPTH: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    push: in Bit,
+    wdata: in UInt<W>,
+    pop: in Bit,
+    rdata: out UInt<W>,
+    empty: out Bit,
+    full: out Bit,
+) {
+    mem storage: [DEPTH] UInt<W>
+    reg wptr: UInt<clog2(DEPTH)> reset(rst, 0)
+    reg rptr: UInt<clog2(DEPTH)> reset(rst, 0)
+    reg count: UInt<clog2(DEPTH) + 1> reset(rst, 0)
+
+    signal do_push: Bit := push and !full
+    signal do_pop: Bit := pop and !empty
+
+    mem_write(storage, wptr, wdata, do_push)
+    rdata := mem_read_sync(storage, rptr, do_pop)
+
+    next wptr := select { do_push => wptr + 1, default => wptr }
+    next rptr := select { do_pop => rptr + 1, default => rptr }
+    next count := select {
+        do_push and !do_pop => count + 1,
+        !do_push and do_pop => count - 1,
+        default => count,
+    }
+
+    empty := count == 0
+    full := count == DEPTH
+}
+```

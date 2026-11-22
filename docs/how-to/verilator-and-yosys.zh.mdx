@@ -1,0 +1,99 @@
+---
+title: Verilator 与 Yosys 验证
+description: 使用 scripts/check_std_sim.sh、编写 C++17 Verilator 周期级仿真 testbench，并通过 Yosys 进行综合验证。
+---
+
+`sylc` 的静态类型检查与 DRC 可以保证结构合法性，而周期级功能正确性与综合资源推断则需要通过 **Verilator** 与 **Yosys** 进行端到端验证。
+
+## 运行标准库验证套件（`scripts/check_std_sim.sh`）
+
+Syl 仓库自带 `scripts/check_std_sim.sh`，用于端到端验证所有 `std.*` 模块：
+
+```bash
+./scripts/check_std_sim.sh
+```
+
+该脚本自动完成以下三步：
+1. 调用 `sylc emit --out-dir ... --filelist ...` 发射 SystemVerilog。
+2. 编译 C++17 Verilator 仿真可执行文件并逐周期断言输出。
+3. 运行 Yosys 综合检查（`proc; memory; check -assert; stat`）。
+
+## 编写 C++17 Verilator Testbench
+
+首先发射 SystemVerilog 与按依赖排序的 `filelist.f`：
+
+```bash
+sylc emit --std-root examples/std --out-dir build/sv --source-comments src/counter.syl
+```
+
+随后编写 C++17 Verilator 驱动（`tb_counter.cpp`）：
+
+```cpp
+#include "VCounter.h"
+#include "verilated.h"
+#include <cassert>
+
+int main(int argc, char** argv) {
+    Verilated::commandArgs(argc, argv);
+    auto* dut = new VCounter;
+
+    auto tick = [&]() {
+        dut->clk = 0; dut->eval();
+        dut->clk = 1; dut->eval();
+    };
+
+    // 复位
+    dut->rst = 1; dut->en = 0;
+    tick();
+    assert(dut->count == 0);
+
+    // 计数 5 个周期
+    dut->rst = 0; dut->en = 1;
+    for (int i = 1; i <= 5; ++i) {
+        tick();
+        assert(dut->count == i);
+    }
+
+    delete dut;
+    return 0;
+}
+```
+
+使用 Verilator 编译并运行：
+
+```bash
+verilator --cc --exe --build -j 0 -Wall --std-c++17 \
+  -f build/sv/filelist.f tb_counter.cpp --top-module Counter
+./obj_dir/VCounter
+```
+
+## 使用 Yosys 进行综合验证
+
+以批处理模式运行 Yosys，检查是否存在意外锁存器（latch）、未驱动线网或不可综合的存储器：
+
+```bash
+yosys -p "read_verilog -sv build/sv/*.sv; hierarchy -top Counter; proc; memory; check -assert; stat"
+```
+
+- `proc`：将 `always_ff` / `always_comb` 过程块降级为网表触发器与多路选择器。
+- `memory`：将 `mem` 阵列降级为可综合存储单元。
+- `check -assert`：若存在组合环路、锁存器或未驱动线网则立即报错退出。
+- `stat`：输出触发器、逻辑门与存储器单元统计信息，用于面积跟踪。
+
+## 在 Verilator 中开启波形跟踪（VCD）
+
+添加 `--trace` 参数即可生成 `.vcd` 波形文件，供 GTKWave 或 Surfer 查看：
+
+```bash
+verilator --cc --exe --build --trace -j 0 -Wall --std-c++17 \
+  -f build/sv/filelist.f tb_counter.cpp --top-module Counter
+```
+
+## Verilator 与 Yosys 常见报错排查
+
+| 工具 | 报错 / 警告 | 原因与解决方法 |
+| :--- | :--- | :--- |
+| Verilator | `UNOPTFLAT` / 组合环路 | 检查 `Stream` 的 `ready` 组合路径，插入 `std.skid.SkidBuffer` 打断环路。 |
+| Verilator | `WIDTH` 位宽不匹配 | 确认 `sylc check` 通过后再执行 `sylc emit`，检查外部 testbench 端口位宽。 |
+| Yosys | `Latch inferred for signal ...` | 合法 Syl 代码不会产生锁存器；检查 `extern cell` 包装的外部 Verilog。 |
+| Yosys | `Wire ... has no driver` | 确认所有 `out` 端口均已驱动（`sylc check` 会静态拦截）。 |

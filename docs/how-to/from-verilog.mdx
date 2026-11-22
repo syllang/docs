@@ -1,0 +1,110 @@
+---
+title: From Verilog / SystemVerilog
+description: Migrate from Verilog and SystemVerilog to Syl, mapping always_ff, always_comb, generate, and module ports.
+---
+
+If you are coming from Verilog or SystemVerilog, Syl replaces implicit latches, blocking vs. non-blocking assignment pitfalls, and untyped bit vectors with explicit, statically checked hardware primitives.
+
+## Concept Mapping
+
+| Verilog / SystemVerilog | Syl | Notes |
+| :--- | :--- | :--- |
+| `module Foo (...)` | `cell Foo<...>(...)` | Explicit `in`, `out`, `inout` on every port. |
+| `assign y = a + b;` | `signal y: UInt<8> := a + b` | Single-driver combinational wire. |
+| `always_comb` | `signal` + `select priority/unique` | No accidental latches; exhaustiveness checked. |
+| `always_ff @(posedge clk)` | `reg r: UInt<8> reset(rst, 0)` + `next r := ...` | Clock domain & reset polarity checked at compile time. |
+| `generate for (genvar i=0; ...)` | `for i in 0..N { ... }` | Elaboration-time structural unrolling. |
+| `localparam` / `parameter` | `const` / `<W: Nat>` | Compile-time `Nat` and `Bool` types. |
+| `struct packed` | `bundle` | Strongly typed, nestable. |
+| `interface` + `modport` | `interface` + `view` | Directional views enforced on `cell` ports. |
+
+## Combinational Logic: `always_comb` vs. `select`
+
+In SystemVerilog, forgetting an `else` branch in `always_comb` silently infers a latch. In Syl, `select` requires a `default` branch (or exhaustive `enum` `match`), making latches impossible:
+
+```syl
+signal out_val: UInt<8> := select priority {
+    sel_a => a,
+    sel_b => b,
+    default => 0,
+}
+```
+
+## Sequential Logic: `always_ff` vs. `reg` + `next`
+
+```syl
+cell Counter<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    en: in Bit,
+    count: out UInt<8>,
+) {
+    reg q: UInt<8> reset(rst, 0)
+    next q := select {
+        en => q + 1,
+        default => q,
+    }
+    count := q
+}
+```
+
+## Key Differences to Watch
+
+1. **No implicit width extension/truncation**: `UInt<W>` binary operations require identical widths on both sides.
+2. **Single driver**: A `signal` can have only one `:=`, and a `reg` can have only one `next`.
+3. **No `X` or `Z` in normal logic**: `Bit` is strictly `0` or `1` (use `inout` only at external pad boundaries).
+
+## Enum & State Machines: `localparam` vs. `enum` + `match`
+
+In Verilog/SystemVerilog, state encodings are often `localparam` integers, and `case` statements can silently miss a state if `default` is omitted. In Syl, `enum` variants are strongly typed (`State.Idle`), and `match` is **statically exhaustive**:
+
+```syl
+enum UartState { Idle, Start, Data, Stop }
+
+cell UartFsm<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    start_tx: in Bit,
+    bit_done: in Bit,
+    busy: out Bit,
+) {
+    reg state: UartState reset(rst, UartState.Idle)
+
+    next state := match state {
+        UartState.Idle => select { start_tx => UartState.Start, default => UartState.Idle },
+        UartState.Start => UartState.Data,
+        UartState.Data => select { bit_done => UartState.Stop, default => UartState.Data },
+        UartState.Stop => UartState.Idle,
+    }
+
+    busy := match state {
+        UartState.Idle => 0,
+        default => 1,
+    }
+}
+```
+
+## Parameterized `generate` vs. `for` / `if`
+
+SystemVerilog `generate for (genvar i = 0; i < N; i = i + 1)` maps directly to Syl's elaboration-time `for i in 0..N`:
+
+```syl
+cell VectorAnd<N: Nat>(
+    a: in [N] Bit,
+    b: in [N] Bit,
+    y: out [N] Bit,
+) {
+    for i in 0..N {
+        y[i] := a[i] and b[i]
+    }
+}
+```
+
+## Migration Checklist for Verilog Engineers
+
+| Verilog Habit | Syl Replacement |
+| :--- | :--- |
+| `reg` used for combinational logic | Use `signal` (`:=`) for combinational, `reg` (`next`) only for flip-flops. |
+| Blocking `=` vs. non-blocking `<=` | Eliminated: `:=` is combinational, `next` is sequential. |
+| Implicit 32-bit integer literals | Specify exact `UInt<W>` widths; no silent truncation. |
+| `ifdef` for structural variants | Use compile-time `Bool` with `if` / `else`. |

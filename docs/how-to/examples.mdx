@@ -1,0 +1,105 @@
+---
+title: Examples & Simulation
+description: End-to-end Syl hardware examples and Verilator/Yosys simulation entry points.
+---
+
+The Syl repository includes runnable examples under `examples/` covering combinational logic, counters, `Stream` pipelines, FIFOs, and CDC synchronizers.
+
+## Running an Example with `sylc`
+
+```bash
+# Type-check and run DRC on an example
+sylc check --std-root examples/std examples/counter.syl
+
+# Emit SystemVerilog
+sylc emit --std-root examples/std --out build/counter.sv examples/counter.syl
+```
+
+## Standard Library Simulation (`scripts/check_std_sim.sh`)
+
+To verify that emitted SystemVerilog simulates identically to hardware expectations, run the Verilator + Yosys suite:
+
+```bash
+./scripts/check_std_sim.sh
+```
+
+This script:
+1. Emits SystemVerilog for `std.*` modules using `sylc emit`.
+2. Compiles C++17 Verilator testbenches and runs cycle-accurate simulations.
+3. Runs Yosys (`proc; memory; check -assert; stat`) to verify synthesizability and memory inference.
+
+## End-to-End Examples
+
+### 1. Parameterized Blinky / Counter
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    en: in Bit,
+    count: out UInt<W>,
+) {
+    reg q: UInt<W> reset(rst, 0)
+    next q := select {
+        en => q + 1,
+        default => q,
+    }
+    count := q
+}
+```
+
+### 2. Stream Filter
+
+Accepts `Stream<UInt<8>>.sink` and forwards only non-zero payloads to `Stream<UInt<8>>.source`:
+
+```syl
+use std.stream.Stream
+
+cell NonZeroFilter(
+    in_s: in Stream<UInt<8>>.sink,
+    out_s: out Stream<UInt<8>>.source,
+) {
+    signal keep: Bit := in_s.payload != 0
+    out_s.payload := in_s.payload
+    out_s.valid := in_s.valid and keep
+    in_s.ready := select {
+        keep => out_s.ready,
+        default => 1,
+    }
+}
+```
+
+### 3. Finite State Machine (Traffic Light)
+
+```syl
+enum LightState { Red, Green, Yellow }
+
+cell TrafficLight<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    tick: in Bit,
+    is_green: out Bit,
+) {
+    reg state: LightState reset(rst, LightState.Red)
+    next state := select {
+        tick => match state {
+            LightState.Red => LightState.Green,
+            LightState.Green => LightState.Yellow,
+            LightState.Yellow => LightState.Red,
+        },
+        default => state,
+    }
+    is_green := match state {
+        LightState.Green => 1,
+        default => 0,
+    }
+}
+```
+
+## Simulation & Synthesis Workflow
+
+| Step | Command | Purpose |
+| :--- | :--- | :--- |
+| 1. Static Check | `sylc check --std-root examples/std examples/counter.syl` | Type-check & DRC |
+| 2. Emit RTL | `sylc emit --std-root examples/std --out-dir build/sv examples/counter.syl` | Generate `.sv` + `filelist.f` |
+| 3. Sim & Synth | `./scripts/check_std_sim.sh` | Run Verilator C++17 & Yosys |

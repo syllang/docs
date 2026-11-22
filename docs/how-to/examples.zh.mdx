@@ -1,0 +1,240 @@
+---
+title: 示例
+description: 完整的 Syl 参考设计分析。
+---
+
+# 示例
+
+本文分析 Syl 仓库中的参考设计。每个示例展示了 Syl 的特定语言特性或设计模式。阅读这些示例是学习 Syl 的有效方式。建议在阅读每个示例时，尝试修改其中的参数或逻辑，观察编译器输出的变化。这些示例覆盖了 Syl 的主要语言特性：模块声明、端口连接、泛型参数、接口视图、组合映射、时序逻辑和编译期构造。从简单到复杂逐步阅读这些示例，可以系统性地掌握 Syl 语言。每个示例都强调了语言的不同侧面，组合起来构成 Syl 的完整使用图景。建议在阅读时对照编译器的输出来验证理解。每个示例都可以单独编译运行。建议在阅读每个示例时，尝试修改其中的参数或逻辑，观察编译器输出的变化。
+
+---
+
+## 1. 计数器（mvp/counter.syl）
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    clear: in Bit,
+) -> value: UInt<W> {
+    reg count: UInt<W> reset(rst, 0)
+
+    signal count_next: UInt<W> :=
+        select priority {
+            clear => 0,
+            enable => count + 1,
+            default => count,
+        }
+
+    next count := count_next
+    value := count
+}
+```
+
+这个示例展示：
+
+- 泛型参数 `W: Nat` 和 `D: Domain`
+- 模块返回值语法 `-> value: UInt<W>`
+- `reg` 寄存器声明和 `reset`
+- `select priority` 多条件选择
+- `next` 寄存器赋值
+
+计数器在 `enable` 为 1 时加 1，`clear` 为 1 时归零。两者同时为 1 时 `clear` 优先（`priority` 模式）。
+
+## 2. 组合 ALU（mvp/com_alu.syl）
+
+```syl
+enum AluOp { Add, Xor }
+
+map select_result<W: Nat>(
+    op: AluOp,
+    base: UInt<W>,
+    xor_value: UInt<W>,
+) -> UInt<W> =
+    match op {
+        AluOp.Add => base + 1,
+        AluOp.Xor => xor_value,
+    }
+```
+
+这个示例展示：
+
+- `enum` 枚举类型声明
+- `map` 组合映射定义
+- `match` 枚举匹配
+
+`map` 是纯组合逻辑，不产生寄存器。`match` 根据枚举变体选择结果。
+
+## 3. 流缓冲（mvp/stream_buffer.syl）
+
+```syl
+cell skid_buffer<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_stream: in Stream<T>.sink,
+) -> out_stream: Stream<T>.source {
+    reg data: T reset(rst, zero<T>())
+    reg full: Bit reset(rst, 0)
+
+    signal push: Bit := in_stream.valid and (not full or out_stream.ready)
+    signal pop: Bit := (full or in_stream.valid) and out_stream.ready
+
+    in_stream.ready := not full or out_stream.ready
+    out_stream.valid := full or in_stream.valid
+    out_stream.payload :=
+        select priority {
+            full => data,
+            default => in_stream.payload,
+        }
+
+    next data :=
+        select priority {
+            push and (not pop or full) => in_stream.payload,
+            default => data,
+        }
+
+    next full :=
+        select unique {
+            push and not pop => 1,
+            not push and pop => 0,
+            default => full,
+        }
+}
+```
+
+这个示例展示：
+
+- `cell` 内联展开的硬件单元
+- 接口和视图（Stream 的 source/sink）
+- 复杂的 `select` 条件赋值
+- `next` 多寄存器状态更新
+
+skid_buffer 是一个基本的流水线缓冲。它在上下游之间提供一级缓冲，处理 valid-ready 握手中的背压。
+
+## 4. 流水线 ALU（pipeline_user.syl）
+
+这个示例在[流水线](/zh/docs/patterns/pipeline)文章中已有完整分析。它展示了：
+
+- 标准库的 `stage_from_stream`、`stage_link`、`stage_to_stream`
+- 多级流水线的组合
+- `halt_link` 暂停控制
+
+## 5. 通道阵列（mvp/lane_array.syl）
+
+```syl
+cell MiniTop<
+    W: Nat = DATA_W,
+    N: Nat = LANES,
+    D: Domain,
+>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_streams: in [N] Stream<Packet<W>>.sink,
+    out_streams: out [N] Stream<Packet<W>>.source,
+) {
+    if N == 0 {
+        compile_error("MiniTop requires at least one lane")
+    }
+
+    let lanes = for lane in 0..N {
+        place Lane<W, D>(
+            clk: clk,
+            rst: rst,
+            in_stream: in_streams[lane],
+            out_stream: out_streams[lane],
+        )
+    }
+}
+```
+
+这个示例展示：
+
+- 数组端口 `[N] Stream<T>`
+- `for` 循环展开创建多个实例
+- 多个并行通道的组合
+
+## 6. 带标准库的流水线示例
+
+`examples/pipeline_user.syl` 结合了标准库组件和用户逻辑：
+
+```syl
+use std.stream.Stream
+use std.stage.Stage
+use std.stage.stage_from_stream
+use std.stage.stage_link
+use std.stage.stage_to_stream
+use std.stage.halt_link
+use std.stage.drop_link
+
+const DATA_W: Nat = 32
+
+enum AluOp { Add, Xor }
+
+bundle AluCmd<W: Nat> {
+    op: AluOp,
+    a: UInt<W>,
+    b: UInt<W>,
+    last: Bit,
+}
+
+bundle AluRsp<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+
+cell PipelinedAlu<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    stall_decode: in Bit,
+    flush_response: in Bit,
+    cmd_in: in Stream<AluCmd<W>>.sink,
+    rsp_out: out Stream<AluRsp<W>>.source,
+) {
+    let in_stage = place stage_from_stream<AluCmd<W>>(stream: cmd_in)
+    let decode_ctrl = place halt_link<AluCmd<W>>(up: in_stage, halt: stall_decode)
+    let execute_stage = place stage_link<AluCmd<W>, D>(clk: clk, rst: rst, up: decode_ctrl)
+    let filtered_response = place drop_link<AluCmd<W>>(up: execute_stage, drop: flush_response)
+    let out_stream = place stage_to_stream<AluCmd<W>>(stage: filtered_response)
+
+    rsp_out.valid := out_stream.valid
+    rsp_out.payload := AluRsp<W> { data: execute_cmd(decode_cmd(out_stream.payload)), last: out_stream.payload.last }
+    out_stream.ready := rsp_out.ready
+}
+```
+
+这个示例展示标准库组件和用户自定义逻辑的组合方式。流水线级之间的控制流由标准库管理，数据处理逻辑由用户编写。
+
+## 7. 最小功能展示（minimal_features.syl）
+
+仓库中的 `examples/minimal_features.syl` 是一个综合示例，展示了 Syl 的大部分语言特性。
+
+它包含：
+
+- `const` 常量定义
+- `fn` 编译期函数（`clog2`）
+- `enum` 枚举类型
+- `bundle` 结构体
+- `interface` 和 `view` 接口
+- `map` 组合映射
+- `extern cell` 外部模块声明
+- `cell` 内联硬件单元
+- `module` 硬件模块
+- `for` 循环展开
+- 数组端口
+
+这个文件可以作为 Syl 语言特性的快速参考。编译它可以看到 Syl 编译器如何处理各种语法。
+
+## 示例的编译方法
+
+所有示例可以单独编译：
+
+```
+# 编译计数器
+sylc examples/mvp/counter.syl
+
+# 编译流水线 ALU（需要标准库路径）
+sylc --std examples/std examples/pipeline_user.syl
+```
+
+编译器输出 SystemVerilog 代码到标准输出。

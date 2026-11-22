@@ -1,0 +1,78 @@
+---
+title: 使用 sylc 编译器
+description: 如何使用 sylc check 与 sylc emit、配置清单与包路径，以及查看 human/json 诊断信息与 SourceMap 渲染。
+---
+
+`sylc` 是 Syl 编译器的命令行入口。它负责执行解析、语义分析、展开（Elaboration）与设计规则检查（DRC），并将合法的硬件设计编译为可综合的 SystemVerilog。
+
+## 子命令概览
+
+`sylc` 提供两个核心子命令：
+
+- `sylc check`：仅执行类型检查与展开期 DRC，不生成 SystemVerilog。
+- `sylc emit`：完成检查后将 SystemVerilog 输出到标准输出、单文件（`--out`）或目录（`--out-dir`）。
+
+### 检查设计（`sylc check`）
+
+```bash
+# 检查单个文件（自动向上发现 syl.toml）
+sylc check src/top.syl
+
+# 显式指定 syl.toml 与标准库路径
+sylc check --manifest syl.toml --std-root vendor/std src/top.syl src/counter.syl
+
+# 输出机器可读的 JSON 诊断（适用于 CI）
+sylc check --diagnostics-format json src/top.syl
+```
+
+### 发射 SystemVerilog（`sylc emit`）
+
+```bash
+# 输出到标准输出
+sylc emit src/top.syl
+
+# 输出到单个 SystemVerilog 文件
+sylc emit --out build/top.sv src/top.syl
+
+# 按模块拆分为多个文件，并生成按依赖排序的 filelist.f
+sylc emit --out-dir build/sv --source-comments src/top.syl
+```
+
+## 编译流程
+
+`sylc` 按顺序执行以下四个阶段：
+
+1. **解析（Parsing）**：读取 `.syl` 源文件并构建 AST。
+2. **语义分析（Semantic Analysis）**：执行名字解析、类型检查、时钟域/能力检查与 `OpaqueSummary` 校验。
+3. **展开与 DRC（Elaboration & DRC）**：求值编译期 `const`/`fn`/`for`/`if` 构造，展开 `cell` 层次结构，并运行设计规则检查（单一驱动、枚举穷尽、CDC 跨时钟域、复位极性等）。
+4. **后端发射（Backend Emission）**：将 HWIR 降级为 SystemVerilog AST，校验结构完整性，并输出 `.sv` 文件与可选的 `SourceMap` 源码注释。
+
+如果任何阶段检测到错误，编译器会将诊断信息输出到 `stderr` 并以非零状态码退出。
+
+## 诊断信息与 `SourceMap` 渲染
+
+### 人类可读格式（`--diagnostics-format human`）
+
+默认模式下，`sylc` 通过 `SourceMap` 渲染精确到文件名、行号与列号的诊断信息：
+
+- **严重级别**：`error` 或 `warning`
+- **错误代码**：如 `E_MIDDLE_TYPE_MISMATCH`
+- **描述信息**：说明问题与修复方向
+- **源码位置**：文件路径、行号、列号及高亮源码片段
+
+### JSON 格式（`--diagnostics-format json`）
+
+面向 CI 流水线与第三方工具集成，`--diagnostics-format json` 输出结构化的诊断记录，包含错误码、级别、消息及主/次源码位置。
+
+## 选项参考
+
+| 选项 | 适用子命令 | 说明 |
+| :--- | :--- | :--- |
+| `--manifest <PATH>` | `check`, `emit` | 指定 `syl.toml` 路径（覆盖自动向上发现）。 |
+| `--std-root <PATH>` | `check`, `emit` | 指定 `std.*` 标准库根目录。 |
+| `--package-root <PATH>` | `check`, `emit` | 追加外部 Syl 包搜索根目录。 |
+| `--diagnostics-format <FMT>` | `check`, `emit` | 诊断输出格式：`human`（默认）或 `json`。 |
+| `--out <OUTPUT>` | `emit` | 输出为单个 SystemVerilog 文件。 |
+| `--out-dir <DIR>` | `emit` | 按模块输出多个 `.sv` 文件并生成依赖排序的 filelist。 |
+| `--filelist <PATH>` | `emit` | 自定义 filelist 输出路径（默认为 `<out-dir>/filelist.f`）。 |
+| `--source-comments` | `emit` | 在生成的 SystemVerilog 中附带 Syl 源码位置注释。 |

@@ -1,0 +1,152 @@
+---
+title: CDC & Async Reset
+description: Write @cdc_sync boundary synchronizers, use std.cdc, and configure Reset<D, Sync|Async, ActiveHigh|ActiveLow> polarity.
+---
+
+Clock-Domain Crossing (CDC) bugs and reset polarity mismatches are among the hardest hardware defects to catch in simulation. Syl encodes both **clock domains** (`Domain`) and **reset mode/polarity** (`Reset<D, Mode, Polarity>`) directly in the type system and enforces them during elaboration DRC.
+
+## Reset Mode and Polarity (`Reset<D, Mode, Polarity>`)
+
+Syl's `Reset` type carries three type-level parameters:
+
+1. **`D: Domain`**: The clock domain this reset belongs to.
+2. **Mode**: `Sync` (synchronous reset) or `Async` (asynchronous reset).
+3. **Polarity**: `ActiveHigh` or `ActiveLow`.
+
+### Declaring Reset Ports
+
+```syl
+cell CounterSyncHigh<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    en: in Bit,
+    count: out UInt<8>,
+) {
+    reg q: UInt<8> reset(rst, 0)
+    next q := select {
+        en => q + 1,
+        default => q,
+    }
+    count := q
+}
+```
+
+### Asynchronous, Active-Low Reset
+
+When targeting ASIC standard cells or FPGA IP that require asynchronous active-low reset (`rst_n`), declare `Reset<D, Async, ActiveLow>` and pass `async, active_low` to `reset(...)`:
+
+```syl
+cell CounterAsyncLow<D: Domain>(
+    clk: in Clock<D>,
+    rst_n: in Reset<D, Async, ActiveLow>,
+    en: in Bit,
+    count: out UInt<8>,
+) {
+    reg q: UInt<8> reset(rst_n, 0, async, active_low)
+    next q := select {
+        en => q + 1,
+        default => q,
+    }
+    count := q
+}
+```
+
+`sylc` emits the exact SystemVerilog sensitivity list and polarity check:
+
+```verilog
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) q <= 8'd0;
+    else ...
+end
+```
+
+If `rst_n` is declared `ActiveLow` but `reset(...)` omits `active_low` (or vice versa), `sylc check` rejects the design at elaboration time.
+
+## Clock-Domain Crossing (`@cdc_sync` & `std.cdc`)
+
+By default, `sylc` forbids reading a signal from domain `D_SRC` inside a register or combinational path belonging to domain `D_DST`. To cross domains safely:
+
+### 1. Use `std.cdc` for Standard Synchronizers
+
+For single-bit control signals, use the 2-flip-flop synchronizer from `std.cdc`:
+
+```syl
+use std.cdc.Sync2FF
+
+cell Top<D_FAST: Domain, D_SLOW: Domain>(
+    clk_fast: in Clock<D_FAST>,
+    clk_slow: in Clock<D_SLOW>,
+    rst_slow: in Reset<D_SLOW, Sync, ActiveHigh>,
+    req_fast: in Bit,
+    req_slow: out Bit,
+) {
+    let sync = place Sync2FF<D_FAST, D_SLOW>(
+        clk_dst: clk_slow,
+        rst_dst: rst_slow,
+        din: req_fast,
+        dout: req_slow,
+    )
+}
+```
+
+### 2. Writing Custom `@cdc_sync` Boundary Synchronizers
+
+When you need a custom synchronizer (such as a multi-cycle handshake or Gray-coded pointer synchronizer), annotate the `cell` with `@cdc_sync`:
+
+```syl
+@cdc_sync
+cell CustomBitSync<D_SRC: Domain, D_DST: Domain>(
+    clk_dst: in Clock<D_DST>,
+    rst_dst: in Reset<D_DST, Sync, ActiveHigh>,
+    din: in Bit,
+    dout: out Bit,
+) {
+    reg stage1: Bit reset(rst_dst, 0)
+    reg stage2: Bit reset(rst_dst, 0)
+
+    next stage1 := din
+    next stage2 := stage1
+    dout := stage2
+}
+```
+
+The `@cdc_sync` attribute tells `sylc`'s CDC DRC pass that this `cell` is an intentional, audited domain-crossing boundary. Multi-bit buses without handshake/Gray-code synchronization should still never be passed raw across domains.
+
+## Checklist
+
+- Always match `Reset<D, Mode, Polarity>` with `reg ... reset(rst, val, ...)`.
+- Prefer `std.cdc` over hand-rolled synchronizers whenever possible.
+- Restrict `@cdc_sync` to dedicated, audited synchronizer cells.
+
+## Error Comparison & Troubleshooting
+
+| Diagnostic / Mistake | Why It Fails | Correct Pattern |
+| :--- | :--- | :--- |
+| `reg q reset(rst_n, 0)` on `Reset<D, Async, ActiveLow>` | Polarity/mode mismatch between port and `reg` | `reg q reset(rst_n, 0, async, active_low)` |
+| Reading `D_A` signal inside `D_B` `reg` | Unsynchronized clock-domain crossing | Route through `std.cdc.Sync2FF` or `@cdc_sync` cell |
+| Passing `UInt<8>` directly through `Sync2FF` | Multi-bit bus skew across 2-FF synchronizer | Use `std.cdc` handshake or Gray-code FIFO |
+
+## Complete Multi-Domain Example
+
+```syl
+use std.cdc.Sync2FF
+
+cell DualDomainBridge<D_FAST: Domain, D_SLOW: Domain>(
+    clk_fast: in Clock<D_FAST>,
+    rst_fast: in Reset<D_FAST, Async, ActiveLow>,
+    clk_slow: in Clock<D_SLOW>,
+    rst_slow: in Reset<D_SLOW, Sync, ActiveHigh>,
+    trigger_fast: in Bit,
+    ack_slow: out Bit,
+) {
+    reg req_latched: Bit reset(rst_fast, 0, async, active_low)
+    next req_latched := trigger_fast
+
+    let sync = place Sync2FF<D_FAST, D_SLOW>(
+        clk_dst: clk_slow,
+        rst_dst: rst_slow,
+        din: req_latched,
+        dout: ack_slow,
+    )
+}
+```

@@ -1,0 +1,33 @@
+{
+  "title": "How-to Guides",
+  "pages": [
+    "index",
+    "---Project & Tooling---",
+    "configure-syl-toml",
+    "sylc",
+    "systemverilog-emission",
+    "extern-and-ip",
+    "lsp-and-editors",
+    "rust-embedding",
+    "ai-prompt",
+    "---Hardware Patterns---",
+    "stream",
+    "pipeline",
+    "interfaces",
+    "parameterization",
+    "standard-library",
+    "examples",
+    "---Advanced Hardware & Verification---",
+    "cdc-and-async-reset",
+    "synthesizable-ram-fifo",
+    "verilator-and-yosys",
+    "---Migrating to Syl---",
+    "from-verilog",
+    "from-vhdl",
+    "from-chisel",
+    "from-spinalhdl",
+    "bool-vs-bit",
+    "elaboration-vs-hardware",
+    "structural-design"
+  ]
+}

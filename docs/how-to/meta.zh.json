@@ -1,0 +1,33 @@
+{
+  "title": "操作指南",
+  "pages": [
+    "index",
+    "---工程与工具链---",
+    "configure-syl-toml",
+    "sylc",
+    "systemverilog-emission",
+    "extern-and-ip",
+    "lsp-and-editors",
+    "rust-embedding",
+    "ai-prompt",
+    "---硬件设计模式---",
+    "stream",
+    "pipeline",
+    "interfaces",
+    "parameterization",
+    "standard-library",
+    "examples",
+    "---进阶硬件与验证---",
+    "cdc-and-async-reset",
+    "synthesizable-ram-fifo",
+    "verilator-and-yosys",
+    "---迁移到 Syl---",
+    "from-verilog",
+    "from-vhdl",
+    "from-chisel",
+    "from-spinalhdl",
+    "bool-vs-bit",
+    "elaboration-vs-hardware",
+    "structural-design"
+  ]
+}

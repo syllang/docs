@@ -1,0 +1,99 @@
+---
+title: Verilator & Yosys Verification
+description: Run scripts/check_std_sim.sh, write C++17 Verilator cycle-accurate testbenches, and verify synthesis with Yosys.
+---
+
+Static type checking and DRC in `sylc` guarantee structural soundness, but cycle-accurate functional behavior and synthesis resource inference must be verified with **Verilator** and **Yosys**.
+
+## Running the Standard Library Suite (`scripts/check_std_sim.sh`)
+
+The Syl repository ships with `scripts/check_std_sim.sh` to validate all `std.*` modules end-to-end:
+
+```bash
+./scripts/check_std_sim.sh
+```
+
+Under the hood, the script:
+1. Emits SystemVerilog for each testbench target via `sylc emit --out-dir ... --filelist ...`.
+2. Compiles C++17 Verilator simulation binaries and asserts cycle-by-cycle outputs.
+3. Runs Yosys synthesis checks (`proc; memory; check -assert; stat`) on the emitted RTL.
+
+## Writing a C++17 Verilator Testbench
+
+First, emit SystemVerilog with a dependency-ordered filelist:
+
+```bash
+sylc emit --std-root examples/std --out-dir build/sv --source-comments src/counter.syl
+```
+
+Then write a minimal C++17 Verilator harness (`tb_counter.cpp`):
+
+```cpp
+#include "VCounter.h"
+#include "verilated.h"
+#include <cassert>
+
+int main(int argc, char** argv) {
+    Verilated::commandArgs(argc, argv);
+    auto* dut = new VCounter;
+
+    auto tick = [&]() {
+        dut->clk = 0; dut->eval();
+        dut->clk = 1; dut->eval();
+    };
+
+    // Reset
+    dut->rst = 1; dut->en = 0;
+    tick();
+    assert(dut->count == 0);
+
+    // Count 5 cycles
+    dut->rst = 0; dut->en = 1;
+    for (int i = 1; i <= 5; ++i) {
+        tick();
+        assert(dut->count == i);
+    }
+
+    delete dut;
+    return 0;
+}
+```
+
+Compile and run with Verilator:
+
+```bash
+verilator --cc --exe --build -j 0 -Wall --std-c++17 \
+  -f build/sv/filelist.f tb_counter.cpp --top-module Counter
+./obj_dir/VCounter
+```
+
+## Synthesis Verification with Yosys
+
+Run Yosys in batch mode to verify that there are no inferred latches, undriven nets, or unmappable memories:
+
+```bash
+yosys -p "read_verilog -sv build/sv/*.sv; hierarchy -top Counter; proc; memory; check -assert; stat"
+```
+
+- `proc`: Converts `always_ff` / `always_comb` processes into netlist flip-flops and muxes.
+- `memory`: Lowers `mem` arrays into synthesizable memory cells.
+- `check -assert`: Fails immediately if any combinational loops, latches, or undriven wires exist.
+- `stat`: Prints cell counts (FFs, LUTs/gates, memories) for area tracking.
+
+## Waveform Tracing (VCD) in Verilator
+
+Enable `--trace` to dump a `.vcd` waveform for GTKWave or Surfer:
+
+```bash
+verilator --cc --exe --build --trace -j 0 -Wall --std-c++17 \
+  -f build/sv/filelist.f tb_counter.cpp --top-module Counter
+```
+
+## Common Verilator & Yosys Troubleshooting
+
+| Tool | Error / Warning | Cause & Fix |
+| :--- | :--- | :--- |
+| Verilator | `UNOPTFLAT` / combinational loop | Check `Stream` `ready` path; insert `std.skid.SkidBuffer`. |
+| Verilator | `WIDTH` mismatch | Ensure `sylc emit` was run after `sylc check` with matching port widths. |
+| Yosys | `Latch inferred for signal ...` | Should not occur from valid Syl; check `extern cell` or `always_comb` wrappers. |
+| Yosys | `Wire ... has no driver` | Verify all `out` ports are driven in Syl (`sylc check` catches this). |

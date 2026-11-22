@@ -1,0 +1,71 @@
+---
+title: SystemVerilog 发射
+description: 使用 --out-dir、--filelist、--source-comments 进行多文件 SystemVerilog 发射，以及确定性跨模块命名消歧。
+---
+
+`sylc emit` 将展开后的 Syl 硬件模块降级为清晰、可综合的 SystemVerilog 代码。本文说明端口与赋值映射、多文件发射、filelist 生成以及确定性命名规则。
+
+## 端口与赋值映射
+
+每个 Syl `cell` 对应一个 SystemVerilog `module`。端口方向与硬件原语的映射关系如下：
+
+| Syl | SystemVerilog |
+| :--- | :--- |
+| `in Bit` | `input wire` |
+| `out Bit` | `output wire` |
+| `inout Bit` | `inout wire` |
+| `in UInt<W>` | `input [W-1:0]` |
+| `out UInt<W>` | `output [W-1:0]` |
+| `y := expr` | `assign y = expr;` |
+| `next r := expr` | `always_ff @(posedge clk) r <= expr;` |
+| `reg r reset(rst, val)` | `always_ff @(posedge clk ...) if (rst) r <= val; else ...` |
+
+## 单文件与多文件发射
+
+### 单文件发射（`--out`）
+
+```bash
+sylc emit --out build/design.sv src/top.syl
+```
+
+所有展开后的模块按依赖顺序写入单个 `build/design.sv` 文件。
+
+### 多文件发射（`--out-dir` 与 `--filelist`）
+
+对于中大型设计，综合器与 Verilator 通常更适合"单模块单文件 + 依赖排序 filelist"的组织方式：
+
+```bash
+sylc emit --out-dir build/sv --filelist build/sv/filelist.f src/top.syl
+```
+
+- `--out-dir <DIR>`：在 `<DIR>` 下为每个展开后的模块生成独立的 `<ModuleName>.sv`。
+- `--filelist <PATH>`：生成按依赖拓扑排序的 `.sv` 路径列表（默认为 `<out-dir>/filelist.f`），可直接传给 `verilator -f build/sv/filelist.f` 或 Vivado/Yosys。
+
+## 源码位置注释（`--source-comments`）
+
+添加 `--source-comments` 可在生成的 SystemVerilog 中嵌入原始 Syl 文件路径与行号注释：
+
+```bash
+sylc emit --out-dir build/sv --source-comments src/top.syl
+```
+
+这在定位综合警告或对照仿真波形回溯 `.syl` 源码时非常有用。
+
+## 确定性跨模块命名消歧
+
+当同一个泛型 `cell`（如 `Fifo<W, D>`）以多组不同参数实例化，或不同包中存在同名模块时，`sylc` 会对生成的 SystemVerilog 模块名进行**确定性消歧**（例如编码参数值或包前缀），确保：
+
+1. 相同源码在任意机器、任意次运行下生成的模块名与 `filelist.f` 完全一致。
+2. 不同的展开实例在扁平的 SystemVerilog 全局模块命名空间中绝不冲突。
+
+## 质量保证与已知限制
+
+在输出 `.sv` 文件前，编译器会执行以下检查：
+
+1. **SV AST 验证**：检查降级后的 SystemVerilog 中间表示的结构完整性。
+2. **文本完整性验证**：检查括号匹配与模块闭合。
+3. **Verilator 与 Yosys 烟雾测试**：标准库与示例输出在 CI 中持续通过仿真与综合检查。
+
+**已知限制**：
+- 输出的 SystemVerilog 风格直接忠实于源码结构，面积与时序优化交由下游综合工具完成。
+- 不支持输出 VHDL，也不支持自定义输出模板。

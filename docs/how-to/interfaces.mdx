@@ -1,0 +1,128 @@
+---
+title: Interfaces & Bundles
+description: Design typed inter-module protocols using bundle, interface, directional views, and std.bundle utilities.
+---
+
+Well-defined interfaces prevent wiring bugs and make hardware modules reusable. Syl's `bundle` and `interface` constructs express data payloads, control signals, and directional contracts directly in the type system.
+
+## Anatomy of a Hardware Protocol
+
+1. **Data signals**: Payload, addresses, byte enables.
+2. **Control signals**: `valid`, `ready`, `last`, `resp`.
+3. **Directional contract**: Which side drives each signal.
+
+## Step-by-Step Protocol Design
+
+### 1. Define Data Payloads with `bundle`
+
+```syl
+bundle AxiAddress<W: Nat> {
+    addr: UInt<W>,
+    len: UInt<8>,
+    size: UInt<3>,
+    burst: UInt<2>,
+}
+
+bundle AxiData<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+```
+
+### 2. Define Directional Views with `interface`
+
+```syl
+interface AxiWriteAddr<W: Nat> {
+    payload: AxiAddress<W>
+    valid: Bit
+    ready: Bit
+
+    view master {
+        out payload
+        out valid
+        in ready
+    }
+
+    view slave {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+### 3. Use Views on `cell` Ports
+
+```syl
+cell AxiMaster(
+    write_addr: out AxiWriteAddr<32>.master,
+    write_data: out AxiWriteData<32>.master,
+)
+
+cell AxiSlave(
+    write_addr: in AxiWriteAddr<32>.slave,
+    write_data: in AxiWriteData<32>.slave,
+)
+```
+
+## Single-Interface vs. Multi-Interface Encapsulation
+
+- **Single-interface** (`Stream<T>`): Ideal for point-to-point unidirectional channels.
+- **Multi-interface**: Complex buses (like AXI4) group separate `AxiWriteAddr`, `AxiWriteData`, and `AxiWriteResp` channels so each channel can be independently buffered or pipelined.
+- **`std.bundle`**: Provides helper utilities for packing, unpacking, and width-safe bundle transformations.
+
+## Multi-Interface Bus Example (AXI4-Lite Write)
+
+Complex bus protocols group multiple independent channels so each channel can be buffered or pipelined separately:
+
+```syl
+bundle AxiLiteAddr {
+    addr: UInt<32>,
+    prot: UInt<3>,
+}
+
+bundle AxiLiteWData {
+    data: UInt<32>,
+    strb: UInt<4>,
+}
+
+interface AxiLiteAw {
+    payload: AxiLiteAddr
+    valid: Bit
+    ready: Bit
+
+    view master { out payload, out valid, in ready }
+    view slave  { in payload, in valid, out ready }
+}
+
+interface AxiLiteW {
+    payload: AxiLiteWData
+    valid: Bit
+    ready: Bit
+
+    view master { out payload, out valid, in ready }
+    view slave  { in payload, in valid, out ready }
+}
+
+interface AxiLiteB {
+    resp: UInt<2>
+    valid: Bit
+    ready: Bit
+
+    view master { in resp, in valid, out ready }
+    view slave  { out resp, out valid, in ready }
+}
+```
+
+## Using `std.bundle` Utilities
+
+`std.bundle` provides helpers for packing and unpacking `bundle` types to/from flat `UInt<W>` vectors when interfacing with `extern cell`s or memory primitives.
+
+## Interface Design Checklist
+
+| Rule | Rationale |
+| :--- | :--- |
+| **Symmetric views** | Every `out` in `master` must be `in` in `slave` (and vice versa). |
+| **Explicit direction** | Never leave a signal undirected inside a `view`. |
+| **Bundle payloads** | Group data fields into a `bundle` so `Stream<T>` and `SyncFifo<T>` can wrap them generically. |
+| **Independent channels** | Separate request and response channels to avoid combinational deadlocks. |

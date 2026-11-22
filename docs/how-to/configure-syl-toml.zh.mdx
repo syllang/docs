@@ -1,0 +1,130 @@
+---
+title: 配置 syl.toml
+description: 使用 [project]、[paths]、多包工作区、std_roots、opaque_summaries 与自动向上发现配置 syl.toml 项目清单。
+---
+
+`syl.toml` 清单文件定义了 Syl 硬件项目的根目录、包搜索路径、标准库根目录以及外部 IP 的 Opaque Summary。`sylc` 与 `syl-lsp` 都会从目标文件或工作区目录开始向上递归查找最近的 `syl.toml`。
+
+## 最小 `syl.toml` 配置
+
+对于源码位于 `src/` 下的单包项目，只需在仓库根目录放置如下 `syl.toml`：
+
+```toml
+[project]
+name = "uart_core"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+workspace_roots = ["src"]
+```
+
+如果省略 `[paths].workspace_roots`，`syl_session` 默认使用 `syl.toml` 所在目录作为工作区根目录。
+
+## 完整字段说明
+
+`syl.toml` 采用严格解码模式（`deny_unknown_fields`）：任何未识别的节或字段都会导致清单加载报错。
+
+### `[project]`
+
+| 字段 | 类型 | 必填 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `name` | `string` | 否 | 人类可读的项目名称。 |
+| `version` | `string` | 否 | 语义化版本号（如 `"0.1.0"`）。 |
+| `edition` | `string` | 否 | 语言版本标识（如 `"2026"`）。 |
+
+### `[paths]`
+
+`[paths]` 中的所有相对路径均相对于 `syl.toml` 所在目录解析（而非当前 shell 工作目录）。
+
+| 字段 | 类型 | 默认值 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `workspace_roots` | `string[]` | `["."]` | 扫描本项目 `.syl` 模块的根目录列表。 |
+| `std_roots` | `string[]` | `[]` | 提供 `std.*` 标准库模块的根目录列表。 |
+| `package_roots` | `string[]` | `[]` | 额外的外部包根目录（如共享 IP 库）。 |
+| `opaque_summaries` | `string[]` | `[]` | 供 `extern` 模块使用的 JSON 或 TOML Opaque Summary 文件路径。 |
+
+## 多包工作区与共享 IP
+
+在包含共享 IP 库与本地标准库副本的 Monorepo 中，可同时配置 `package_roots` 与 `std_roots`：
+
+```toml
+[project]
+name = "soc_top"
+version = "0.2.0"
+edition = "2026"
+
+[paths]
+workspace_roots = ["rtl"]
+std_roots = ["vendor/syl-std"]
+package_roots = ["../common_ip/rtl", "third_party/axi_lite"]
+opaque_summaries = [
+  "ip/pll_summary.json",
+  "ip/serdes_summary.toml",
+]
+```
+
+## 自动向上发现与显式 `--manifest`
+
+1. **自动向上发现**：运行 `sylc check rtl/top.syl` 或在 `syl-lsp` 中打开文件时，`ProjectManifest::discover` 会从 `rtl/top.syl` 逐级向上查找父目录中的 `syl.toml`。
+2. **显式指定**：在 CI 环境或需要切换多套板级配置时，可通过 `--manifest` 显式指定清单路径：
+
+```bash
+sylc check --manifest ./boards/fpga/syl.toml rtl/top.syl
+```
+
+3. **命令行覆盖**：`sylc` 的 `--std-root` 与 `--package-root` 参数会在 `syl.toml` 的基础上追加或覆盖对应路径。
+
+## `syl-lsp` 中的热重载
+
+`syl-lsp` 通过 `workspace/didChangeWatchedFiles` 监听 `syl.toml`。修改并保存 `workspace_roots`、`package_roots` 或 `opaque_summaries` 后，LSP 会自动重载工作区并重新检查已打开的文件，无需重启编辑器。若 `syl.toml` 存在语法错误或未知字段，`syl-lsp` 会直接将错误诊断发布到 `syl.toml` 文件上。
+
+## 完整多包工程示例
+
+```
+my_soc/
+├── syl.toml
+├── rtl/
+│   └── top.syl
+├── common_ip/
+│   └── uart.syl
+└── ip/
+    └── pll_summary.toml
+```
+
+`rtl/top.syl`：
+
+```syl
+use common_ip.uart.UartTx
+
+cell SocTop<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    tx_en: in Bit,
+    tx_data: in UInt<8>,
+    tx_pin: out Bit,
+) {
+    let uart = place UartTx<D>(
+        clk: clk,
+        rst: rst,
+        en: tx_en,
+        data: tx_data,
+        tx: tx_pin,
+    )
+}
+```
+
+使用以下命令验证：
+
+```bash
+sylc check --manifest syl.toml rtl/top.syl
+```
+
+## 常见清单错误与排查
+
+| 错误 / 现象 | 原因 | 解决方法 |
+| :--- | :--- | :--- |
+| `unknown field ...` | `syl.toml` 启用了 `deny_unknown_fields` | 检查 `[project]` 与 `[paths]` 字段拼写。 |
+| `module std.stream not found` | 未配置 `std_roots` 或 `--std-root` | 添加 `std_roots = ["vendor/syl-std"]` 或传入 `--std-root`。 |
+| `opaque summary file not found` | 相对路径基于 `syl.toml` 所在目录解析，而非当前工作目录 | 将路径修改为相对于 `syl.toml` 的路径。 |
+| `package not found` | 外部包目录未加入 `package_roots` | 将包根目录添加到 `package_roots = ["..."]`。 |
