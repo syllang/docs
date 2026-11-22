@@ -41,7 +41,9 @@ class Counter(width: Int) extends Component {
 ### Syl
 
 ```syl
-cell Counter<W: nat>(
+cell Counter<W: nat = 8, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
     enable: in Bit,
     count: out UInt<W>,
 ) {

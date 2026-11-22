@@ -37,9 +37,9 @@ cell StreamPipe<D: Domain>(
     let skid = place SkidBuffer<UInt<16>, D>(
         clk: clk,
         rst: rst,
-        input: in_s,
-        output: out_s,
+        up: in_s,
     )
+    out_s := skid
 }
 ```
 
@@ -49,7 +49,7 @@ In SpinalHDL, `new Area { ... }` groups logic inside a `Component` without creat
 
 ```syl
 map saturating_add(a: UInt<8>, b: UInt<8>) -> UInt<8> = select {
-    (a + b) lt a => 255,
+    lt(a + b, a) => 255,
     default => a + b,
 }
 ```

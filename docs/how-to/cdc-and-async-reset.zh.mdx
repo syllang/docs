@@ -84,8 +84,8 @@ cell Top<D_FAST: Domain, D_SLOW: Domain>(
         dst_clk: clk_slow,
         dst_rst: rst_slow,
         async_in: req_fast,
-        sync_out: req_slow,
     )
+    req_slow := sync
 }
 ```
 
@@ -146,7 +146,7 @@ cell DualDomainBridge<D_FAST: Domain, D_SLOW: Domain>(
         dst_clk: clk_slow,
         dst_rst: rst_slow,
         async_in: req_latched,
-        sync_out: ack_slow,
     )
+    ack_slow := sync
 }
 ```

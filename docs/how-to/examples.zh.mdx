@@ -53,8 +53,8 @@ map select_result<W: nat>(
     xor_value: UInt<W>,
 ) -> UInt<W> =
     match op {
-        AluOp.Add => base + 1,
-        AluOp.Xor => xor_value,
+        .Add => base + 1,
+        .Xor => xor_value,
     }
 ```
 

@@ -71,15 +71,15 @@ cell UartFsm<D: Domain>(
     reg state: UartState reset(rst, UartState.Idle)
 
     next state := match state {
-        UartState.Idle => select { start_tx => UartState.Start, default => UartState.Idle },
-        UartState.Start => UartState.Data,
-        UartState.Data => select { bit_done => UartState.Stop, default => UartState.Data },
-        UartState.Stop => UartState.Idle,
+        .Idle => select { start_tx => UartState.Start, default => UartState.Idle },
+        .Start => UartState.Data,
+        .Data => select { bit_done => UartState.Stop, default => UartState.Data },
+        .Stop => UartState.Idle,
     }
 
     busy := match state {
-        UartState.Idle => 0,
-        default => 1,
+        .Idle => 0,
+        _ => 1,
     }
 }
 ```
@@ -89,7 +89,7 @@ cell UartFsm<D: Domain>(
 SystemVerilog `generate for (genvar i = 0; i < N; i = i + 1)` maps directly to Syl's elaboration-time `for i in 0..N`:
 
 ```syl
-cell VectorAnd<N: nat>(
+cell VectorAnd<N: nat = 8>(
     a: in [N] Bit,
     b: in [N] Bit,
     y: out [N] Bit,

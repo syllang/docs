@@ -89,7 +89,7 @@ cell FifoWrapper<D: Domain>(
 ## 完整参数化环形缓冲区示例
 
 ```syl
-cell RingBuffer<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, D: Domain>(
+cell RingBuffer<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, CNT_W: nat = 7, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D, Sync, ActiveHigh>,
     push: in Bit,
@@ -102,13 +102,13 @@ cell RingBuffer<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, D: Domain>(
     mem storage: [DEPTH] UInt<W>
     reg wptr: UInt<ADDR_W> reset(rst, 0)
     reg rptr: UInt<ADDR_W> reset(rst, 0)
-    reg count: UInt<clog2(DEPTH) + 1> reset(rst, 0)
+    reg count: UInt<CNT_W> reset(rst, 0)
 
-    signal do_push: Bit := push and !full
-    signal do_pop: Bit := pop and !empty
+    signal do_push: Bit := push and not full
+    signal do_pop: Bit := pop and not empty
 
-    mem_write(storage, wptr, wdata, do_push)
-    rdata := mem_read_sync(storage, rptr, do_pop)
+    mem_write(storage, clk, do_push, wptr, wdata)
+    mem_read_sync(storage, clk, do_pop, rptr, rdata)
 
     next wptr := select { do_push => wptr + 1, default => wptr }
     next rptr := select { do_pop => rptr + 1, default => rptr }

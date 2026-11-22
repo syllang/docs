@@ -57,20 +57,6 @@ error[E_MIDDLE_DUPLICATE_HARDWARE_DRIVER]: duplicate hardware driver for `y`
 
 每个信号只能有一个驱动源。使用 `select` 合并多条件赋值。
 
-### E_MIDDLE_MISSING_HARDWARE_DRIVER
-
-缺少驱动。`out` 端口没有被赋值。
-
-```
-error[E_MIDDLE_MISSING_HARDWARE_DRIVER]: missing hardware driver for `y`
-    ┌─ input.syl:1:20
-    │
-1   │ cell Top(y: out Bit) { }
-    │                    ^ `y` is never driven
-```
-
-每个 `out` 端口必须被赋值。
-
 ### E_MIDDLE_UNKNOWN_TYPE
 
 使用了未定义的类型。
@@ -80,18 +66,6 @@ error[E_MIDDLE_UNKNOWN_TYPE]: unknown type `CustomType`
 ```
 
 检查类型名字是否拼写正确，是否已导入。
-
-## 警告
-
-### W_MIDDLE_UNUSED_SIGNAL
-
-声明的信号未被使用。
-
-```
-warning[W_MIDDLE_UNUSED_SIGNAL]: unused signal `tmp`
-```
-
-移除未使用的信号清理代码。
 
 ## 真实 `E_*` 错误码分类索引（`7608b0d`）
 

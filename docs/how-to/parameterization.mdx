@@ -26,8 +26,18 @@ cell RegisterFile<W: nat, DEPTH: nat, D: Domain>(
 Use `compile_error` inside `fn` or `check_fn` / `check_map` to enforce parameter invariants (such as power-of-two depths or minimum widths) at elaboration time:
 
 ```syl
-fn is_pow2(n: nat) -> Bool {
-    return n > 0 and (n & (n - 1)) == 0
+fn is_pow2(n: nat) -> bool {
+    if n <= 0 {
+        return false
+    }
+    var v: nat = n
+    while v > 1 {
+        if v % 2 != 0 {
+            return false
+        }
+        v = v / 2
+    }
+    return true
 }
 
 check_fn require_pow2(n: nat) {
@@ -76,11 +86,11 @@ map zero_packet<W: nat>() -> Packet<W> = Packet<W> {
 Use `const` and `fn` to compute derived widths (such as `clog2`) at elaboration time:
 
 ```syl
-fn clog2(n: nat) -> Nat {
+fn clog2(n: nat) -> nat {
     var v: nat = n - 1
     var r: nat = 0
     while v > 0 {
-        v = v >> 1
+        v = v / 2
         r = r + 1
     }
     return r
