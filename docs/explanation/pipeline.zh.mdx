@@ -25,11 +25,12 @@ flowchart TB
     Front --> Sema
     Sema --> Elab
     Elab --> Backend
+    Elab --> Sim["原生仿真：syl_sim → SimDesign"]
 ```
 
 每个箭头代表一次数据转换。转换过程中还可能产生诊断信息（错误和警告）。在现代 `syl_session` 架构中，这些转换被拆分为细粒度的 Salsa 查询（如单次解析去重 `Arc<ParsedFileOutput>`、声明级 `owner_const_mir` / `owner_map_ir`、规范路径定向构建 `module_eir_stage`），从而在文件编辑时只重算受影响的声明与模块。
 
-下面按阶段顺序逐个讲解。
+执行 `sylc sim` 时，`syl_sim` 将展开结果特化为字级 `SimDesign`，参考后端、CPU SIMD 与 CUDA 后端直接执行该设计。参见[原生仿真与 GPU 加速](/zh/docs/explanation/simulation-and-gpu)。
 
 ## 前端
 
@@ -289,8 +290,6 @@ SV 验证器分两步检查生成的代码：
 在 CI 中，生成的 SystemVerilog 代码还会通过 Verilator 仿真与 Yosys 综合门禁，确保输出是可综合的。
 
 ## 下一步阅读
-
-了解了整个流水线之后，你可以选择深入某个阶段：
 
 - [Salsa 增量架构](/zh/docs/explanation/salsa-incremental-architecture)：了解声明级增量查询与单次解析去重
 - [语法与 AST](/zh/docs/explanation/syntax-ast)：深入前端，了解 AST 的内部构造

@@ -25,6 +25,7 @@
     "const-mir-and-map-ir",
     "elab-and-eir",
     "hw-and-sv-ir",
+    "simulation-and-gpu",
     "repository-map",
     "testing-and-contributing"
   ]

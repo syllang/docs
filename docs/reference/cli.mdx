@@ -1,127 +1,103 @@
 ---
 title: CLI Reference
-description: Command-line usage for sylc check, sylc emit, options, filelists, and JSON diagnostics.
+description: sylc commands, simulation options, output formats, diagnostics and exit codes.
 ---
 
 # CLI Reference
 
-`sylc` is the command-line entry point for the Syl compiler. It compiles Syl source files into SystemVerilog.
+## Subcommands
 
----
+- `sylc check [OPTIONS] [FILE_OR_DIR]...` type-checks and runs elaboration DRC.
+- `sylc emit [OPTIONS] [FILE_OR_DIR]...` checks and emits SystemVerilog. Invoking `sylc` without a subcommand retains this behavior.
+- `sylc sim <INPUT> --top <CELL> [OPTIONS]` specializes a top cell from one input and runs a four-state trace or a deterministic batch.
 
-## Usage
-
-```
-sylc [OPTIONS] [FILE_OR_DIR]... [COMMAND]
-```
-
-### Subcommands
-
-- `sylc check [OPTIONS] [FILE_OR_DIR]...`: Type-check and run elaboration DRC without emitting SystemVerilog.
-- `sylc emit [OPTIONS] [FILE_OR_DIR]...`: Check and emit SystemVerilog to stdout, `--out`, or `--out-dir`.
-
-## Basic Usage
-
-Compile a single file and print to stdout:
-
-```
+```sh
 sylc input.syl
-```
-
-Compile multiple files:
-
-```
 sylc file1.syl file2.syl
+sylc emit input.syl --out build/output.sv
 ```
 
-Write output to a file:
+## Project and output options
 
-```
-sylc input.syl --out output.sv
-```
+| Option | Behavior |
+| --- | --- |
+| `--manifest <PATH>` | Load this `syl.toml`. |
+| `--package-root <PATH>`, `--std-root <PATH>` | Add a package or standard library root. Both options are repeatable. |
+| `--diagnostics-format <human\|json>` | Select stderr format. Default `human`. |
+| `--out <OUTPUT>` | Write one SystemVerilog file. |
+| `--out-dir <DIR>` | Write one file per module and a dependency-ordered filelist. Mutually exclusive with `--out`. |
+| `--filelist <PATH>` | Override `<out-dir>/filelist.f`. Requires `--out-dir`. |
+| `--source-comments` | Include Syl locations in emitted code. |
+| `--help`, `--version` | Print help or compiler version. |
 
-## Options
+Manifest, root and diagnostic options work before or after the subcommand. Output options belong to `emit`. By default `emit` writes SystemVerilog to stdout.
 
-### `--manifest <PATH>`
+## `sylc sim` single-trace options
 
-Explicitly specify the `syl.toml` project manifest path.
+| Option | Behavior |
+| --- | --- |
+| `--top <CELL>` | Required top cell name. |
+| `--cycles <N>` | Automatic cycles, including the reset cycle. Default 1. Zero settles initial inputs. Conflicts with explicit `--stimulus`. |
+| `--param K=V` | Bind a natural number or `true`/`false`. Repeat with distinct keys. |
+| `--stimulus <PATH>` | Read a JSON array of steps. |
+| `--vcd <PATH>` | Write the direct hierarchical waveform. |
+| `--strict-unique` | Treat overlapping true `select unique` guards as an error. |
+| `--fail-on-x` | Fail on any X or Z bit in a top output after a step or automatic cycle. |
 
-### `--package-root <PATH>`
+Automatic traces initialize top inputs to zero, assert top resets according to polarity for the first cycle, then release them. Each cycle pulses all top clocks together. With `--stimulus`, use flattened top port names. `drive`, `clocks` and `expect` are optional and default to empty. Unknown fields are rejected. Drives in one step settle together, including asynchronous reset. The named clocks rise together and fall together before `expect` compares bits. Put clock pulses in `clocks`. Literals accept unsigned 64-bit integers, booleans and binary strings of `0`, `1`, `X`, `Z` resized to the port width.
 
-Explicitly specify the package root directory.
-
-### `--std-root <PATH>`
-
-Specify the standard library root path.
-
-### `--out <OUTPUT>`
-
-Write a single SystemVerilog file.
-
-```
-sylc input.syl --out build/output.sv
-```
-
-### `--out-dir <DIR>`
-
-Write one SystemVerilog file per module and generate a dependency-ordered filelist.
-
-### `--filelist <PATH>`
-
-Set the filelist path (defaults to `<out-dir>/filelist.f`).
-
-### `--source-comments`
-
-Include Syl source locations in the emitted SystemVerilog.
-
-### `--diagnostics-format <human|json>`
-
-Set the diagnostics output format (default: `human`).
-
-### `--help`
-
-Print help information.
-
-```
-sylc --help
+```json
+[
+  {"drive":{"dst_rst_n":0,"async_in":1},"expect":{"sync_out":0}},
+  {"drive":{"dst_rst_n":1},"clocks":["dst_clk"],"expect":{"sync_out":0}},
+  {"clocks":["dst_clk"],"expect":{"sync_out":1}}
+]
 ```
 
-### `--version`
+Save the array in `steps.json` and run from the `syllang/syl` checkout. A step without clock edges can change outputs without incrementing the cycle count.
 
-Print version information.
-
-```
-sylc --version
+```sh
+sylc sim examples/std/cdc.syl --top Sync2FFAsyncLow --stimulus steps.json --vcd trace.vcd
 ```
 
-## Output
-
-### Normal Output
-
-On success, SystemVerilog code is written to stdout (or to `--out` / `--out-dir`).
-
-### Diagnostics
-
-Diagnostics are written to stderr. Each diagnostic includes:
-
-- Severity (`error` or `warning`)
-- Error code
-- Description message
-- Source location (file, line, column)
-
-```
-error[E_MIDDLE_TYPE_MISMATCH]: expected `UInt<8>`, found `Bit`
-  ┌─ input.syl:2:9
-  │
-2 │     y := x
-  │         ^ expected `UInt<8>`, found `Bit`
+```text
+Sync2FFAsyncLow cycles=2
+sync_out=1
 ```
 
-### JSON Diagnostics Output Schema
+## Deterministic batch options
 
-When `--diagnostics-format json` is used, each diagnostic is emitted as structured JSON containing `code`, `severity`, `message`, and `span` (file, line, column) for CI and editor integration.
+| Option | Behavior |
+| --- | --- |
+| `--backend <auto\|cpu-ref\|cpu-simd\|gpu-cuda>` | Default `auto` considers reference semantics, work size, supported operations, device and cache. An explicitly forced accelerator reports unsupported requests. |
+| `--batch <N>` | Independent trajectories, at least 1. Default 1. |
+| `--seed <U64>` | Base seed for the deterministic input stream. Default 0. |
+| `--threads <N>` | CPU SIMD host workers, at least 1. Defaults to available parallelism. |
+| `--gpu-mode <auto\|batch\|family>` | Default `auto`. CUDA uses one trajectory per thread (`batch`) or per block (`family`). |
+| `--replay-vcd <PATH>` | On an assertion failure, record the verified reference replay of the earliest failing lane and step. |
+| `--gpu-cache-dir <PATH>` | Directory for reusable CUDA executables. |
+| `--no-gpu-cache` | Compile into an isolated temporary directory. Conflicts with `--gpu-cache-dir`. |
 
-### Exit Codes
+**Mode selection.** Using only the original single-trace options preserves four-state behavior and final port output. Without direct tracing, specifying `--backend` (even `auto` or `cpu-ref`) or any batch option selects deterministic inputs, including at `--batch 1`. Batches normally use two states. `--strict-unique` or `--fail-on-x` requires four-state `cpu-ref` and is valid with `auto` or `cpu-ref`.
 
-- `0`: Compilation succeeded
-- `1`: Compilation failed (error diagnostics present)
+**Direct tracing.** `--stimulus` and `--vcd` can be combined with each other and accept `--backend auto` or `--backend cpu-ref`. Either conflicts with `--batch` (even 1), `--seed`, `--threads`, `--gpu-mode`, `--replay-vcd`, `--gpu-cache-dir` and `--no-gpu-cache`. Forced `cpu-simd` and `gpu-cuda` reject direct tracing and the two four-state checks.
+
+**Environment.** `SYL_CUDA_ARCH` overrides the `nvcc` target, for example `sm_75` or `native`. Cache lookup uses `--gpu-cache-dir`, then `SYL_CUDA_CACHE_DIR`, then `$XDG_CACHE_HOME/syl/cuda`, then `syl-cuda-cache` in the system temporary directory.
+
+## Output and exit status
+
+A successful direct trace prints `<top> cycles=<count>` and one `port=bits` line per top output or inout. A successful batch prints a single line. CPU backends omit the cache field. CUDA appends `cache=hit` or `cache=miss`.
+
+```text
+WideAluArray backend=gpu-cuda/family batch=256 cycles=100 seed=42 digest=14271358684969178033 cache=hit
+```
+
+Diagnostics go to stderr. JSON mode writes one document with `schema_version` and a `diagnostics` array. If argument parsing fails (for example, an invalid option value or mutually exclusive arguments), `clap` writes its own plain-text error to stderr and exits with status `2` before diagnostic formatting.
+
+Each JSON diagnostic has `severity`, `code`, `source`, `message`, `location` and `related` fields. A located batch assertion includes the zero-based lane, global stimulus step (first edge is 1), hierarchical path, assertion ID and Syl source span.
+
+- `0` indicates success. A direct trace with a `W_SIM_UNIQUE` overlap warning alone succeeds.
+- `1` indicates a compiler, project or simulation error. `E_SIM` covers simulation failures such as an expectation mismatch, a failed assertion or a `--strict-unique` overlap.
+- `2` indicates a clap usage error, such as an invalid backend name or explicit `--cycles` with `--stimulus`.
+
+[Run a simulation and replay an assertion](/docs/how-to/native-simulation) · [Diagnostic codes](/docs/reference/diagnostics)

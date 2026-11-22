@@ -3,8 +3,6 @@ title: How-to Guides
 description: Practical, task-oriented recipes for configuring Syl projects, emitting SystemVerilog, applying hardware design patterns, verifying with Verilator/Yosys, and migrating from other HDLs.
 ---
 
-This section provides goal-oriented, step-by-step guides for real-world Syl hardware engineering workflows. Every code example and configuration snippet is verified against the `sylc` compiler.
-
 ## Project & Tooling
 
 - [Configure syl.toml](/docs/how-to/configure-syl-toml): Set up `[project]`, `[paths]`, multi-package workspaces, and automatic manifest discovery.
@@ -28,6 +26,7 @@ This section provides goal-oriented, step-by-step guides for real-world Syl hard
 
 - [CDC & Async Reset](/docs/how-to/cdc-and-async-reset): `@cdc_sync` boundary synchronizers, `std.cdc`, and `Reset<D, Sync|Async, ActiveHigh|ActiveLow>`.
 - [Synthesizable RAM & FIFO](/docs/how-to/synthesizable-ram-fifo): `mem`, `mem_write`, `mem_read_sync`, `std.mem`, and `std.fifo` for BRAM/distributed RAM.
+- [Run native simulations](/docs/how-to/native-simulation) with four-state stimuli, CPU SIMD or CUDA batches, and first-failure VCD replay.
 - [Verilator & Yosys Verification](/docs/how-to/verilator-and-yosys): `scripts/check_std_sim.sh`, C++17 Verilator testbenches, and Yosys synthesis checks.
 
 ## Migrating to Syl

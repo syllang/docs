@@ -5,8 +5,6 @@ description: Understand Syl from first principles — design philosophy, static 
 
 # Explanation Overview
 
-This section examines *why* Syl is designed the way it is and *how* the compiler works under the hood, organized into three themes:
-
 1. **Design Philosophy**: Why Syl is a standalone language with native hardware semantics and static analyzability, and where it fits best.
 2. **Static Analysis Model**: How the compiler catches multiple drivers, missing drivers, capability violations, out-of-bounds indexing, incomplete aggregates, width/type mismatches, CDC and reset-polarity errors, and cycles/disambiguation at compile time.
 3. **Compiler Internals & Incremental Engine**: The full pipeline from source to SystemVerilog, the strict ownership boundaries across IRs (AST → HIR → TIR → Const MIR / Map IR → EIR → HW IR → SV AST), and the declaration-level incremental query engine powered by Salsa 0.28.2.
@@ -55,6 +53,7 @@ flowchart TB
     P3 --> P4
     P5 -.-> P4
     P4 --> P6
+    P4 --> Sim["Native simulation: syl_sim and SimDesign"]
 ```
 
 | Article | Summary |
@@ -66,5 +65,6 @@ flowchart TB
 | [Const MIR and Map IR](/docs/explanation/const-mir-and-map-ir) | Pure compile-time evaluation and per-owner `owner_const_mir` / `owner_map_ir` isolation |
 | [Elaboration and EIR](/docs/explanation/elab-and-eir) | Targeted `module_eir_stage`, `EirNameDisambiguator`, `mem` primitive lowering, and DRC |
 | [HW IR and SV IR](/docs/explanation/hw-and-sv-ir) | Multi-file `EmittedSvBundle` / `filelist.f`, reset polarity SV emission, and synthesizable RAM |
+| [Simulation and GPU acceleration](/docs/explanation/simulation-and-gpu) | Word-level scheduling, state semantics, measured CPU/GPU crossover and cache costs |
 | [Repository Map](/docs/explanation/repository-map) | Workspace crate dependency graph, 13 stdlib modules, and simulation/conformance test layout |
 | [Testing and Contributing](/docs/explanation/testing-and-contributing) | `quality_gate.sh`, Verilator + Yosys gates, no-inline-tests rule, and public API snapshots |

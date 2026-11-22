@@ -5,13 +5,11 @@ description: Medium- and long-term plans and priorities for Syl.
 
 # Roadmap
 
-This page outlines Syl's medium- and long-term roadmap and engineering priorities.
-
----
-
 ## Current Stage
 
 Syl has completed Wave 0–3 milestones: frontend parsing, Salsa incremental queries, semantic analysis, elaboration DRC (single-driver, CDC, memory), and SystemVerilog backend emission are all operational for small-to-medium digital designs.
+
+The T1–T4 native simulation milestones are delivered. `syl_sim` specializes the word-level design, runs four-state traces, and accelerates supported two-state batches with CPU SIMD and CUDA. `sylc sim --replay-vcd` captures the earliest batch assertion in a reference replay with a Syl source location. [Simulation and GPU acceleration](/docs/explanation/simulation-and-gpu).
 
 ## Near-Term Goals
 
@@ -67,7 +65,7 @@ Syl has completed Wave 0–3 milestones: frontend parsing, Salsa incremental que
 
 **Third-party IP integration.** Expand `extern cell` and Opaque Summary workflows.
 
-**Simulation integration.** Explore tighter integration with simulation tools.
+**External simulator integration.** Explore tighter integration with third-party simulators.
 
 ## Priority Principles
 

@@ -1,122 +1,103 @@
 ---
 title: CLI 参考
-description: sylc 命令行编译器的使用说明。
+description: sylc 子命令、仿真选项、输出格式、诊断与退出码。
 ---
 
 # CLI 参考
 
-`sylc` 是 Syl 编译器的命令行入口。它将 Syl 源代码编译为 SystemVerilog 代码。
+## 子命令
 
----
+- `sylc check [OPTIONS] [FILE_OR_DIR]...` 执行类型检查与展开期 DRC。
+- `sylc emit [OPTIONS] [FILE_OR_DIR]...` 先检查再生成 SystemVerilog。省略子命令时保留此行为。
+- `sylc sim <INPUT> --top <CELL> [OPTIONS]` 从一个输入特化顶层 cell，运行四态轨迹或确定性批处理。
 
-## 用法
-
-```
-sylc [OPTIONS] [FILE_OR_DIR]... [COMMAND]
-```
-
-### 子命令
-
-- `sylc check [OPTIONS] [FILE_OR_DIR]...`：执行类型检查与展开期 DRC（不生成 SystemVerilog）。
-- `sylc emit [OPTIONS] [FILE_OR_DIR]...`：执行检查并输出 SystemVerilog 到标准输出、`--out` 或 `--out-dir`。
-
-## 常用选项
-
-- `--manifest <PATH>`：显式指定 `syl.toml` 清单路径。
-- `--package-root <PATH>`：显式指定包根目录。
-- `--std-root <PATH>`：指定标准库路径。
-- `--out <OUTPUT>`：输出单个 SystemVerilog 文件。
-- `--out-dir <DIR>`：按模块输出多个 SystemVerilog 文件并生成依赖排序的 filelist。
-- `--filelist <PATH>`：指定 filelist 路径（默认 `<out-dir>/filelist.f`）。
-- `--source-comments`：在生成的 SystemVerilog 中保留 Syl 源码位置注释。
-- `--diagnostics-format <human|json>`：设置诊断输出格式（默认 `human`）。
-
-### JSON 诊断输出 Schema
-
-使用 `--diagnostics-format json` 时，每条诊断以结构化 JSON 输出，包含 `code`、`severity`、`message`、`span`（文件与行列范围）等字段，便于 CI 与编辑器集成解析。
-
-## 基本使用
-
-编译单个文件，输出到标准输出：
-
-```
+```sh
 sylc input.syl
-```
-
-编译多个文件：
-
-```
 sylc file1.syl file2.syl
+sylc emit input.syl --out build/output.sv
 ```
 
-输出到文件：
+## 工程与输出选项
 
-```
-sylc input.syl -o output.sv
-```
+| 选项 | 行为 |
+| --- | --- |
+| `--manifest <PATH>` | 加载指定的 `syl.toml`。 |
+| `--package-root <PATH>`、`--std-root <PATH>` | 添加包根目录或标准库根目录，均可重复。 |
+| `--diagnostics-format <human\|json>` | 指定标准错误格式，默认 `human`。 |
+| `--out <OUTPUT>` | 写入一个 SystemVerilog 文件。 |
+| `--out-dir <DIR>` | 按模块输出文件和按依赖排序的 filelist，与 `--out` 互斥。 |
+| `--filelist <PATH>` | 覆盖 `<out-dir>/filelist.f`，须配合 `--out-dir`。 |
+| `--source-comments` | 在生成代码中保留 Syl 源码位置。 |
+| `--help`、`--version` | 显示帮助或编译器版本。 |
 
-## 选项
+清单、根目录和诊断选项可放在子命令之前或之后。输出文件选项用于 `emit`，默认将 SystemVerilog 写入标准输出。
 
-### -o, --output
+## `sylc sim` 单轨迹选项
 
-指定输出文件路径。默认输出到标准输出。
+| 选项 | 行为 |
+| --- | --- |
+| `--top <CELL>` | 必填，指定顶层 cell 名称。 |
+| `--cycles <N>` | 自动运行的周期数，含复位周期，默认 1。零周期仅对初始输入求稳。与显式 `--stimulus` 互斥。 |
+| `--param K=V` | 绑定自然数或 `true`/`false`，可重复使用，键名须唯一。 |
+| `--stimulus <PATH>` | 读取步骤组成的 JSON 数组。 |
+| `--vcd <PATH>` | 直接写出层次化波形。 |
+| `--strict-unique` | `select unique` 的多个守卫同时为真时按错误处理。 |
+| `--fail-on-x` | 每步或自动周期结束时，顶层输出含任意 X 或 Z 位即失败。 |
 
-```
-sylc input.syl -o build/output.sv
-```
+自动轨迹将顶层输入初始化为零，首周期按极性施加顶层复位，随后释放。每周期同时脉冲所有顶层时钟。使用 `--stimulus` 时以展开后的顶层端口名标识信号。`drive`、`clocks`、`expect` 均可省略，默认为空；未知字段会报错。每步的驱动一起求稳，包含异步复位；指定的时钟一起上升再一起下降，最后按位比较 `expect`。时钟脉冲写在 `clocks` 中。字面值接受 64 位无符号整数、布尔值或由 `0`、`1`、`X`、`Z` 组成的二进制字符串，按端口位宽调整。
 
-```
-sylc input.syl -o build/output.sv
-```
-
-### --std
-
-指定标准库路径。默认值为 `examples/std`。
-
-```
-sylc --std /path/to/std input.syl
-```
-
-### --help
-
-显示帮助信息。
-
-```
-sylc --help
-```
-
-### --version
-
-显示版本信息。
-
-```
-sylc --version
+```json
+[
+  {"drive":{"dst_rst_n":0,"async_in":1},"expect":{"sync_out":0}},
+  {"drive":{"dst_rst_n":1},"clocks":["dst_clk"],"expect":{"sync_out":0}},
+  {"clocks":["dst_clk"],"expect":{"sync_out":1}}
+]
 ```
 
-## 输出
+将数组保存为 `steps.json`，并在 `syllang/syl` 仓库根目录运行。不含时钟边沿的步骤可以改变输出，周期数不增加。
 
-### 正常输出
-
-编译成功后，SystemVerilog 代码输出到标准输出（或 `-o` 指定的文件）。
-
-### 诊断信息
-
-诊断信息输出到标准错误（stderr）。每条诊断包含：
-
-- 严重级别（error 或 warning）
-- 错误代码
-- 描述信息
-- 源码位置（文件、行号、列号）
-
-```
-error[E_MIDDLE_TYPE_MISMATCH]: expected `UInt<8>`, found `Bit`
-  ┌─ input.syl:2:9
-  │
-2 │     y := x
-  │         ^ expected `UInt<8>`, found `Bit`
+```sh
+sylc sim examples/std/cdc.syl --top Sync2FFAsyncLow --stimulus steps.json --vcd trace.vcd
 ```
 
-### 退出码
+```text
+Sync2FFAsyncLow cycles=2
+sync_out=1
+```
 
-- `0`：编译成功
-- `1`：编译失败（有错误诊断）
+## 确定性批处理选项
+
+| 选项 | 行为 |
+| --- | --- |
+| `--backend <auto\|cpu-ref\|cpu-simd\|gpu-cuda>` | 默认 `auto`，考虑参考语义、工作量、支持的运算、设备与缓存。显式强制加速后端时，不支持的请求会报错。 |
+| `--batch <N>` | 独立轨迹数，至少为 1，默认 1。 |
+| `--seed <U64>` | 确定性激励的基础种子，默认 0。 |
+| `--threads <N>` | CPU SIMD 的宿主工作线程数，至少为 1，默认取可用并行度。 |
+| `--gpu-mode <auto\|batch\|family>` | 默认 `auto`。CUDA 每线程执行一条轨迹（`batch`），或每块执行一条轨迹（`family`）。 |
+| `--replay-vcd <PATH>` | 断言失败时，记录参考后端对首错轨迹及步骤的验证回放。 |
+| `--gpu-cache-dir <PATH>` | 指定可重复使用的 CUDA 可执行文件目录。 |
+| `--no-gpu-cache` | 在独立临时目录编译，与 `--gpu-cache-dir` 互斥。 |
+
+**模式选择。** 仅使用原有单轨迹选项时，保留四态语义和最终端口输出。未启用直接跟踪时，显式指定 `--backend`（包括 `auto` 或 `cpu-ref`）或任一批处理选项均选择确定性输入，`--batch 1` 也如此。批处理通常使用两态。`--strict-unique` 或 `--fail-on-x` 需要四态 `cpu-ref`，可配合 `auto` 或 `cpu-ref`。
+
+**直接跟踪。** `--stimulus` 和 `--vcd` 可同时使用，接受 `--backend auto` 或 `--backend cpu-ref`。两者各自都与 `--batch`（即使为 1）、`--seed`、`--threads`、`--gpu-mode`、`--replay-vcd`、`--gpu-cache-dir` 和 `--no-gpu-cache` 冲突。强制 `cpu-simd` 或 `gpu-cuda` 时，直接跟踪和两项四态检查均会报错。
+
+**环境变量。** `SYL_CUDA_ARCH` 覆盖 `nvcc` 目标架构，例如 `sm_75` 或 `native`。缓存位置按 `--gpu-cache-dir`、`SYL_CUDA_CACHE_DIR`、`$XDG_CACHE_HOME/syl/cuda`、系统临时目录中的 `syl-cuda-cache` 的顺序确定。
+
+## 输出与退出码
+
+成功的直接跟踪首先输出 `<top> cycles=<count>`，再为每个顶层输出或双向端口打印一行 `port=bits`。成功的批处理只输出一行。CPU 后端省略缓存字段，CUDA 追加 `cache=hit` 或 `cache=miss`。
+
+```text
+WideAluArray backend=gpu-cuda/family batch=256 cycles=100 seed=42 digest=14271358684969178033 cache=hit
+```
+
+诊断写入标准错误。JSON 模式输出一个包含 `schema_version` 与 `diagnostics` 数组的文档。若 `clap` 在参数解析阶段报错（例如枚举值无效或同时使用了 `clap` 定义为互斥的参数），会在诊断格式化之前将自身的纯文本错误写入标准错误，并以 `2` 退出。
+
+每条 JSON 诊断记录包括 `severity`、`code`、`source`、`message`、`location` 与 `related`。可定位的批处理断言包含从零开始的轨迹号、全局激励步（首个边沿为 1）、层次路径、断言 ID 和 Syl 源码范围。
+
+- `0` 表示成功。直接跟踪仅产生 `W_SIM_UNIQUE` 重叠警告时也成功。
+- `1` 表示编译、工程或仿真错误。期望值不符、断言失败或 `--strict-unique` 检测到重叠等仿真错误使用 `E_SIM`。
+- `2` 表示 clap 用法错误，例如后端名称无效或显式同时使用 `--cycles` 与 `--stimulus`。
+
+[运行仿真并回放断言](/zh/docs/how-to/native-simulation) · [诊断码](/zh/docs/reference/diagnostics)

@@ -3,8 +3,6 @@ title: 操作指南
 description: 面向实际工程任务的 Syl 操作手册：涵盖 syl.toml 配置、SystemVerilog 发射、硬件设计模式、Verilator/Yosys 验证以及从其他 HDL 迁移。
 ---
 
-本栏目提供面向具体工程目标的实操指南。所有 `.syl` 代码示例与配置片段均已通过 `sylc` 实测验证。
-
 ## 工程与工具链
 
 - [配置 syl.toml](/zh/docs/how-to/configure-syl-toml)：配置 `[project]`、`[paths]`、多包工作区与自动向上发现。
@@ -28,6 +26,7 @@ description: 面向实际工程任务的 Syl 操作手册：涵盖 syl.toml 配�
 
 - [CDC 与异步复位](/zh/docs/how-to/cdc-and-async-reset)：`@cdc_sync` 边界同步器、`std.cdc` 与 `Reset<D, Sync|Async, ActiveHigh|ActiveLow>`。
 - [可综合 RAM 与 FIFO](/zh/docs/how-to/synthesizable-ram-fifo)：`mem`、`mem_write`、`mem_read_sync`、`std.mem` 与 `std.fifo` 建模。
+- [运行原生仿真](/zh/docs/how-to/native-simulation)，使用四态激励、CPU SIMD 或 CUDA 批处理及首错 VCD 回放。
 - [Verilator 与 Yosys 验证](/zh/docs/how-to/verilator-and-yosys)：`scripts/check_std_sim.sh`、C++17 Verilator testbench 与 Yosys 综合检查。
 
 ## 迁移到 Syl

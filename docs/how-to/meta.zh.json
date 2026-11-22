@@ -20,6 +20,7 @@
     "---进阶硬件与验证---",
     "cdc-and-async-reset",
     "synthesizable-ram-fifo",
+    "native-simulation",
     "verilator-and-yosys",
     "---迁移到 Syl---",
     "from-verilog",

@@ -25,11 +25,12 @@ flowchart TB
     Front --> Sema
     Sema --> Elab
     Elab --> Backend
+    Elab --> Sim["Native simulation: syl_sim → SimDesign"]
 ```
 
 Each arrow represents a data transformation that may also emit diagnostics (errors and warnings). In the `syl_session` architecture, these transformations are decomposed into fine-grained Salsa queries—such as single-parse deduplication via `Arc<ParsedFileOutput>`, per-owner `owner_const_mir` / `owner_map_ir`, and targeted `module_eir_stage`—so editing a file only recomputes affected declarations and modules.
 
-Let's walk through each stage in order.
+For `sylc sim`, `syl_sim` specializes the elaboration output into a word-level `SimDesign`. The reference, CPU SIMD and CUDA backends execute this design directly. [Simulation and GPU acceleration](/docs/explanation/simulation-and-gpu).
 
 ## Frontend
 
