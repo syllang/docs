@@ -5,7 +5,7 @@ description: 引入 Clock<D>、Reset<D> 与 reg 状态原语构建可综合计�
 
 # 第 2 课：时序计数器与仿真
 
-在[第 1 课](/docs/tutorials/first-cell)中，你构建了一个纯组合逻辑电路。但真实的数字系统需要状态——在时钟沿捕获数值并在复位时干净初始化的触发器（Flip-Flop）。本课将带你编写一个带时钟域参数的 8 位计数器 `Counter8`，解读其生成的 `always_ff` SystemVerilog 代码，并使用 **Verilator** 与 **C++17** 完成周期级功能仿真。
+在[第 1 课](/zh/docs/tutorials/first-cell)中，你构建了一个纯组合逻辑电路。但真实的数字系统需要状态——在时钟沿捕获数值并在复位时干净初始化的触发器（Flip-Flop）。本课将带你编写一个带时钟域参数的 8 位计数器 `Counter8`，解读其生成的 `always_ff` SystemVerilog 代码，并使用 **Verilator** 与 **C++17** 完成周期级功能仿真。
 
 ## 学习目标
 
@@ -18,7 +18,7 @@ description: 引入 Clock<D>、Reset<D> 与 reg 状态原语构建可综合计�
 
 ## 前置条件
 
-- 已完成[第 1 课](/docs/tutorials/first-cell)。
+- 已完成[第 1 课](/zh/docs/tutorials/first-cell)。
 - 已安装 `verilator` 与支持 C++17 的 `g++`。
 
 ---
@@ -30,7 +30,7 @@ description: 引入 Clock<D>、Reset<D> 与 reg 状态原语构建可综合计�
 - `clk: in Clock<D>`
 - `rst: in Reset<D>`
 
-由于 `clk` 与 `rst` 共享同一个 `D`，编译器就能静态保证它们属于同一个时钟域。（我们将在[第 5 课](/docs/tutorials/cdc-and-fifo)中看到 Syl 如何拦截跨时钟域错误。）
+由于 `clk` 与 `rst` 共享同一个 `D`，编译器就能静态保证它们属于同一个时钟域。（我们将在[第 5 课](/zh/docs/tutorials/cdc-and-fifo)中看到 Syl 如何拦截跨时钟域错误。）
 
 ---
 
@@ -187,4 +187,4 @@ Counter8 Verilator testbench PASSED!
 
 ## 下一步
 
-单文件设计适合入门，但真实硬件工程往往跨越多个文件并复用标准库组件。在[第 3 课：多文件工程](/docs/tutorials/multi-file-project)中，你将使用 `syl.toml` 组织工程、导入 `std.pulse` 与 `std.skid`，并使用 `--out-dir` 与 `--filelist` 发射多文件 SystemVerilog。
+单文件设计适合入门，但真实硬件工程往往跨越多个文件并复用标准库组件。在[第 3 课：多文件工程](/zh/docs/tutorials/multi-file-project)中，你将使用 `syl.toml` 组织工程、导入 `std.pulse` 与 `std.skid`，并使用 `--out-dir` 与 `--filelist` 发射多文件 SystemVerilog。

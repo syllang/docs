@@ -7,7 +7,7 @@ description: Deep dive into Syl's declaration-level incremental query engine bui
 
 The Syl compiler powers both batch CLI compilation (`sylc`) and interactive IDE tooling (`syl_lsp` and `syl_query`). To keep large hardware projects responsive to sub-10ms edits, `syl_session` implements a declaration-level incremental computation engine on top of **Salsa 0.28.2**.
 
-This page walks through the `AnalysisHost` / `AnalysisSnapshot` session model, single-parse deduplication, O(1) generation comparison, `Retained` pointer deduplication, LSP fast/background lane isolation, and 50/100-file benchmark results.
+The incremental engine combines the `AnalysisHost` / `AnalysisSnapshot` session model, single-parse deduplication, O(1) generation comparison, `Retained` pointer deduplication, and LSP fast/background lane isolation, achieving sub-millisecond incremental checks across 50- and 100-file benchmarks.
 
 ---
 
@@ -83,7 +83,7 @@ To prevent editing a single function or cell body from triggering workspace-wide
 In interactive editing, users expect instant syntax, name, and type diagnostics, whereas full workspace elaboration and DRC are heavier. `BackgroundDrcScheduler` (`crates/syl_lsp/src/drc/mod.rs`) splits diagnostics into two independently cancellable lanes sharing `generation: u64` and `Option<Arc<AnalysisSnapshot>>`:
 
 ```mermaid
-flowchart LR
+flowchart TB
     Edit["did_open / did_change"] --> Fast["Fast Lane\nCancellationSlot::Diagnostics\n0ms / 150ms debounce"]
     Fast --> FastQuery["grouped_diagnostics_with_token\nParse + HIR + TIR only"]
     FastQuery --> PubFast["apply_fast_layer"]

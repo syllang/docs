@@ -5,7 +5,7 @@ description: 了解后端无关的硬件中间表示（HW IR）、多文件 Emit
 
 # 硬件 IR 与 SV 后端
 
-欢迎来到硬件 IR 与 SV 后端篇章！这篇文章我们分两部分讲解。先介绍 HW IR（硬件中间表示）——它是展开和后端之间的接口，后端无关。然后介绍后端如何处理 HW IR，将其转换为 SystemVerilog 代码（支持单文件与多文件 `EmittedSvBundle` / `filelist.f`、源位置注释、同步/异步复位极性与可综合 RAM）。
+HW IR（硬件中间表示）是展开阶段与后端代码生成之间的后端无关接口；`syl_emit` 后端接收 HW IR 并将其转换为 SystemVerilog（支持单文件与多文件 `EmittedSvBundle` / `filelist.f`、源位置注释、同步/异步复位极性与可综合 RAM）。
 
 ---
 
@@ -132,7 +132,7 @@ SV 验证分两步执行：
 HW IR 和后端之间有一个重要的设计约束：**HW IR 不依赖后端，后端不依赖前端。**
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Front["前端和语义分析"]
         Sema["syl_sema"]
     end

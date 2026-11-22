@@ -85,7 +85,7 @@ Salsa 0.28.2 的数据库内部状态是 `Send` 但非 `Sync` 的。为了支持
 在编辑器交互场景中，用户最敏感的是输入时的语法、名字与类型提示延迟，而全工作区展开与跨模块 DRC（设计规则检查）计算量相对较大。为此，`crates/syl_lsp/src/drc/mod.rs` 中的 `BackgroundDrcScheduler` 将诊断发布拆分为两个可独立取消的通道，共享同一 `generation: u64` 与 `Option<Arc<AnalysisSnapshot>>`：
 
 ```mermaid
-flowchart LR
+flowchart TB
     Edit["did_open / did_change"] --> Fast["快通道 (Fast Lane)\nDiagnostics 令牌\n0ms / 150ms 防抖"]
     Fast --> FastQuery["grouped_diagnostics_with_token\n仅 Parse + HIR + TIR"]
     FastQuery --> PubFast["apply_fast_layer 发布"]

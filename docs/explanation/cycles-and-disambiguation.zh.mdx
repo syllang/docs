@@ -90,7 +90,7 @@ flowchart TB
     Extern -->|"是"| Keep["保留原始名称"]
     Extern -->|"否"| Unique{"叶名是否全局唯一?"}
     Unique -->|"是"| Sanitize["规范化标识符\n(关键字加 syl_ 前缀)"]
-    Unique -->|"否 (发生冲突)"| Qualify["使用规范路径拼接:\ncanonical_path.join(\"__\")"]
+    Unique -->|"否 (发生冲突)"| Qualify["使用规范路径拼接:\ncanonical_path.join('__')"]
     Qualify --> Collide2{"拼接后仍冲突?"}
     Collide2 -->|"是"| Hash["附加 FNV-1a 32-bit 哈希:\n{candidate}__h{hash:08x}"]
     Collide2 -->|"否"| Rewrite["重写 EirItem::Instance::module"]

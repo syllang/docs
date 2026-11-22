@@ -5,7 +5,7 @@ description: Understand the two-layer semantic IR — HIR's structural skeleton 
 
 # HIR and TIR
 
-Welcome to the HIR and TIR chapter! This page answers two questions: what HIR and TIR are, and how they relate. We explain why separating them beats a single-pass typed AST, walk through their internal structures with a concrete Syl example, cover `check_fn` / `check_map` declaration-level checks, unused `use` validation, and CDC semantic facts, and explain the side-table pattern.
+HIR (High-level IR) and TIR (Typed IR) form the two-layer core of Syl's semantic analysis, decoupling name resolution from type checking while supporting `check_fn` / `check_map` declaration-level checks, unused `use` validation, CDC semantic facts, and the side-table pattern.
 
 ---
 

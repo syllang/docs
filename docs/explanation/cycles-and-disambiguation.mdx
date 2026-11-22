@@ -90,7 +90,7 @@ flowchart TB
     Extern -->|"Yes"| Keep["Preserve original name"]
     Extern -->|"No"| Unique{"Is leaf name globally unique?"}
     Unique -->|"Yes"| Sanitize["Sanitize identifier\n(prefix keywords with syl_)"]
-    Unique -->|"No (collision)"| Qualify["Qualify with canonical path:\ncanonical_path.join(\"__\")"]
+    Unique -->|"No (collision)"| Qualify["Qualify with canonical path:\ncanonical_path.join('__')"]
     Qualify --> Collide2{"Still collides?"}
     Collide2 -->|"Yes"| Hash["Append FNV-1a 32-bit hash:\n{candidate}__h{hash:08x}"]
     Collide2 -->|"No"| Rewrite["Rewrite EirItem::Instance::module"]
