@@ -92,7 +92,7 @@ sync_out=1
 WideAluArray backend=gpu-cuda/family batch=256 cycles=100 seed=42 digest=14271358684969178033 cache=hit
 ```
 
-诊断写入标准错误。JSON 模式输出一个包含 `schema_version` 与 `diagnostics` 数组的文档。若选项值无效或参数互斥，`clap` 会在诊断格式化之前将自身的纯文本错误写入标准错误，并以 `2` 退出。
+诊断写入标准错误。JSON 模式输出一个包含 `schema_version` 与 `diagnostics` 数组的文档。若 `clap` 在参数解析阶段报错（例如枚举值无效或同时使用了 `clap` 定义为互斥的参数），会在诊断格式化之前将自身的纯文本错误写入标准错误，并以 `2` 退出。
 
 每条 JSON 诊断记录包括 `severity`、`code`、`source`、`message`、`location` 与 `related`。可定位的批处理断言包含从零开始的轨迹号、全局激励步（首个边沿为 1）、层次路径、断言 ID 和 Syl 源码范围。
 
