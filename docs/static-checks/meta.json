@@ -1,0 +1,14 @@
+{
+  "title": "Static Checks",
+  "icon": "checks",
+  "pages": [
+    "index",
+    "driver-overlap",
+    "missing-drivers",
+    "capability-violations",
+    "width-and-type-mismatches",
+    "bounds-and-indexing",
+    "aggregate-completeness",
+    "diagnostic-index"
+  ]
+}

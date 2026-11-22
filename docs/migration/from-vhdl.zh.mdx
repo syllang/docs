@@ -1,0 +1,168 @@
+---
+title: 从 VHDL 迁移
+description: 面向 VHDL 开发者的 Syl 快速入门。
+---
+
+# 从 VHDL 迁移
+
+如果你熟悉 VHDL，这篇文章帮助你快速将已有的 VHDL 知识映射到 Syl。
+
+---
+
+## 实体和架构
+
+VHDL 使用 `entity` 和 `architecture` 分离模块声明和实现。Syl 的 `cell` 将两者合并为单个声明。
+
+### VHDL
+
+```vhdl
+entity counter is
+    generic (W : positive := 8);
+    port (
+        clk   : in  std_logic;
+        rst   : in  std_logic;
+        en    : in  std_logic;
+        count : out std_logic_vector(W-1 downto 0)
+    );
+end entity;
+
+architecture rtl of counter is
+    signal value : unsigned(W-1 downto 0);
+begin
+    process(clk) begin
+        if rising_edge(clk) then
+            if rst = '1' then
+                value <= (others => '0');
+            elsif en = '1' then
+                value <= value + 1;
+            end if;
+        end if;
+    end process;
+    count <= std_logic_vector(value);
+end architecture;
+```
+
+### Syl
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W> reset(rst, 0)
+    next value := select { enable => value + 1, default => value }
+    count := value
+}
+```
+
+## 类型对比
+
+| VHDL | Syl |
+|------|-----|
+| `std_logic` | `Bit` |
+| `std_logic_vector(W-1 downto 0)` | `UInt<W>` |
+| `unsigned(W-1 downto 0)` | `UInt<W>` |
+| `integer` | `Nat`（编译期） |
+| `boolean` | `Bool`（编译期） |
+
+Syl 的类型系统比 VHDL 简单。VHDL 中有 `std_logic`、`std_ulogic`、`bit`、`boolean` 等多种类似类型。Syl 统一为 `Bit`（硬件电平）和 `Bool`（编译期布尔值）。
+
+## 进程和敏感列表
+
+VHDL 的 `process` 需要显式敏感列表。Syl 不需要敏感列表：
+
+- 组合逻辑：使用 `signal` 和 `:=`
+- 时序逻辑：使用 `reg` 和 `next`
+
+```vhdl
+-- VHDL 组合逻辑
+process(a, b) begin
+    y <= a and b;
+end process;
+```
+
+```syl
+// Syl 组合逻辑
+signal y: Bit := a and b
+```
+
+```vhdl
+-- VHDL 时序逻辑
+process(clk) begin
+    if rising_edge(clk) then
+        q <= d;
+    end if;
+end process;
+```
+
+```syl
+// Syl 时序逻辑
+reg q: Bit reset(rst, 0)
+next q := d
+```
+
+## 泛型
+
+| VHDL | Syl |
+|------|-----|
+| `generic (W : positive := 8)` | `<W: Nat = 8>` |
+| `port (count : out std_logic_vector(W-1 downto 0))` | `count: out UInt<W>` |
+
+VHDL 的泛型可以是任意类型。Syl 的泛型参数需要声明具体类型（`Nat`、`Domain` 或类型参数）。
+
+## 库和包
+
+```vhdl
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+```
+
+```syl
+use std.stream.Stream
+use std.stage.Stage
+```
+
+Syl 使用 `use` 导入其他包中的声明。标准库路径以 `std.` 开头，例如 `use std.stream.Stream`。
+
+## VHDL 到 Syl 的映射表
+
+| VHDL | Syl |
+|------|-----|
+| `entity foo is port(...)` | `cell foo(...)` |
+| `architecture rtl of foo` | 模块体 |
+| `generic (W : positive)` | `<W: Nat>` |
+| `in std_logic` | `in Bit` |
+| `out std_logic_vector(7 downto 0)` | `out UInt<8>` |
+| `signal s : unsigned(7 downto 0)` | `signal s: UInt<8>` |
+| `s <= a and b` | `s := a and b` |
+| `process(clk) begin` | `reg` + `next` |
+| `rising_edge(clk)` | 由 `Clock<D>` 端口隐式处理 |
+| `generate for` | 编译期 `for` |
+| `generate if` | 编译期 `if` |
+
+## 迁移实践建议
+
+从 VHDL 迁移到 Syl 的步骤：
+
+1. 理解 VHDL 中的类型对应关系。`std_logic_vector` 对应 `UInt<W>`，`integer` 对应 `Nat`。
+2. 移除 VHDL 的 `process` 和敏感列表。组合逻辑用 `signal` 和 `:=`，时序逻辑用 `reg` 和 `next`。
+3. 用 `use` 替代 VHDL 的 `library` 和 `use`。
+4. 用编译期 `if` 和 `for` 替代 VHDL 的 `generate`。
+
+VHDL 和 Syl 在类型系统上的差异最大。Syl 的类型系统更简单，但检查更严格。在 VHDL 中可以编译通过的代码在 Syl 中可能需要调整类型声明。VHDL 的 `std_logic_vector` 可以同时表示有符号和无符号整数，Syl 使用不同的类型来区分。Syl 的类型系统更简单，但检查更严格。在 VHDL 中可以编译通过的代码在 Syl 中可能需要调整类型声明。VHDL 有丰富的子类型（`std_logic`、`std_ulogic`、`bit`），Syl 统一为 `Bit`。
+
+## 关键差异总结
+
+| 特性 | VHDL | Syl |
+|------|------|-----|
+| 模块声明 | entity + architecture | cell |
+| 类型系统 | 复杂（多种 std_logic 变体） | 简洁（Bit, UInt） |
+| 敏感列表 | 显式声明 | 不需要 |
+| 并发赋值 | `<=` | `:=` |
+| 时序赋值 | process + rising_edge | reg + next |
+| 泛型 | generic | 类型安全的泛型参数 |
+| 库管理 | library + use | use |
+| 编译期计算 | generate + functions | fn + const |

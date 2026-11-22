@@ -1,0 +1,97 @@
+---
+title: Session 与 Query
+description: Syl 编译器的工作区管理和查询系统。
+---
+
+# Session 与 Query
+
+Syl 编译器提供工作区管理（Session）和查询系统（Query）。Session 管理源文件和编译状态，Query 提供只读访问编译结果。
+
+---
+
+## Session
+
+Session 是编译器的工作区入口。它管理源文件的打开、关闭和编译状态。
+
+### 打开文档
+
+```rust
+let mut host = AnalysisHost::new();
+host.open_document(uri, source, version);
+```
+
+### 更新文档
+
+```rust
+host.update_document(uri, new_source, new_version);
+```
+
+### 关闭文档
+
+```rust
+host.close_document(uri);
+```
+
+### 获取快照
+
+```rust
+let snapshot = host.snapshot()?;
+```
+
+## 快照
+
+快照是某一时刻的编译结果。它包含：
+
+- 语义分析结果
+- 展开结果（如果需要）
+- 诊断信息
+
+快照可以被缓存。如果源文件没有变化，后续请求直接返回缓存结果。
+
+## Query
+
+查询系统对快照提供只读访问。
+
+### 悬停提示
+
+查询光标位置的类型信息。
+
+```rust
+let hover = snapshot.hover_at(uri, position)?;
+```
+
+### 跳转定义
+
+查找名字的声明位置。
+
+```rust
+let definition = snapshot.definition_at(uri, position)?;
+```
+
+### 自动补全
+
+获取光标位置的补全候选。
+
+```rust
+let completions = snapshot.completions_at(uri, position)?;
+```
+
+### 分组诊断
+
+获取按阶段和包组织的诊断信息。
+
+```rust
+let grouped = snapshot.grouped_diagnostics();
+```
+
+## 增量编译
+
+Session 支持增量编译。当文件变化时：
+
+1. Session 标记受影响包的缓存为过期
+2. 后续请求重新编译过期包
+3. 未受影响的包直接返回缓存
+
+## 取消
+
+查询系统支持取消。如果用户继续输入，正在进行的查询被取消，新查询从头开始。

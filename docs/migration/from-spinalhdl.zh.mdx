@@ -1,0 +1,191 @@
+---
+title: 从 SpinalHDL 迁移
+description: 面向 SpinalHDL 开发者的 Syl 快速入门。
+---
+
+# 从 SpinalHDL 迁移
+
+如果你熟悉 SpinalHDL，这篇文章帮助你将 SpinalHDL 知识映射到 Syl。
+
+---
+
+## 基本类型对比
+
+| SpinalHDL | Syl |
+|-----------|-----|
+| `Bool` | `Bit` |
+| `Bits(width bits)` | `UInt<W>` |
+| `UInt(width bits)` | `UInt<W>`（无符号） |
+| `SInt(width bits)` | 不直接支持 |
+
+Syl 目前只支持 `UInt<W>`（无符号整数）。没有对应的 `SInt`（有符号整数）。
+
+## 模块声明
+
+### SpinalHDL
+
+```scala
+class Counter(width: Int) extends Component {
+    val io = new Bundle {
+        val en = in Bool()
+        val count = out UInt(width bits)
+    }
+    val value = RegInit(U(0, width bits))
+    when(io.en) {
+        value := value + 1
+    }
+    io.count := value
+}
+```
+
+### Syl
+
+```syl
+cell Counter<W: Nat>(
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W> reset(rst, 0)
+    next value := select { enable => value + 1, default => value }
+    count := value
+}
+```
+
+## Area 和 module
+
+SpinalHDL 的 `Component` 对应 Syl 的 `cell`。SpinalHDL 的 `Area` 用于组织代码但不产生层次，对应 Syl 的 `cell`（用 `inplace` 标记内联展开）。
+
+### SpinalHDL
+
+```scala
+class AddSub extends Component {
+    val io = new Bundle {
+        val a = in UInt(8 bits)
+        val b = in UInt(8 bits)
+        val add = out UInt(8 bits)
+    }
+    io.add := io.a + io.b
+}
+```
+
+### Syl
+
+```syl
+cell AddSub(
+    a: in UInt<8>,
+    b: in UInt<8>,
+    add: out UInt<8>,
+) {
+    add := a + b
+}
+```
+
+`cell` 默认产生独立的层次。用 `inplace` 标记实例化可内联展开。SpinalHDL 的 `Component` 默认产生层次，`Area` 不产生层次。
+
+## 信号声明
+
+| SpinalHDL | Syl |
+|-----------|-----|
+| `Bool()` | `signal x: Bit` |
+| `Bits(8 bits)` | `signal x: UInt<8>` |
+| `RegInit(...)` | `reg x reset(rst, init)` |
+| `val x = y` | `let x = y` |
+
+## 赋值
+
+| SpinalHDL | Syl |
+|-----------|-----|
+| `:=` | `:=`（连续赋值） |
+| `when` | `select` |
+| `switch` | `match` |
+
+SpinalHDL 的 `:=` 操作符和 Syl 的 `:=` 语义类似。
+
+### SpinalHDL
+
+```scala
+when(cond) {
+    result := 1
+}.otherwise {
+    result := 0
+}
+```
+
+### Syl
+
+```syl
+signal result: UInt<8> := select {
+    cond => 1,
+    default => 0,
+}
+```
+
+## Bundle 和接口
+
+### SpinalHDL
+
+```scala
+case class Stream[T <: Data](payload: T) extends Bundle with IMasterSlave {
+    val valid = Bool()
+    val ready = Bool()
+
+    override def asMaster(): Unit = {
+        out(valid, payload)
+        in(ready)
+    }
+}
+```
+
+### Syl
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source { out payload, out valid, in ready }
+    view sink { in payload, in valid, out ready }
+}
+```
+
+SpinalHDL 的 `IMasterSlave` 和 `asMaster` 对应 Syl 的 `view source/sink`。关键区别是：SpinalHDL 的方向在 Scala 运行时通过方法调用设置，Syl 的方向在语法层面声明，编译期固定。
+
+## SpinalHDL 到 Syl 的映射表
+
+| SpinalHDL | Syl |
+|-----------|-----|
+| `class Foo extends Component` | `cell Foo` |
+| `new Area` | `cell` |
+| `in Bool()` | `in Bit` |
+| `out UInt(8 bits)` | `out UInt<8>` |
+| `RegInit(...)` | `reg ... reset(...)` |
+| `when(c) { }.otherwise { }` | `select { c => ..., default => ... }` |
+| `switch(c) { is(v) { } }` | `match` |
+| `Mux(c, a, b)` | `select { c => a, default => b }` |
+| `Cat(a, b)` | bundle 构造 |
+| `IMasterSlave` + `asMaster()` | `view source/sink` |
+
+## 迁移实践建议
+
+从 SpinalHDL 迁移到 Syl 的步骤：
+
+1. SpinalHDL 的 `Component` 对应 Syl 的 `cell`。SpinalHDL 的 `Area` 对应 Syl 的 `cell`（用 `inplace` 标记内联展开）。
+2. SpinalHDL 的 `Bool` 对应 Syl 的 `Bit`。SpinalHDL 的 `Bits/W 位` 对应 Syl 的 `UInt<W>`。
+3. SpinalHDL 的 `:=` 运算符在 Syl 中也有类似的语义，都是连续赋值。
+4. SpinalHDL 的 `IMasterSlave` 对应 Syl 的 `view source/sink`。
+
+SpinalHDL 和 Syl 在接口方向的表达方式上最相似。两者都通过视图机制来表达不同连接方向看到的端口集合。差异在于实现机制：SpinalHDL 的运行期方法调用 vs Syl 的语法声明。
+
+## 关键差异总结
+
+| 特性 | SpinalHDL | Syl | 对设计者的实际影响 |
+|------|-----------|-----|-------------------|
+| 宿主语言 | Scala | 独立语言 | SpinalHDL 需要 Scala 工具链（sbt + JVM），Syl 只需要一个二进制文件 |
+| 模块 | Component | cell | SpinalHDL 通过 Scala 类继承创建模块；Syl 的 `cell` 是语法关键字 |
+| 内联单元 | Area | cell | SpinalHDL 的 Area 是类实例化；Syl 的 `cell` 是编译器直接处理的语法构造 |
+| 类型 | Bool, Bits, UInt, SInt | Bit, UInt | SpinalHDL 的类型是 Scala 库类型，错误信息经过 Scala 包装；Syl 的类型是语言原生 |
+| 条件赋值 | when/otherwise | select | SpinalHDL 是语句块；Syl 是表达式（可以赋值给信号） |
+| 枚举匹配 | switch | match | 语法不同，语义类似 |
+| 接口方向 | IMasterSlave | view source/sink | SpinalHDL 通过 Scala 运行时方法调用设置方向；Syl 在语法层面声明，编译期固定 |
+| 编译期计算 | Scala 代码 | fn | SpinalHDL 的展开阶段可执行任意 Scala 代码；Syl 的 `fn` 是无副作用的纯函数 |

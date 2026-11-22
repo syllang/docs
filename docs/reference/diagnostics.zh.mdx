@@ -1,0 +1,158 @@
+---
+title: 诊断代码
+description: Syl 编译器诊断信息代码参考。
+---
+
+# 诊断代码
+
+本文列出 Syl 编译器生成的诊断代码。每条诊断包含错误代码、描述和示例。
+
+---
+
+## 诊断格式
+
+编译器输出的诊断信息格式：
+
+```
+<severity>[<code>]: <message>
+  ┌─ <file>:<line>:<column>
+  │
+<line> │     <source>
+  │         <highlight>
+```
+
+- severity：`error` 或 `warning`
+- code：诊断代码，如 `E_MIDDLE_TYPE_MISMATCH`
+- message：描述信息
+
+## 错误
+
+### E_PARSE_UNEXPECTED_TOKEN
+
+解析器遇到无法识别的 Token。
+
+```
+error[E_PARSE_UNEXPECTED_TOKEN]: expected item, found `@`
+```
+
+检查代码中是否有拼写错误或多余字符。
+
+### E_HIR_UNKNOWN_NAME
+
+名字解析失败，找不到指定名字。
+
+```
+error[E_HIR_UNKNOWN_NAME]: name `Counter` not found in this scope
+```
+
+检查 `use` 导入是否正确，名字是否拼写正确。
+
+### E_HIR_IMPORT_CYCLE
+
+导入形成循环依赖。
+
+```
+error[E_HIR_IMPORT_CYCLE]: circular import detected
+```
+
+检查包之间的依赖关系，避免循环导入。
+
+### E_MIDDLE_TYPE_MISMATCH
+
+类型不匹配。
+
+```
+error[E_MIDDLE_TYPE_MISMATCH]: expected `UInt<8>`, found `Bit`
+    ┌─ input.syl:2:9
+    │
+2   │     y := x
+    │         ^ expected `UInt<8>`, found `Bit`
+```
+
+检查赋值两侧的类型和位宽是否一致。
+
+### E_MIDDLE_CAPABILITY_VIOLATION
+
+能力违规。对端口进行了不允许的操作。
+
+```
+error[E_MIDDLE_CAPABILITY_VIOLATION]: cannot drive `in` port `x`
+    ┌─ input.syl:2:5
+    │
+2   │     x := 1
+    │     ^ `x` is declared as `in`
+```
+
+`in` 端口不能赋值，`out` 端口不能读取。
+
+### E_MIDDLE_DUPLICATE_HARDWARE_DRIVER
+
+多驱动冲突。同一个信号被多个来源驱动。
+
+```
+error[E_MIDDLE_DUPLICATE_HARDWARE_DRIVER]: duplicate hardware driver for `y`
+    ┌─ input.syl:2:5
+    │
+2   │     y := 1
+    │     ^ first driver
+3   │     y := 2
+    │     ^ duplicate driver
+```
+
+每个信号只能有一个驱动源。使用 `select` 合并多条件赋值。
+
+### E_MIDDLE_MISSING_HARDWARE_DRIVER
+
+缺少驱动。`out` 端口没有被赋值。
+
+```
+error[E_MIDDLE_MISSING_HARDWARE_DRIVER]: missing hardware driver for `y`
+    ┌─ input.syl:1:20
+    │
+1   │ cell Top(y: out Bit) { }
+    │                    ^ `y` is never driven
+```
+
+每个 `out` 端口必须被赋值。
+
+### E_MIDDLE_INCOMPLETE_MATCH
+
+`match` 表达式没有覆盖所有枚举变体。
+
+```
+error[E_MIDDLE_INCOMPLETE_MATCH]: match must cover all variants
+```
+
+检查 `match` 是否覆盖了所有枚举变体。
+
+### E_MIDDLE_CONST_EVAL
+
+常量求值失败。
+
+```
+error[E_MIDDLE_CONST_EVAL]: division by zero
+```
+
+检查编译期表达式是否有除零、溢出等错误。
+
+### E_MIDDLE_UNKNOWN_TYPE
+
+使用了未定义的类型。
+
+```
+error[E_MIDDLE_UNKNOWN_TYPE]: unknown type `CustomType`
+```
+
+检查类型名字是否拼写正确，是否已导入。
+
+## 警告
+
+### W_MIDDLE_UNUSED_SIGNAL
+
+声明的信号未被使用。
+
+```
+warning[W_MIDDLE_UNUSED_SIGNAL]: unused signal `tmp`
+```
+
+移除未使用的信号清理代码。

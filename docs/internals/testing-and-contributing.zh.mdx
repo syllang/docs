@@ -1,0 +1,162 @@
+---
+title: 测试与贡献
+description: 如何运行测试、理解架构合约、为 Syl 编译器贡献代码。
+---
+
+# 测试与贡献
+
+欢迎来到测试与贡献篇章！这篇文章帮助新贡献者快速上手。我们先介绍如何运行测试，然后解释 Syl 编译器的测试体系——包括架构合约测试、黄金测试和一致性测试。最后给出贡献流程和代码质量要求。
+
+---
+
+## 运行测试
+
+Syl 编译器使用 Cargo 管理测试。在仓库根目录运行：
+
+```
+cargo test
+```
+
+这会运行所有 crate 的单元测试和集成测试。
+
+如果你想只运行某个 crate 的测试：
+
+```
+cargo test -p syl_syntax
+cargo test -p syl_sema
+cargo test -p syl_elab
+```
+
+架构合约测试在 `sylc` crate 中：
+
+```
+cargo test -p sylc --test architecture_*
+```
+
+一致性测试也是独立的：
+
+```
+cargo test -p sylc --test conformance
+```
+
+## 测试体系
+
+Syl 的测试分为四个层次。
+
+### 单元测试
+
+每个 crate 内部有针对具体函数的单元测试。它们测试小粒度的行为，比如解析器的某个语法规则、类型检查器的某个检查逻辑。
+
+单元测试通常放在被测试代码的同文件中，用 `#[cfg(test)]` 标注。测试代码可以访问 crate 的内部 API。
+
+### 架构合约测试
+
+架构合约测试是一组特殊的集成测试，位于 `sylc/tests/` 目录下。它们的文件名以 `architecture_` 开头：
+
+- `architecture_phase1_ir.rs`：验证每个 IR 单拥有者，端到端编译流
+- `architecture_phase2_frontend.rs`：验证前端的解析和恢复行为
+- `architecture_phase3_sema.rs`：验证语义分析的公开事实接口
+- `architecture_phase4_elab.rs`：验证展开流水线的每个阶段都暴露了输出
+- `architecture_phase5_opaque.rs`：验证不透明摘要的注册和查询
+- `architecture_phase6_backend.rs`：验证后端输出稳定的 SV 代码
+- `architecture_phase7_query_lsp.rs`：验证查询引擎不触发展开
+- `architecture_phase8_std.rs`：验证标准库和其他代码走相同流水线
+
+这些合约测试有两个作用：
+
+**第一，维护架构边界。** 每个合约测试都检查 crate 之间的依赖关系是否合规。例如，`syl_sema` 的生产代码不能依赖 `syl_elab`。如果有人在 `syl_sema` 中添加了 `use syl_elab`，合约测试会失败。
+
+**第二，验证阶段输出。** 每个合约测试都检查该阶段的输出是否结构完整。例如，展开阶段的合约测试验证：从 TIR 开始，经过展开流水线，最终输出的 HW IR 可以正确转换为 SystemVerilog。
+
+### 黄金测试
+
+黄金测试（Golden Test）比较编译器输出和预先存储的期望输出。黄金文件位于 `sylc/tests/golden/` 目录下。
+
+例如，`architecture_phase6_backend.rs` 中的一个测试会编译一段 Syl 代码，将输出的 SystemVerilog 和 `golden/phase6_child_top.sv` 文件的内容进行逐字节比较。如果两者不一致，测试失败。
+
+黄金测试的变化需要审慎处理：如果故意修改了输出格式，需要同时更新黄金文件。如果无意中修改了输出格式，黄金测试会发现回归。
+
+### 一致性测试
+
+一致性测试（Conformance Test）检查编译器对特定语言特性的支持和错误检测。测试用例位于 `conformance/` 目录下：
+
+```
+conformance/
+├── parse/       # 语法解析测试
+│   ├── positive/  # 应该通过解析的代码
+│   └── negative/  # 应该触发语法错误的代码
+├── sema/        # 语义分析测试
+│   ├── positive/
+│   └── negative/
+└── elab/        # 展开测试
+    ├── positive/
+    └── negative/
+```
+
+每个测试用例是一个 `.syl` 文件，配套一个 `.codes` 文件描述期望的诊断信息。
+
+### Verilator 烟雾测试
+
+如果系统中安装了 Verilator，后端测试会自动运行 Verilator 烟雾测试。Verilator 会检查生成的 SystemVerilog 代码是否可以解析和综合。
+
+如果 Verilator 未安装，这些测试会被跳过，不会导致 CI 失败。
+
+## 代码质量检查
+
+Syl 使用以下工具保证代码质量：
+
+**Cargo clippy。** 运行 Rust 的 lint 工具：
+
+```
+cargo clippy --all-targets
+```
+
+**架构合约。** 运行架构合约测试验证 crate 边界：
+
+```
+cargo test -p sylc --test architecture_*
+```
+
+**Mermaid 检查。** 文档中的 mermaid 图需要经过语法校验：
+
+```
+pnpm check:mermaid <mdx-file>
+```
+
+**阅读时间检查。** 每篇文档的阅读时间需要落在 6 到 20 分钟之间：
+
+```
+pnpm check:readtime <mdx-file>
+```
+
+## 贡献流程
+
+### 报告问题
+
+在 GitHub Issues 中报告 bug 或提出功能请求。报告 bug 时请包含：
+
+- 观察到的问题描述
+- 期望的行为
+- 最小可复现示例
+- 环境信息和诊断输出
+
+### 提交 PR
+
+提交 Pull Request 时请遵循以下原则：
+
+**聚焦。** 一个 PR 只解决一个问题。无关的修改请放在另一个 PR 中。
+
+**说明改动原因。** 在 PR 描述中解释改了什么、为什么改、如何验证。
+
+**标注用户可见影响。** 如果改动改变了命令行接口的输出、新增或修改了诊断信息、影响了公共 API，请在 PR 描述中明确说明。
+
+**更新测试。** 新增功能需要配套测试，修复 bug 需要添加回归测试。
+
+**通过 CI。** 提交前在本地运行相关测试，确保不会引入回归。
+
+## 下一步阅读
+
+现在你已经了解了 Syl 编译器的完整架构。如果还有疑问，可以参考以下文档：
+
+- [仓库地图](/zh/docs/internals/repository-map)：crate 的依赖关系和职责
+- [编译流水线](/zh/docs/internals/pipeline)：每个阶段的执行细节
