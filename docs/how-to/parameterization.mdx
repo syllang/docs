@@ -8,7 +8,7 @@ Syl separates compile-time elaboration (`Nat`, `Bool`, `fn`, `const`, `for`, `if
 ## Generic `cell` and `bundle` Parameters
 
 ```syl
-cell RegisterFile<W: Nat, DEPTH: Nat, D: Domain>(
+cell RegisterFile<W: nat, DEPTH: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
     we: in Bit,
@@ -26,11 +26,11 @@ cell RegisterFile<W: Nat, DEPTH: Nat, D: Domain>(
 Use `compile_error` inside `fn` or `check_fn` / `check_map` to enforce parameter invariants (such as power-of-two depths or minimum widths) at elaboration time:
 
 ```syl
-fn is_pow2(n: Nat) -> Bool {
+fn is_pow2(n: nat) -> Bool {
     return n > 0 and (n & (n - 1)) == 0
 }
 
-check_fn require_pow2(n: Nat) {
+check_fn require_pow2(n: nat) {
     if !is_pow2(n) {
         compile_error("DEPTH must be a power of two")
     }
@@ -60,12 +60,12 @@ for i in 0..LANES {
 Generics work on `bundle` and `map` as well as `cell`:
 
 ```syl
-bundle Packet<W: Nat> {
+bundle Packet<W: nat> {
     data: UInt<W>,
     parity: Bit,
 }
 
-map zero_packet<W: Nat>() -> Packet<W> = Packet<W> {
+map zero_packet<W: nat>() -> Packet<W> = Packet<W> {
     data: 0,
     parity: 0,
 }
@@ -76,9 +76,9 @@ map zero_packet<W: Nat>() -> Packet<W> = Packet<W> {
 Use `const` and `fn` to compute derived widths (such as `clog2`) at elaboration time:
 
 ```syl
-fn clog2(n: Nat) -> Nat {
-    var v: Nat = n - 1
-    var r: Nat = 0
+fn clog2(n: nat) -> Nat {
+    var v: nat = n - 1
+    var r: nat = 0
     while v > 0 {
         v = v >> 1
         r = r + 1
@@ -86,7 +86,7 @@ fn clog2(n: Nat) -> Nat {
     return r
 }
 
-const ADDR_W: Nat = clog2(64) -- evaluates to 6
+const ADDR_W: nat = clog2(64) -- evaluates to 6
 ```
 
 ## Conditional Hardware Generation (`if` / `else`)
@@ -94,7 +94,7 @@ const ADDR_W: Nat = clog2(64) -- evaluates to 6
 Because `if` requires a compile-time `Bool`, untaken branches generate zero hardware:
 
 ```syl
-cell OptionalRegister<W: Nat, BYPASS: Bool, D: Domain>(
+cell OptionalRegister<W: nat, BYPASS: bool, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D, Sync, ActiveHigh>,
     din: in UInt<W>,

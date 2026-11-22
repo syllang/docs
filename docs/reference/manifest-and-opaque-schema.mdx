@@ -71,10 +71,10 @@ Opaque summaries describe the internal driver, consumption, and clock-domain beh
 | `endpoints` | `Vec<Endpoint>` | No | Endpoint descriptors |
 | `driven_fields` | `Vec<String>` | No | Port/field paths driven by the black box |
 | `consumed_fields` | `Vec<String>` | No | Port/field paths consumed by the black box |
-| `domain_behavior` | `DomainBehavior` | No | Clock domain relationship (`same_domain`, `cdc_crossings`, etc.) |
-| `latency_class` | `LatencyClass` | No | Latency classification (`combinational`, `registered`, etc.) |
-| `protocol_preservation` | `Preservation` | No | Protocol preservation metadata |
-| `trust_boundary` | `TrustBoundary` | No | Trust boundary classification |
+| `domain_behavior` | `DomainBehavior` | No | Clock domain relationship (`unknown`, `clockless`, `single_clock`, etc.) |
+| `latency_class` | `LatencyClass` | No | Latency classification (`unknown`, `transparent`, `sequential`) |
+| `protocol_preservation` | `Preservation` | No | Protocol preservation metadata (`unknown`, `preserved`, `opaque`) |
+| `trust_boundary` | `TrustBoundary` | No | Trust boundary classification (`source_derived`, `trusted_precompiled`, etc.) |
 | `backend_constraints` | `Vec<Constraint>` | No | Additional backend constraints |
 
 ### JSON Example (`vendor_ip.json`)
@@ -89,10 +89,10 @@ Opaque summaries describe the internal driver, consumption, and clock-domain beh
       "endpoints": [],
       "driven_fields": ["out_data", "out_valid"],
       "consumed_fields": ["in_data", "in_valid"],
-      "domain_behavior": "same_domain",
-      "latency_class": "registered",
+      "domain_behavior": "clockless",
+      "latency_class": "sequential",
       "protocol_preservation": "preserved",
-      "trust_boundary": "trusted",
+      "trust_boundary": "trusted_precompiled",
       "backend_constraints": []
     }
   ]
@@ -109,8 +109,8 @@ kind = "extern_cell"
 callable = "VendorCdcBridge"
 driven_fields = ["dst_data", "dst_valid"]
 consumed_fields = ["src_data", "src_valid"]
-domain_behavior = "cdc_crossings"
-latency_class = "registered"
+domain_behavior = "clockless"
+latency_class = "sequential"
 ```
 
 ---

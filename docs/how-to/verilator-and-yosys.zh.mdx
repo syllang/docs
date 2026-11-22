@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 使用 Verilator 编译并运行：
 
 ```bash
-verilator --cc --exe --build -j 0 -Wall --std-c++17 \
+verilator --cc --exe --build -j 0 -Wall -CFLAGS "-std=c++17" \
   -f build/sv/filelist.f tb_counter.cpp --top-module Counter
 ./obj_dir/VCounter
 ```
@@ -85,7 +85,7 @@ yosys -p "read_verilog -sv build/sv/*.sv; hierarchy -top Counter; proc; memory; 
 添加 `--trace` 参数即可生成 `.vcd` 波形文件，供 GTKWave 或 Surfer 查看：
 
 ```bash
-verilator --cc --exe --build --trace -j 0 -Wall --std-c++17 \
+verilator --cc --exe --build --trace -j 0 -Wall -CFLAGS "-std=c++17" \
   -f build/sv/filelist.f tb_counter.cpp --top-module Counter
 ```
 

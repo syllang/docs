@@ -35,43 +35,43 @@ Syl 的类型分为三类：
 
 | 文章 | 内容 |
 |------|------|
-| [基本类型](./basic-types) | `Bit`、`Nat`、`Bool` 以及它们的使用场景 |
-| [数值字类型](./numeric-word-types) | `UInt<W>` 的声明、运算和位宽规则 |
-| [复合类型](./composite-types) | `bundle`、`enum`、数组与递归类型检查 |
-| [接口与视图](./interfaces-and-views) | `interface`、`view`、端口分组与方向视图 |
-| [硬件语义](./hardware-semantics) | 连续赋值、单驱动规则、CDC 域规则与 `@cdc_sync` |
-| [时序逻辑](./sequential-logic) | `reg`、`next`、`Reset` 极性与可综合 `mem` |
-| [编译期构造](./compile-time-constructs) | `const`、`fn`、编译期 `if` 和 `for`、循环检测 |
-| [结构构造](./structural-constructs) | `cell`、`extern cell`、端口与 `place` 实例化 |
-| [包与导入](./packages-and-imports) | `package`、`use`、`syl.toml` 根发现与文件组织 |
+| [基本类型](/zh/docs/reference/basic-types) | `Bit`、`Nat`、`Bool` 以及它们的使用场景 |
+| [数值字类型](/zh/docs/reference/numeric-word-types) | `UInt<W>` 的声明、运算和位宽规则 |
+| [复合类型](/zh/docs/reference/composite-types) | `bundle`、`enum`、数组与递归类型检查 |
+| [接口与视图](/zh/docs/reference/interfaces-and-views) | `interface`、`view`、端口分组与方向视图 |
+| [硬件语义](/zh/docs/reference/hardware-semantics) | 连续赋值、单驱动规则、CDC 域规则与 `@cdc_sync` |
+| [时序逻辑](/zh/docs/reference/sequential-logic) | `reg`、`next`、`Reset` 极性与可综合 `mem` |
+| [编译期构造](/zh/docs/reference/compile-time-constructs) | `const`、`fn`、编译期 `if` 和 `for`、循环检测 |
+| [结构构造](/zh/docs/reference/structural-constructs) | `cell`、`extern cell`、端口与 `place` 实例化 |
+| [包与导入](/zh/docs/reference/packages-and-imports) | `package`、`use`、`syl.toml` 根发现与文件组织 |
 
 ### 2. 语法与内置原语
 
 | 文章 | 内容 |
 |------|------|
-| [词法语法](./lexical-syntax) | 标识符、关键字、字面量、注释与运算符 |
-| [文法规范](./grammar) | Syl 声明、语句与表达式的 EBNF 文法 |
-| [属性](./attributes) | `@cdc_sync` 等属性的语法与校验规则 |
-| [内置原语](./builtins) | 内置函数、`mem`、`mem_write`、`mem_read_sync` 与位宽辅助原语 |
+| [词法语法](/zh/docs/reference/lexical-syntax) | 标识符、关键字、字面量、注释与运算符 |
+| [文法规范](/zh/docs/reference/grammar) | Syl 声明、语句与表达式的 EBNF 文法 |
+| [属性](/zh/docs/reference/attributes) | `@cdc_sync` 等属性的语法与校验规则 |
+| [内置原语](/zh/docs/reference/builtins) | 内置函数、`mem`、`mem_write`、`mem_read_sync` 与位宽辅助原语 |
 
 ### 3. 标准库与工具链
 
 | 文章 | 内容 |
 |------|------|
-| [标准库](./standard-library) | 全部 13 个 `std.*` 模块（36 个 `cell`、`bundle`、`interface`、`map`）完整参考 |
-| [清单与 Opaque Schema](./manifest-and-opaque-schema) | `syl.toml` 全部字段与 JSON/TOML Opaque Summary `schema_version = 1` 规范 |
-| [命令行工具（`sylc`）](./cli) | `sylc check`、`sylc emit`、参数、filelist 与 JSON 诊断输出格式 |
-| [诊断信息](./diagnostics) | 编译器全部真实 `E_*` 错误码分类索引 |
-| [LSP（`syl-lsp`）](./lsp) | 语言服务器能力、语义高亮与后台 DRC 通道 |
+| [标准库](/zh/docs/reference/standard-library) | 全部 13 个 `std.*` 模块（36 个 `cell`、`bundle`、`interface`、`map`）完整参考 |
+| [清单与 Opaque Schema](/zh/docs/reference/manifest-and-opaque-schema) | `syl.toml` 全部字段与 JSON/TOML Opaque Summary `schema_version = 1` 规范 |
+| [命令行工具（`sylc`）](/zh/docs/reference/cli) | `sylc check`、`sylc emit`、参数、filelist 与 JSON 诊断输出格式 |
+| [诊断信息](/zh/docs/reference/diagnostics) | 编译器全部真实 `E_*` 错误码分类索引 |
+| [LSP（`syl-lsp`）](/zh/docs/reference/lsp) | 语言服务器能力、语义高亮与后台 DRC 通道 |
 
 ### 4. 项目信息与支持
 
 | 文章 | 内容 |
 |------|------|
-| [项目状态](./project-status) | 当前实现里程碑（Wave 0–3） |
-| [常见问题](./faq) | 关于 Syl、Salsa、CDC、RAM 与 LSP 的常见问题 |
-| [支持](./support) | 获取帮助、提交问题与社区渠道 |
-| [路线图](./roadmap) | 已完成里程碑与未来方向 |
-| [发布策略](./release-policy) | 发布节奏与稳定性承诺 |
-| [版本与兼容性](./versioning-and-compatibility) | 语义化版本与兼容性保证 |
-| [更新日志](./changelog) | 版本历史与 Wave 0–3 能力记录 |
+| [项目状态](/zh/docs/reference/project-status) | 当前实现里程碑（Wave 0–3） |
+| [常见问题](/zh/docs/reference/faq) | 关于 Syl、Salsa、CDC、RAM 与 LSP 的常见问题 |
+| [支持](/zh/docs/reference/support) | 获取帮助、提交问题与社区渠道 |
+| [路线图](/zh/docs/reference/roadmap) | 已完成里程碑与未来方向 |
+| [发布策略](/zh/docs/reference/release-policy) | 发布节奏与稳定性承诺 |
+| [版本与兼容性](/zh/docs/reference/versioning-and-compatibility) | 语义化版本与兼容性保证 |
+| [更新日志](/zh/docs/reference/changelog) | 版本历史与 Wave 0–3 能力记录 |

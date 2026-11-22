@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 Compile and run with Verilator:
 
 ```bash
-verilator --cc --exe --build -j 0 -Wall --std-c++17 \
+verilator --cc --exe --build -j 0 -Wall -CFLAGS "-std=c++17" \
   -f build/sv/filelist.f tb_counter.cpp --top-module Counter
 ./obj_dir/VCounter
 ```
@@ -85,7 +85,7 @@ yosys -p "read_verilog -sv build/sv/*.sv; hierarchy -top Counter; proc; memory; 
 Enable `--trace` to dump a `.vcd` waveform for GTKWave or Surfer:
 
 ```bash
-verilator --cc --exe --build --trace -j 0 -Wall --std-c++17 \
+verilator --cc --exe --build --trace -j 0 -Wall -CFLAGS "-std=c++17" \
   -f build/sv/filelist.f tb_counter.cpp --top-module Counter
 ```
 

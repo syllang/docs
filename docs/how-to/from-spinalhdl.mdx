@@ -49,7 +49,7 @@ In SpinalHDL, `new Area { ... }` groups logic inside a `Component` without creat
 
 ```syl
 map saturating_add(a: UInt<8>, b: UInt<8>) -> UInt<8> = select {
-    (a + b) < a => 255,
+    (a + b) lt a => 255,
     default => a + b,
 }
 ```

@@ -14,7 +14,7 @@ If you are coming from Verilog or SystemVerilog, Syl replaces implicit latches, 
 | `always_comb` | `signal` + `select priority/unique` | No accidental latches; exhaustiveness checked. |
 | `always_ff @(posedge clk)` | `reg r: UInt<8> reset(rst, 0)` + `next r := ...` | Clock domain & reset polarity checked at compile time. |
 | `generate for (genvar i=0; ...)` | `for i in 0..N { ... }` | Elaboration-time structural unrolling. |
-| `localparam` / `parameter` | `const` / `<W: Nat>` | Compile-time `Nat` and `Bool` types. |
+| `localparam` / `parameter` | `const` / `<W: nat>` | Compile-time `Nat` and `Bool` types. |
 | `struct packed` | `bundle` | Strongly typed, nestable. |
 | `interface` + `modport` | `interface` + `view` | Directional views enforced on `cell` ports. |
 
@@ -89,7 +89,7 @@ cell UartFsm<D: Domain>(
 SystemVerilog `generate for (genvar i = 0; i < N; i = i + 1)` maps directly to Syl's elaboration-time `for i in 0..N`:
 
 ```syl
-cell VectorAnd<N: Nat>(
+cell VectorAnd<N: nat>(
     a: in [N] Bit,
     b: in [N] Bit,
     y: out [N] Bit,

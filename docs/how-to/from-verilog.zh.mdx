@@ -34,7 +34,7 @@ endmodule
 ### Syl
 
 ```syl
-cell Counter<W: Nat, D: Domain>(
+cell Counter<W: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
     enable: in Bit,
@@ -48,7 +48,7 @@ cell Counter<W: Nat, D: Domain>(
 
 主要区别：
 
-- Verilog 使用 `parameter`，Syl 使用 `<W: Nat>` 泛型参数
+- Verilog 使用 `parameter`，Syl 使用 `<W: nat>` 泛型参数
 - Verilog 的端口方向（`input`/`output`）放在端口名前，Syl 放在端口名后（`x: in Bit`）
 - Syl 需要显式声明时钟域 `D: Domain`
 - Syl 的 `reg` 需要 `reset` 指定复位信号和值
@@ -162,7 +162,7 @@ localparam W = 8;
 ### Syl
 
 ```syl
-const W: Nat = 8
+const W: nat = 8
 ```
 
 Syl 使用 `const` 声明编译期常量。常量的类型必须显式声明。
@@ -189,7 +189,7 @@ interface Stream<T> {
 | Verilog | Syl |
 |---------|-----|
 | `module foo(input clk)` | `module foo(clk: in Clock<D>)` |
-| `parameter W = 8` | `<W: Nat = 8>` |
+| `parameter W = 8` | `<W: nat = 8>` |
 | `wire [7:0] data` | `signal data: UInt<8>` |
 | `reg [7:0] data` | `reg data: UInt<8> reset(...)` |
 | `assign y = a & b` | `y := a and b` |

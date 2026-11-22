@@ -12,7 +12,7 @@ description: 完整的 Syl 参考设计分析。
 ## 1. 计数器（mvp/counter.syl）
 
 ```syl
-cell Counter<W: Nat, D: Domain>(
+cell Counter<W: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
     enable: in Bit,
@@ -34,7 +34,7 @@ cell Counter<W: Nat, D: Domain>(
 
 这个示例展示：
 
-- 泛型参数 `W: Nat` 和 `D: Domain`
+- 泛型参数 `W: nat` 和 `D: Domain`
 - 模块返回值语法 `-> value: UInt<W>`
 - `reg` 寄存器声明和 `reset`
 - `select priority` 多条件选择
@@ -47,7 +47,7 @@ cell Counter<W: Nat, D: Domain>(
 ```syl
 enum AluOp { Add, Xor }
 
-map select_result<W: Nat>(
+map select_result<W: nat>(
     op: AluOp,
     base: UInt<W>,
     xor_value: UInt<W>,
@@ -124,8 +124,8 @@ skid_buffer 是一个基本的流水线缓冲。它在上下游之间提供一�
 
 ```syl
 cell MiniTop<
-    W: Nat = DATA_W,
-    N: Nat = LANES,
+    W: nat = DATA_W,
+    N: nat = LANES,
     D: Domain,
 >(
     clk: in Clock<D>,
@@ -167,23 +167,23 @@ use std.stage.stage_to_stream
 use std.stage.halt_link
 use std.stage.drop_link
 
-const DATA_W: Nat = 32
+const DATA_W: nat = 32
 
 enum AluOp { Add, Xor }
 
-bundle AluCmd<W: Nat> {
+bundle AluCmd<W: nat> {
     op: AluOp,
     a: UInt<W>,
     b: UInt<W>,
     last: Bit,
 }
 
-bundle AluRsp<W: Nat> {
+bundle AluRsp<W: nat> {
     data: UInt<W>,
     last: Bit,
 }
 
-cell PipelinedAlu<W: Nat, D: Domain>(
+cell PipelinedAlu<W: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
     stall_decode: in Bit,
