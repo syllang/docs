@@ -1,0 +1,170 @@
+---
+title: "第 4 课：接口与流水线"
+description: 使用 bundle、interface、view、std.stream、std.skid 与 std.arbiter 构建带反压的流水线，并体会静态方向与单驱动检查。
+---
+
+# 第 4 课：接口与流水线
+
+在[第 3 课](/docs/tutorials/multi-file-project)中，你使用了标准库中的 `Stream<UInt<8>>.sink` 与 `Stream<UInt<8>>.source`。本课将带你深入理解 Syl 如何用 `bundle`、`interface` 与 `view` 描述双向握手协议，串联带完整反压的弹性流水线，集成 `std.arbiter.FixedPriorityArbiter4`，并亲眼见证 `sylc` 如何在编译期拦截接口方向错误。
+
+## 学习目标
+
+完成本课后，你将能够：
+
+- 使用 `bundle` 定义复合数据载荷，使用 `interface` 与 `view`（`source` / `sink`）定义双向握手协议。
+- 串联 `std.stream.Stream` 与 `std.skid.WordSkidBuffer` 构建带反压的两级流水线。
+- 集成 `std.arbiter.FixedPriorityArbiter4` 实现组合逻辑请求仲裁。
+- 理解当违反 `view` 方向驱动信号时，编译器报告的 `E_MIDDLE_NOT_DRIVABLE` 错误。
+
+## 前置条件
+
+- 已完成[第 3 课](/docs/tutorials/multi-file-project)。
+
+---
+
+## 第 1 步：定义 `bundle` 与带 `view` 的 `interface`
+
+在 SystemVerilog 中，`modport` 往往是可选的，综合工具也常忽略其方向约束。而在 Syl 中，`interface` 和 `view` 是**一等公民且经过静态严格检查**的语言原语。
+
+创建 `pipeline_demo.syl`，首先定义一个 `bundle` 和一个 `SimpleBus<T>` 接口：
+
+```syl
+bundle Packet {
+    data: UInt<8>,
+    tag: UInt<2>,
+}
+
+interface SimpleBus<T> {
+    valid: Bit,
+    data: T,
+    ready: Bit,
+
+    view source {
+        out valid,
+        out data,
+        in ready,
+    }
+
+    view sink {
+        in valid,
+        in data,
+        out ready,
+    }
+}
+```
+
+### 硬件语义解析
+
+- **`bundle Packet`**：将 `data` 与 `tag` 打包为一个单向值类型，所有字段始终同向流动。
+- **`interface SimpleBus<T>`**：声明一组信号（`valid`、`data`、`ready`），它们在不同端点处具有**相反**的流动方向。
+- **`view source` / `view sink`**：锁定每个字段的方向。`source` 端驱动 `valid` 与 `data`（`out`）并读取 `ready`（`in`）；`sink` 端读取 `valid` 与 `data`（`in`）并驱动 `ready`（`out`）。
+
+---
+
+## 第 2 步：构建带反压的两级流水线
+
+在 `pipeline_demo.syl` 中导入 `std.stream.Stream`、`std.skid.WordSkidBuffer` 与 `std.arbiter.FixedPriorityArbiter4`，编写 `TwoStagePipe`：
+
+```syl
+use std.stream.Stream
+use std.skid.WordSkidBuffer
+use std.arbiter.FixedPriorityArbiter4
+
+bundle Packet {
+    data: UInt<8>,
+    tag: UInt<2>,
+}
+
+interface SimpleBus<T> {
+    valid: Bit,
+    data: T,
+    ready: Bit,
+
+    view source {
+        out valid,
+        out data,
+        in ready,
+    }
+
+    view sink {
+        in valid,
+        in data,
+        out ready,
+    }
+}
+
+cell TwoStagePipe<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    up: in Stream<UInt<8>>.sink,
+    req: in UInt<4>,
+    grant: out UInt<4>,
+) -> down: Stream<UInt<8>>.source {
+    signal g: UInt<4> := place FixedPriorityArbiter4(req: req)
+    grant := g
+
+    let s1 = place WordSkidBuffer<8, D>(clk: clk, rst: rst, up: up)
+    let s2 = place WordSkidBuffer<8, D>(clk: clk, rst: rst, up: s1)
+
+    down.valid := s2.valid
+    down.payload := s2.payload
+    s2.ready := down.ready
+}
+```
+
+### 设计要点
+
+1. **全寄存器级反压**：每个 `WordSkidBuffer` 同时切断前向 `valid`/`payload` 与反向 `ready` 的组合逻辑路径。将 `s1` 串联到 `s2` 构成两级弹性流水线，在下游 `down.ready == 0` 时安全吸收背压而不丢数。
+2. **仲裁器集成**：`FixedPriorityArbiter4` 是纯组合逻辑 `cell`，对 4 位请求 `req` 按固定优先级输出独热码 `grant`。
+3. **显式握手连接**：通过 `down.valid := s2.valid`、`down.payload := s2.payload` 与 `s2.ready := down.ready` 完成下游 `Stream` 对接。
+
+运行 `sylc check`：
+
+```bash
+sylc check pipeline_demo.syl
+```
+
+退出码 `0`——所有 `view` 方向与单驱动规则均通过静态验证。
+
+---
+
+## 第 3 步：编译期方向检查（`E_MIDDLE_NOT_DRIVABLE`）
+
+如果你不小心在接收 `up: in Stream<UInt<8>>.sink` 的模块内部尝试驱动 `up.valid`，会发生什么？
+
+创建 `bad_dir.syl`：
+
+```syl
+use std.stream.Stream
+
+cell BadDirection(
+    up: in Stream<UInt<8>>.sink,
+) {
+    up.valid := 1
+}
+```
+
+运行 `sylc check bad_dir.syl`：
+
+```text
+error[E_MIDDLE_NOT_DRIVABLE]: up.valid is not drivable in this scope
+  --> bad_dir.syl:6:5
+   |
+ 6 |     up.valid := 1
+   |     ^^^^^^^^
+   |
+error: aborting due to 1 previous errors
+```
+
+由于 `up` 的视图是 `Stream<UInt<8>>.sink`，`up.valid` 是只读输入字段，`sylc` 立即以 `E_MIDDLE_NOT_DRIVABLE` 拦截了非法驱动。
+
+---
+
+## 常见踩坑与排障
+
+- **在 `sink` 视图上驱动 `in` 字段**：牢记 `sink` 驱动 `ready`（`out ready`）并读取 `valid`/`payload`（`in valid`、`in payload`）。
+- **忘记连接 `s2.ready := down.ready`**：遗漏反向通道驱动会被 `sylc check` 静态捕获。
+
+## 下一步
+
+到目前为止，所有电路都运行在单一时钟域 `D` 中。在[第 5 课：跨时钟域与 FIFO](/docs/tutorials/cdc-and-fifo)中，你将连接两个独立时钟域（`clk_a` 与 `clk_b`），触发并理解 `E_MIDDLE_CDC_VIOLATION`，并使用 `@cdc_sync`、`std.cdc`、`std.fifo`、Verilator 与 Yosys 完成跨时钟域设计与综合验证。

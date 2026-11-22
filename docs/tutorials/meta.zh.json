@@ -1,0 +1,12 @@
+{
+  "title": "实战教程",
+  "icon": "book",
+  "pages": [
+    "index",
+    "first-cell",
+    "sequential-counter-sim",
+    "multi-file-project",
+    "interfaces-and-pipelines",
+    "cdc-and-fifo"
+  ]
+}

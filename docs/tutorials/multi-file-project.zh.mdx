@@ -1,0 +1,155 @@
+---
+title: "第 3 课：多文件工程"
+description: 使用 syl.toml 组织多文件 Syl 工程，按路径导入本地模块与 std.pulse/std.skid 标准库，并发射带 filelist 与源码注释的多文件 SystemVerilog。
+---
+
+# 第 3 课：多文件工程
+
+真实的硬件设计很少只放在一个 `.syl` 文件里。随着规模增长，你需要工程清单、清晰的模块边界，以及对标准库组件的直接复用。本课将带你用 `syl.toml` 组织多文件工程，导入本地模块与 `std.*` 标准库（`std.pulse` 与 `std.skid`），并使用 `--out-dir`、`--filelist` 和 `--source-comments` 发射多文件 SystemVerilog 构建树。
+
+## 学习目标
+
+完成本课后，你将能够：
+
+- 使用 `syl.toml` 配置 Syl 工程根目录。
+- 在 `src/` 下按文件划分模块，并使用 `use` 跨文件导入 `cell`。
+- 复用标准库中的 `std.pulse.RisingEdgeDetector`、`std.stream.Stream` 与 `std.skid.WordSkidBuffer`。
+- 使用 `--out-dir` 按模块生成独立 `.sv` 文件，用 `--filelist` 生成依赖排序的 `.f` 文件列表，并用 `--source-comments` 保留源码追溯注释。
+
+## 前置条件
+
+- 已完成[第 2 课](/docs/tutorials/sequential-counter-sim)。
+- 准备一个新的工程目录（例如 `mkdir -p ~/syl-tut3/src && cd ~/syl-tut3`）。
+
+---
+
+## 第 1 步：创建工程清单（`syl.toml`）
+
+在工程根目录（`~/syl-tut3/syl.toml`）创建 `syl.toml`：
+
+```toml
+[project]
+name = "pulse_skid"
+```
+
+当你对目录运行 `sylc check .` 或 `sylc emit .` 时，`sylc` 会以 `syl.toml` 所在目录作为工程根。相对于根目录的文件路径直接映射为模块路径——例如 `src/frontend.syl` 对应的模块路径就是 `src.frontend`。
+
+---
+
+## 第 2 步：创建本地模块（`src/frontend.syl`）
+
+创建 `src/frontend.syl`，封装 `std.pulse.RisingEdgeDetector`，将电平按键信号转换为单周期脉冲：
+
+```syl
+use std.pulse.RisingEdgeDetector
+
+cell ButtonPulse<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    raw_btn: in Bit,
+) -> trig: Bit {
+    place RisingEdgeDetector<D>(
+        clk: clk,
+        rst: rst,
+        level: raw_btn,
+        rising: trig,
+    )
+}
+```
+
+### 硬件语义解析
+
+- **`use std.pulse.RisingEdgeDetector`**：从 Syl 标准库（`std.pulse`）导入上升沿检测器。
+- **`place RisingEdgeDetector<D>(...)`**：实例化子模块，并将其 `rising` 输出直接连到 `ButtonPulse` 的 `trig` 输出。由于透传了类型参数 `D`，两个模块在编译期被绑定到同一个时钟域。
+
+---
+
+## 第 3 步：组装顶层模块（`src/main.syl`）
+
+创建 `src/main.syl`，将 `ButtonPulse` 与 `std.skid.WordSkidBuffer`（一个用于切断 `Stream<UInt<8>>` 组合逻辑 `ready` 路径的两级弹性缓冲器）组合在一起：
+
+```syl
+use std.stream.Stream
+use std.skid.WordSkidBuffer
+use src.frontend.ButtonPulse
+
+cell PulseSkidTop<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    raw_btn: in Bit,
+    up: in Stream<UInt<8>>.sink,
+    btn_pulse: out Bit,
+) -> down: Stream<UInt<8>>.source {
+    signal trig: Bit := place ButtonPulse<D>(
+        clk: clk,
+        rst: rst,
+        raw_btn: raw_btn,
+    )
+    btn_pulse := trig
+
+    let skid_out = place WordSkidBuffer<8, D>(
+        clk: clk,
+        rst: rst,
+        up: up,
+    )
+    down.valid := skid_out.valid
+    down.payload := skid_out.payload
+    skid_out.ready := down.ready
+}
+```
+
+### 关键细节
+
+- **`use src.frontend.ButtonPulse`**：通过工程相对路径导入 `src/frontend.syl` 中的 `ButtonPulse`。
+- **`let skid_out = place WordSkidBuffer<8, D>(...)`**：由于 `WordSkidBuffer` 返回的是双向接口视图（`Stream<UInt<8>>.source`），这里使用 `let` 绑定，并显式连接前向通道（`valid`、`payload`）与反向背压通道（`ready`）。（我们将在[第 4 课](/docs/tutorials/interfaces-and-pipelines)深入讲解 `bundle`、`interface` 与 `view`。）
+
+---
+
+## 第 4 步：检查整个工程
+
+对工程目录运行 `sylc check`：
+
+```bash
+sylc check .
+```
+
+如果标准库位于自定义路径，可附加 `--std-root /path/to/std`。退出码 `0` 表示跨文件导入、时钟域参数以及 `std.*` 接口方向全部通过静态检查。
+
+---
+
+## 第 5 步：多文件 SystemVerilog 发射
+
+对接综合工具（Yosys、Vivado）和仿真器（Verilator）时，通常需要按模块拆分为独立的 `.sv` 文件并生成 `.f` 文件列表。运行：
+
+```bash
+sylc emit --out-dir sv_out --filelist sv_out/files.f --source-comments .
+```
+
+查看 `sv_out/files.f`：
+
+```text
+RisingEdgeDetector.sv
+ButtonPulse.sv
+FallingEdgeDetector.sv
+EdgeDetector.sv
+PulseStretcher.sv
+stream_connect.sv
+stream_skid_buffer.sv
+SkidBuffer.sv
+WordSkidBuffer.sv
+PulseSkidTop.sv
+```
+
+`sylc` 会自动按拓扑依赖顺序排列 `files.f`（底层叶子模块在前，`PulseSkidTop.sv` 在最后），而 `--source-comments` 会在生成的 SystemVerilog 中嵌入 `// <file>:<line>` 注释，方便将任意连线或 `always_ff` 追溯回 `.syl` 源码。
+
+---
+
+## 常见踩坑与排障
+
+- **在 `syl.toml` 中误写 `[package]`**：`sylc` 要求使用 `[project]`（及可选的 `[paths]`），写 `[package]` 会触发 `E_MANIFEST_PARSE`。
+- **`use` 路径漏掉 `src.`**：在默认路径配置下，`src/frontend.syl` 对应 `src.frontend`。写成 `use frontend.ButtonPulse` 会触发 `E_IMPORT_RESOLVE`。
+- **用 `signal` 绑定双向 `Stream` 视图**：接口视图请使用 `let skid_out = place ...`，这样才能同时驱动 `skid_out.ready` 并读取 `skid_out.valid`/`skid_out.payload`。
+
+## 下一步
+
+你已经体验了标准库中的 `Stream<T>.sink` 与 `Stream<T>.source`。在[第 4 课：接口与流水线](/docs/tutorials/interfaces-and-pipelines)中，你将亲手定义 `bundle`、`interface` 和 `view`，并结合 `std.stage`、`std.pipeline` 与 `std.arbiter` 构建带反压的多级流水线。
