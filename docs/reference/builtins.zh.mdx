@@ -1,0 +1,151 @@
+---
+title: 内建类型和函数
+description: Syl 的内建类型、内建函数和特殊构造。
+---
+
+# 内建类型和函数
+
+Syl 提供一组内建类型和函数。它们由编译器直接提供，不需要导入。
+
+---
+
+## 内建类型
+
+### Bit
+
+单比特硬件信号。值：`0` 或 `1`。
+
+```syl
+signal valid: Bit := 1
+```
+
+运算符：`and`、`or`、`xor`、`not`、`eq`。
+
+### Nat
+
+编译期非负整数。
+
+```syl
+const W: Nat = 8
+```
+
+运算符：`+`、`-`、`*`、`/`、`%`、`<<`、`==`、`!=`、`<`、`>`、`<=`、`>=`。
+
+### Bool
+
+编译期布尔值。值：`true`、`false`。
+
+```syl
+const debug: Bool = true
+```
+
+运算符：`and`、`or`、`not`。
+
+### UInt\<W\>
+
+W 位无符号整数。W 必须是编译期 `Nat`。
+
+```syl
+signal data: UInt<8>
+```
+
+### Clock 和 Domain
+
+`Clock<D>` 是时钟信号。D 是 `Domain` 类型参数。
+
+```syl
+signal clk: Clock<A>
+```
+
+### Reset
+
+`Reset<D>` 是复位信号。D 必须和对应的 `Clock<D>` 一致。
+
+```syl
+signal rst: Reset<A>
+```
+
+### Domain
+
+时钟域标识。用于关联时钟、复位和寄存器。
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+)
+```
+
+## 内建函数
+
+### zero\<T\>()
+
+返回类型 `T` 的零值。
+
+```syl
+reg data: UInt<8> reset(rst, zero<UInt<8>>())
+```
+
+### compile_error(message)
+
+在编译期报错并终止编译。
+
+```syl
+if W == 0 {
+    compile_error("width must be greater than 0")
+}
+```
+
+## 内建构造
+
+### select
+
+条件选择。支持 `priority` 和 `unique` 模式。
+
+```syl
+signal s: UInt<8> := select priority {
+    a => 1,
+    b => 2,
+    default => 0,
+}
+```
+
+### match
+
+枚举匹配。必须覆盖所有变体。
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+    State.Done => State.Idle,
+}
+```
+
+### place
+
+模块或 cell 实例化。
+
+```syl
+let inst = place Counter<8>(enable: en, count: cnt)
+```
+
+### for
+
+编译期循环展开。
+
+```syl
+for i in 0..4 {
+    signal s: UInt<8>
+}
+```
+
+### if
+
+编译期条件分支。
+
+```syl
+if W > 8 {
+    signal wide: UInt<16>
+}
+```

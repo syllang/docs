@@ -1,0 +1,65 @@
+---
+title: SystemVerilog 输出
+description: Syl 编译器生成的 SystemVerilog 代码格式和质量。
+---
+
+# SystemVerilog 输出
+
+Syl 编译器将硬件设计输出为 SystemVerilog 代码。本文说明输出格式、代码风格和质量保证。
+
+---
+
+## 输出格式
+
+每个 Syl `module` 对应一个 SystemVerilog `module`。Syl 的端口方向映射到 SV 的端口方向：
+
+| Syl | SystemVerilog |
+|-----|---------------|
+| `in Bit` | `input wire` |
+| `out Bit` | `output wire` |
+| `inout Bit` | `inout wire` |
+| `in UInt<W>` | `input [W-1:0]` |
+| `out UInt<W>` | `output [W-1:0]` |
+
+## 赋值映射
+
+| Syl | SystemVerilog |
+|-----|---------------|
+| `y := expr` | `assign y = expr;` |
+| `next r := expr` | `always @(posedge clk) r <= expr;` |
+| `reg r reset(rst, val)` | `always @(posedge clk) if (rst) r <= val; else` |
+
+## 模块输出示例
+
+Syl 输入：
+
+```syl
+cell AddOne(x: in UInt<8>, y: out UInt<8>) {
+    y := x + 1
+}
+```
+
+SV 输出：
+
+```
+module AddOne(
+    input  [7:0] x,
+    output [7:0] y
+);
+    assign y = x + 8'd1;
+endmodule
+```
+
+## 质量保证
+
+编译器在输出前执行以下检查：
+
+1. **SV AST 验证。** 检查生成的 SV 中间表示的结构完整性。
+2. **文本验证。** 检查输出的 SV 文本的括号匹配和模块闭合。
+3. **Verilator 烟雾测试。** 在 CI 中通过 Verilator 解析和检查输出。
+
+## 已知限制
+
+- 输出的 SV 代码风格比较直接，没有做面积或时序优化
+- 不支持输出 VHDL
+- 不支持自定义输出格式模板

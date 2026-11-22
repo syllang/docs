@@ -1,0 +1,102 @@
+---
+title: CLI 参考
+description: sylc 命令行编译器的使用说明。
+---
+
+# CLI 参考
+
+`sylc` 是 Syl 编译器的命令行入口。它将 Syl 源代码编译为 SystemVerilog 代码。
+
+---
+
+## 用法
+
+```
+sylc [选项] <源文件>...
+```
+
+## 基本使用
+
+编译单个文件，输出到标准输出：
+
+```
+sylc input.syl
+```
+
+编译多个文件：
+
+```
+sylc file1.syl file2.syl
+```
+
+输出到文件：
+
+```
+sylc input.syl -o output.sv
+```
+
+## 选项
+
+### -o, --output
+
+指定输出文件路径。默认输出到标准输出。
+
+```
+sylc input.syl -o build/output.sv
+```
+
+```
+sylc input.syl -o build/output.sv
+```
+
+### --std
+
+指定标准库路径。默认值为 `examples/std`。
+
+```
+sylc --std /path/to/std input.syl
+```
+
+### --help
+
+显示帮助信息。
+
+```
+sylc --help
+```
+
+### --version
+
+显示版本信息。
+
+```
+sylc --version
+```
+
+## 输出
+
+### 正常输出
+
+编译成功后，SystemVerilog 代码输出到标准输出（或 `-o` 指定的文件）。
+
+### 诊断信息
+
+诊断信息输出到标准错误（stderr）。每条诊断包含：
+
+- 严重级别（error 或 warning）
+- 错误代码
+- 描述信息
+- 源码位置（文件、行号、列号）
+
+```
+error[E_MIDDLE_TYPE_MISMATCH]: expected `UInt<8>`, found `Bit`
+  ┌─ input.syl:2:9
+  │
+2 │     y := x
+  │         ^ expected `UInt<8>`, found `Bit`
+```
+
+### 退出码
+
+- `0`：编译成功
+- `1`：编译失败（有错误诊断）

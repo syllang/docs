@@ -1,0 +1,13 @@
+{
+  "title": "Migration",
+  "icon": "migration",
+  "pages": [
+    "from-verilog",
+    "from-vhdl",
+    "from-spinalhdl",
+    "from-chisel",
+    "elaboration-vs-hardware",
+    "bool-vs-bit",
+    "structural-design"
+  ]
+}

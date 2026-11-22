@@ -1,0 +1,82 @@
+---
+title: 属性
+description: Syl 的声明属性——@layout 等。
+---
+
+# 属性
+
+属性是附加在声明上的元数据。它们以 `@name` 语法写在声明之前。
+
+---
+
+## 语法
+
+属性使用 `@` 开头，放在声明之前：
+
+```syl
+@attribute_name
+bundle MyBundle { ... }
+```
+
+属性可以有参数：
+
+```syl
+@layout(packed)
+bundle PackedWord { ... }
+```
+
+多个属性可以叠加：
+
+```syl
+@attr1
+@attr2(value)
+cell MyModule { ... }
+```
+
+## 支持的属性
+
+### @layout(packed)
+
+控制 bundle 的位布局。`packed` 表示字段在内存中连续排列，没有填充位。
+
+```syl
+@layout(packed)
+bundle Word {
+    high: UInt<4>,
+    low: UInt<4>,
+}
+```
+
+默认情况下，bundle 的字段按照声明的顺序排列。`@layout(packed)` 确保没有额外的填充位。
+
+### @layout(...)
+
+布局控制。当前只支持 `packed`。未来可能支持其他布局方式。
+
+## 属性使用场景
+
+### 协议接口
+
+当 bundle 需要精确匹配硬件协议的位布局时，使用 `@layout(packed)`。
+
+```syl
+@layout(packed)
+bundle AxiAddress {
+    addr: UInt<32>,
+    len: UInt<8>,
+    size: UInt<3>,
+    burst: UInt<2>,
+}
+```
+
+### 寄存器映射
+
+当 bundle 映射到硬件寄存器时，精确的位布局很重要。
+
+## 属性扩展
+
+Syl 的属性系统是可扩展的。未来版本可能支持以下属性：
+
+- `@deprecated`：标记废弃的声明
+- `@inline`：强制内联
+- `@no_inline`：禁止内联

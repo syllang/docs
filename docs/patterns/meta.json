@@ -1,0 +1,13 @@
+{
+  "title": "Patterns and Standard Library",
+  "icon": "patterns",
+  "pages": [
+    "index",
+    "stream",
+    "pipeline",
+    "parameterization",
+    "interfaces",
+    "examples",
+    "standard-library"
+  ]
+}

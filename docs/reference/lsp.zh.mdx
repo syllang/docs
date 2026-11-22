@@ -1,0 +1,115 @@
+---
+title: LSP
+description: Syl 语言服务器协议支持。
+---
+
+# LSP 参考
+
+Syl 实现 Language Server Protocol（LSP）以提供编辑器集成。语言服务器是一个独立进程，通过标准输入输出与编辑器通信。
+
+---
+
+## 启动
+
+语言服务器在 `syl_lsp` crate 中实现。启动方式：
+
+```
+syl-lsp
+```
+
+启动后，服务器等待编辑器的 LSP 请求。
+
+## 支持的功能
+
+### 悬停提示
+
+```json
+// 编辑器发送 hover 请求
+// 服务器返回类型信息
+{
+    "contents": {
+        "kind": "markdown",
+        "value": "**Type**: `UInt<8>`"
+    }
+}
+```
+
+悬停提示显示表达式的类型。默认显示类型名称。
+
+### 跳转定义
+
+```json
+// 编辑器发送 definition 请求
+// 服务器返回定义位置
+```
+
+跳转定义将光标下的名字定位到它的声明位置。支持跨文件跳转。
+
+### 自动补全
+
+```json
+// 编辑器发送 completion 请求
+// 服务器返回候选项列表
+```
+
+自动补全在光标位置提供可用的符号名。包括模块端口、信号名、局部变量和关键字。
+
+### 诊断信息
+
+服务器在文件变化时发布诊断信息。诊断信息包含错误代码、描述和位置。
+
+```json
+{
+    "diagnostics": [{
+        "range": {
+            "start": {"line": 1, "character": 4},
+            "end": {"line": 1, "character": 5}
+        },
+        "severity": 1,
+        "message": "type mismatch: expected `UInt<8>`, found `Bit`"
+    }]
+}
+```
+
+## 编辑器集成
+
+### VS Code
+
+在 VS Code 中使用 Syl LSP：
+
+1. 编译 `syl-lsp` 并确保它在 PATH 中
+2. 安装支持自定义 LSP 的扩展
+3. 配置 LSP 命令为 `syl-lsp`
+
+### Neovim
+
+在 Neovim 中使用 `vim.lsp.start` 配置：
+
+```lua
+vim.lsp.start({
+    name = "syl",
+    cmd = { "syl-lsp" },
+})
+```
+
+### Helix
+
+在 Helix 的 `languages.toml` 中配置：
+
+```toml
+[language-server.syl]
+command = "syl-lsp"
+
+[[language]]
+name = "syl"
+language-servers = ["syl"]
+```
+
+## 限制
+
+当前 LSP 支持以下限制：
+
+- 大型文件的补全响应可能较慢
+- 不支持重命名（rename）操作
+- 不支持代码动作（code actions）
+- 不支持签名帮助（signature help）

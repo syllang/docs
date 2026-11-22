@@ -1,0 +1,12 @@
+{
+  "title": "介绍",
+  "icon": "intro",
+  "pages": [
+    "what-is-syl",
+    "why-static-analyzability",
+    "project-status",
+    "faq",
+    "users",
+    "support"
+  ]
+}
