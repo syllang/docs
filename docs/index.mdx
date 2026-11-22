@@ -60,7 +60,7 @@ Multi-file projects are configured via `syl.toml`, which defines package names, 
 
 ### Static Hardware Guarantees
 Every `sylc check` run verifies:
-- **Driver completeness & exclusivity**: No undriven outputs (`E_MIDDLE_MISSING_HARDWARE_DRIVER`) and no multiple drivers (`E_MIDDLE_DUPLICATE_HARDWARE_DRIVER`).
+- **Driver completeness & exclusivity**: No undriven outputs (`E_MIDDLE_UNDRIVEN_OUT`) and no multiple drivers (`E_MIDDLE_DUPLICATE_HARDWARE_DRIVER`).
 - **Width & type safety**: Exact bit-width matching (`E_MIDDLE_TYPE_MISMATCH`) and `Bool` vs `Bit` separation.
 - **Clock & Reset Domain Crossing (CDC/RDC)**: Explicit `Clock<D>` and `Reset<D>` domain tracking (`E_MIDDLE_CDC_VIOLATION`), reset polarity consistency, and synthesizable RAM/FIFO inference.
 

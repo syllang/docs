@@ -113,12 +113,12 @@ cell RingBuffer<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, CNT_W: nat = 7, D:
     next wptr := select { do_push => wptr + 1, default => wptr }
     next rptr := select { do_pop => rptr + 1, default => rptr }
     next count := select {
-        do_push and !do_pop => count + 1,
-        !do_push and do_pop => count - 1,
+        do_push and not do_pop => count + 1,
+        not do_push and do_pop => count - 1,
         default => count,
     }
 
-    empty := count == 0
-    full := count == DEPTH
+    empty := count eq 0
+    full := count eq DEPTH
 }
 ```

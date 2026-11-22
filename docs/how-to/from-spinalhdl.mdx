@@ -39,7 +39,9 @@ cell StreamPipe<D: Domain>(
         rst: rst,
         up: in_s,
     )
-    out_s := skid
+    out_s.valid := skid.valid
+    out_s.payload := skid.payload
+    skid.ready := out_s.ready
 }
 ```
 
@@ -48,10 +50,7 @@ cell StreamPipe<D: Domain>(
 In SpinalHDL, `new Area { ... }` groups logic inside a `Component` without creating a hierarchy boundary. In Syl, use `cell` + `place` for clean modular boundaries, or `map` for pure combinational helpers:
 
 ```syl
-map saturating_add(a: UInt<8>, b: UInt<8>) -> UInt<8> = select {
-    lt(a + b, a) => 255,
-    default => a + b,
-}
+map saturating_add(a: UInt<8>, b: UInt<8>) -> UInt<8> = a + b
 ```
 
 ## `ClockDomain` & Reset Polarity

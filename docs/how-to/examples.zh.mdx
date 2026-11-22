@@ -123,6 +123,19 @@ skid_buffer 是一个基本的流水线缓冲。它在上下游之间提供一�
 ## 5. 通道阵列（mvp/lane_array.syl）
 
 ```syl
+const LANES: nat = 2
+
+cell Lane<W: nat = 8, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_stream: in Stream<Packet<W>>.sink,
+    out_stream: out Stream<Packet<W>>.source,
+) {
+    out_stream.valid := in_stream.valid
+    out_stream.payload := in_stream.payload
+    in_stream.ready := out_stream.ready
+}
+
 cell MiniTop<
     W: nat = DATA_W,
     N: nat = LANES,
@@ -198,7 +211,7 @@ cell PipelinedAlu<W: nat, D: Domain>(
     let out_stream = place stage_to_stream<AluCmd<W>>(stage: filtered_response)
 
     rsp_out.valid := out_stream.valid
-    rsp_out.payload := AluRsp<W> { data: execute_cmd(decode_cmd(out_stream.payload)), last: out_stream.payload.last }
+    rsp_out.payload := AluRsp<W> { data: out_stream.payload.a + out_stream.payload.b, last: out_stream.payload.last }
     out_stream.ready := rsp_out.ready
 }
 ```

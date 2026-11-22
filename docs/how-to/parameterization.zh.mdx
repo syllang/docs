@@ -150,6 +150,7 @@ cell FIFO<W: nat, D: Domain>(
     if W > 1024 {
         compile_error("FIFO width exceeds implementation limit")
     }
+    data_out := data_in
 }
 ```
 

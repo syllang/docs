@@ -40,10 +40,11 @@ fn is_pow2(n: nat) -> bool {
     return true
 }
 
-check_fn require_pow2(n: nat) {
+fn require_pow2(n: nat) -> bool {
     if !is_pow2(n) {
         compile_error("DEPTH must be a power of two")
     }
+    return true
 }
 ```
 
@@ -96,7 +97,7 @@ fn clog2(n: nat) -> nat {
     return r
 }
 
-const ADDR_W: nat = clog2(64) -- evaluates to 6
+const ADDR_W: nat = clog2(64) // evaluates to 6
 ```
 
 ## Conditional Hardware Generation (`if` / `else`)

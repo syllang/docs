@@ -60,7 +60,7 @@ Syl 编译器（`sylc`）与语言服务器（`syl_lsp`）共享一套基于 **S
 
 ### 编译期静态硬件保证
 每次执行 `sylc check` 都会验证：
-- **驱动完整性与排他性**：杜绝悬空未驱动输出（`E_MIDDLE_MISSING_HARDWARE_DRIVER`）与多驱动冲突（`E_MIDDLE_DUPLICATE_HARDWARE_DRIVER`）。
+- **驱动完整性与排他性**：杜绝悬空未驱动输出（`E_MIDDLE_UNDRIVEN_OUT`）与多驱动冲突（`E_MIDDLE_DUPLICATE_HARDWARE_DRIVER`）。
 - **位宽与类型安全**：精确位宽匹配（`E_MIDDLE_TYPE_MISMATCH`）以及 `Bool` 与 `Bit` 的严格区分。
 - **跨时钟域与复位域检查（CDC/RDC）**：显式的 `Clock<D>` 与 `Reset<D>` 域追踪（`E_MIDDLE_CDC_VIOLATION`）、复位极性一致性检查，以及可综合 RAM/FIFO 推断。
 
