@@ -5,33 +5,34 @@ description: Understand the two semantic evaluation IRs — Const MIR (control-f
 
 # Const MIR and Map IR
 
-Welcome to the Const MIR and Map IR chapter! Alongside TIR, semantic analysis produces two specialized IRs: Const MIR and Map IR. This page explains what they are, how they work internally, and how they are isolated per owner in the Salsa query pipeline.
+Welcome to the Const MIR and Map IR chapter! Alongside TIR, semantic analysis produces two specialized IRs: Const MIR and Map IR. This page answers what they are, what scenarios they serve, walks through their internal structures with concrete examples, and explains their relationship to TIR and per-owner incremental queries.
 
 ---
 
 ## What Problems They Solve
 
-Syl has two compile-time evaluable constructs: `fn` (functions) and `map` (combinational maps).
+Syl has two special compile-time evaluable constructs: `fn` (functions) and `map` (combinational maps). Both are evaluated before hardware emission, but in fundamentally different ways.
 
-- **`fn` is a callable function** with control flow (branches, loops, `return`). It runs at compile time to compute generic arguments and constant expressions.
-- **`map` is a pure combinational mapping** with no control flow, no state, and no side effects. It is inlined into combinational hardware during elaboration.
+**`fn` is a callable function.** It contains control flow: conditional branches, loops, and `return` statements. `fn` executes at compile time, and its results compute generic parameters and constant expressions.
 
-Because their execution models differ, each uses a dedicated IR.
+**`map` is a pure combinational mapping.** It has no control flow, no state, and no side effects. `map` is inlined into combinational hardware logic during elaboration.
+
+Because their execution models differ, each requires its own intermediate representation.
 
 ## Const MIR
 
-Const MIR (Constant Middle-level IR) is the compile-time execution representation for `fn`.
+Const MIR (Constant Middle-level Intermediate Representation) is the compile-time execution representation for `fn`.
 
-### Control-Flow Graph (CFG)
+### What Is a Control-Flow Graph?
 
-Const MIR represents a function as basic blocks connected by terminators:
+Const MIR represents a function as a Control-Flow Graph (CFG) composed of basic blocks. Each basic block contains a sequence of statements and ends with a single terminator instruction.
 
 ```mermaid
 flowchart TB
-    Entry["Entry Block"]
+    Entry["Entry Basic Block"]
     Cond["Condition Block"]
-    Then["Then Block"]
-    Else["Else Block"]
+    Then["then Branch Block"]
+    Else["else Branch Block"]
     Merge["Merge Block"]
     Ret["Return Block"]
 
@@ -43,17 +44,69 @@ flowchart TB
     Merge --> Ret
 ```
 
-Each basic block contains:
-- **Statements**: `Assign` statements binding locals to constant expressions.
-- **Terminator**: `Goto(block)`, `Branch { cond, then_block, else_block }`, or `Return(value)`.
+Basic blocks are connected by terminators:
 
-### Evaluation
+- **`Goto`**: unconditional jump to another basic block
+- **`Branch`**: conditional jump to `then` or `else` block
+- **`Return`**: terminates execution and returns a value
 
-`ConstEvaluator` interprets Const MIR starting from the entry block. To prevent infinite loops, it enforces `step_limit = 10_000` steps, emitting `E_MIDDLE_CONST_STEP_LIMIT` if exceeded.
+### A Concrete Example
+
+For this Syl function:
+
+```syl
+fn max(a: Nat, b: Nat) -> Nat {
+    if a > b {
+        return a
+    } else {
+        return b
+    }
+}
+```
+
+Const MIR generates three basic blocks:
+
+**Entry block:**
+```
+local.0 = a
+local.1 = b
+→ Branch(cond: local.0 > local.1, then: B1, else: B2)
+```
+
+**Then branch (B1):**
+```
+→ Return(local.0)
+```
+
+**Else branch (B2):**
+```
+→ Return(local.1)
+```
+
+### Inside a Basic Block
+
+Each basic block has two parts:
+
+**Statement list.** Currently Const MIR supports a single statement kind: `Assign`, which binds a local variable to a constant expression.
+
+**Terminator.** Decides which basic block executes next:
+- `Goto(block)`: unconditional jump
+- `Branch { cond, then_block, else_block }`: conditional branch on `cond`
+- `Return(value)`: return a value
+
+### Evaluation Process
+
+`ConstEvaluator` executes Const MIR starting from the entry block, following terminators until `Return`. To prevent infinite loops, the evaluator enforces `step_limit = 10_000` steps and emits `E_MIDDLE_CONST_STEP_LIMIT` if exceeded.
+
+The evaluated constants are consumed during elaboration to resolve generic parameters and array sizes.
 
 ## Map IR
 
-Map IR represents `map` definitions as pure expression trees (`MapExpr`):
+Map IR (Map Intermediate Representation) is the intermediate representation for `map` definitions.
+
+### What Is an Expression Tree?
+
+Map IR represents a `map` as a pure expression tree (`MapExpr`): leaves are literals or parameter references, and internal nodes are operators or calls.
 
 ```mermaid
 flowchart TB
@@ -67,20 +120,60 @@ flowchart TB
     Add --> Result
 ```
 
-Supported `MapExpr` nodes include `Ident`, `Int`, `Bool`, `Str`, `Unary`, `Binary`, `Call`, `Aggregate`, `Field`, `Index`, `Match`, and `Select`. During elaboration, `map` calls are evaluated bottom-up into combinational hardware expressions.
+### A Concrete Example
+
+For this Syl `map`:
+
+```syl
+map double(x: UInt<8>) -> UInt<8> = x + x
+```
+
+Map IR produces:
+
+```
+MapExpr::Binary {
+    op: Add,
+    left: MapExpr::Ident(x),
+    right: MapExpr::Ident(x)
+}
+```
+
+### Supported Expression Nodes
+
+| Node Kind | Description | Example |
+|-----------|-------------|---------|
+| `Ident` | Parameter reference | `x` |
+| `Int` | Integer literal | `42` |
+| `Bool` | Boolean literal | `true` |
+| `Str` | String literal | `"hello"` |
+| `Unary` | Unary operation | `-x`, `not x` |
+| `Binary` | Binary operation | `a + b`, `a and b` |
+| `Call` | Function call | `add(x, y)` |
+| `Aggregate` | Aggregate construction | `Pair { left: x, right: y }` |
+| `Field` | Field access | `packet.payload` |
+| `Index` | Index access | `arr[0]` |
+| `Match` | Pattern match | `match color { ... }` |
+| `Select` | Conditional select | `select { a => x, b => y }` |
+
+### Evaluation Process
+
+Map IR is evaluated during elaboration: given argument values for a `map` call, the elaborator evaluates the expression tree bottom-up from leaves to root to produce combinational hardware.
 
 ## Const MIR vs. Map IR
 
-| Feature | Const MIR | Map IR |
-|---------|-----------|--------|
+| Property | Const MIR | Map IR |
+|----------|-----------|--------|
 | Construct | `fn` | `map` |
-| Structure | Control-flow graph (basic blocks) | Expression tree |
+| Data structure | Control-flow graph (basic blocks) | Expression tree |
 | Control flow | Yes (branches, loops, return) | No |
-| State | Locals | None |
+| State | Yes (local variables) | No |
 | Side effects | Forbidden | Forbidden |
-| Evaluation | Compile-time interpretation | Elaboration-time inlining |
+| Evaluation time | Compile-time evaluation | Elaboration-time inlining |
+| Evaluation mode | Interpretation | Expression evaluation |
 
-## Per-Owner Incremental Queries
+Both disallow side effects, are defined in `syl_sema`, and are consumed by `syl_elab`.
+
+## Dataflow and Per-Owner Incremental Queries
 
 ```mermaid
 flowchart TB
@@ -100,4 +193,6 @@ flowchart TB
     TIR --> Elab
 ```
 
-In `crates/syl_session/src/query/elab.rs`, Const MIR and Map IR are tracked per owner via `owner_const_mir` (`HardwareCompiler::const_mir_stage`) and `owner_map_ir` (`HardwareCompiler::map_ir_stage`). Editing one `fn` or `map` only invalidates that specific owner's query.
+Both Const MIR and Map IR are lowered from TIR (after name resolution and type checking). In the Salsa incremental query architecture (`crates/syl_session/src/query/elab.rs`), they are split into per-owner tracked queries: `owner_const_mir` (`HardwareCompiler::const_mir_stage`) and `owner_map_ir` (`HardwareCompiler::map_ir_stage`).
+
+Editing the body of a single `fn` or `map` only invalidates that owner's query—all other declarations hit Salsa's memo cache directly.

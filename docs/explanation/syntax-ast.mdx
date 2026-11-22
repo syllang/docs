@@ -1,11 +1,11 @@
 ---
 title: Syntax and AST
-description: How the Syl frontend turns source text into structured representations — lexing, parsing, dual-tree design, Reset polarity, and @cdc_sync syntax.
+description: How the Syl frontend turns source text into structured representations — lexing, parsing, dual-tree design, error recovery, node indexing, Reset polarity, and @cdc_sync syntax.
 ---
 
 # Syntax and AST
 
-Welcome to the Syntax and AST chapter! This page explains how the Syl compiler processes source code. We cover the overall design of the frontend (`syl_syntax`), lexing and parsing (including `Reset` polarity and `@cdc_sync` hardware syntax), why two trees—the typed AST and the lossless syntax tree—coexist, and how error recovery and stable node indexing work.
+Welcome to the Syntax and AST chapter! This page explains how the Syl compiler processes source code. We introduce the overall design of the frontend (`syl_syntax`), walk through lexing and parsing (including `Reset` polarity and `@cdc_sync` hardware syntax), explain why two trees—the typed AST and the lossless syntax tree—coexist, and discuss error recovery and stable node indexing.
 
 ---
 
@@ -40,7 +40,7 @@ The lexer reads a source string and outputs a token stream. Each token records t
 
 ### Why Tokens?
 
-The compiler does not operate on raw characters. Characters form sequences, whereas the parser needs meaningful syntactic units—for instance, `:=` is a single assignment operator, not a colon followed by an equals sign.
+The compiler does not operate on raw characters. Characters form sequences, whereas the parser needs meaningful syntactic units—for instance, `:=` is a single assignment operator, not a colon followed by an equals sign. Lexing groups these character combinations into syntactic units up front.
 
 ### Example
 
@@ -69,7 +69,7 @@ Every token also records its exact line and column span for downstream diagnosti
 
 ## Parsing
 
-The parser consumes the token stream and builds a tree (AST), where each node corresponds to a syntactic construct.
+The parser consumes the token stream and builds a tree (AST), where each node corresponds to a syntactic construct and its children correspond to its components.
 
 ### From Tokens to AST
 
@@ -117,6 +117,13 @@ cell Counter<W: Nat, D: Domain>(
 }
 ```
 
+After seeing `cell`, the parser parses in order:
+1. Name: `Counter`
+2. Generic parameters: `<W: Nat, D: Domain>`
+3. Port list: `(clk: in Clock<D>, ...)`
+4. Return binding: `-> value: UInt<W>`
+5. Body: `{ reg count: ... value := count }`
+
 ### `Reset` Polarity and `@cdc_sync` Syntax
 
 The frontend natively captures hardware domain and attribute syntax in the AST:
@@ -136,13 +143,15 @@ This is a core architectural decision: the two trees serve different consumers w
 - It has generic parameters `W` and `D`
 - Port `clk` has direction `in` and type `Clock<D>`
 
-Comments and whitespace are noise to semantic analysis. Embedding them in the typed AST would force every semantic pass to skip them.
+Comments and whitespace are noise to semantic analysis. Embedding them in the typed AST would force every semantic pass to skip them, adding complexity and bug surface.
 
 **Lossless Syntax Tree (`LosslessSyntaxFile`)** serves the editor (via LSP), which needs to know:
 
 - Which token sits under the cursor at line 3, column 15
 - How token offsets shift when a comment is inserted between lines 2 and 3
 - Whether a file-header comment should be preserved
+
+What semantic analysis ignores is exactly what the LSP needs most.
 
 ### How Both Trees Coexist
 
@@ -177,7 +186,28 @@ flowchart TB
     A --> B --> C --> D --> E
 ```
 
+### Synchronization Points
+
 Synchronization points are top-level declaration boundaries (`cell`, `fn`, `const`, etc.) or closing braces (`}`). A syntax error inside one `cell` never corrupts the `cell`s that follow it.
+
+### Recovery Example
+
+```syl
+cell Top(x: in Bit, y: out Bit) {
+    this is broken syntax
+    y := x
+}
+
+cell Tail(a: in Bit, b: out Bit) {
+    b := a
+}
+```
+
+The parser outputs:
+- Both modules in the AST
+- An `ErrorItem` placeholder inside `Top`, followed by the recovered assignment `y := x`
+- A cleanly parsed `Tail` module with zero errors
+- One diagnostic on `Top`
 
 ## AST Node Indexing
 

@@ -1,6 +1,6 @@
 ---
 title: HIR and TIR
-description: Understand the two-layer semantic IR — HIR's structural skeleton and TIR's typed side tables, plus check_fn / check_map and CDC semantics.
+description: Understand the two-layer semantic IR — HIR's structural skeleton and TIR's typed side tables, plus check_fn / check_map, unused use validation, and CDC semantics.
 ---
 
 # HIR and TIR
@@ -40,18 +40,50 @@ Separating HIR and TIR enforces separation of concerns. HIR construction only in
 - Type checking to run on HIR (including declaration-level `check_fn` and `check_map`)
 - Capability and CDC domain checking to run on HIR
 
-Each layer does one job and can be tested independently.
+Each layer does one job and can be tested and debugged independently.
 
 ## Structure of HIR
 
 Defined in `syl_hir`, `HirDesign` consists of six main parts:
 
 - **Definitions (`Def`)**: each top-level item (`cell Top`, `fn add`, `const WIDTH`) with a unique `DefId`.
-- **Expressions (`Expr`)**: every expression in a function or cell body with a unique `ExprId`.
+- **Expressions (`Expr`)**: every expression in a function or cell body with a unique `ExprId` (literals, identifiers, binary ops, calls, aggregates, etc.).
 - **Locals (`Local`)**: every `let`, `signal`, and `reg` binding with a unique `LocalId`.
 - **Packages (`Package`)**: each source file belongs to a `PackageId`.
 - **Imports (`Import`)**: each `use` directive.
 - **Name resolution results**: mapping each expression/binding to its target definition.
+
+For example, given:
+
+```syl
+const WIDTH: Nat = 8
+
+fn double(x: Nat) -> Nat {
+    return x + x
+}
+
+const W: Nat = double(WIDTH)
+```
+
+HIR records:
+
+| DefId | Kind | Name |
+|-------|------|------|
+| D0 | ConstItem | WIDTH |
+| D1 | FnItem | double |
+| D2 | ConstItem | W |
+
+The body `x + x` of `double` is represented as:
+
+```
+Expr(Binary {
+    op: Add,
+    left: Expr(Ident("x")),
+    right: Expr(Ident("x"))
+})
+```
+
+Each `Ident("x")` has its own `ExprId`, and name resolution maps both to parameter `x` of `double`.
 
 ## Structure of TIR
 
@@ -77,10 +109,12 @@ flowchart TB
 ```
 
 Specifically:
-- **TypeTable**: all known types (`Bit`, `UInt<8>`, `Clock<D>`, `Reset<D>`, etc.), each assigned a `TypeId`.
-- **expr_types / binding_types**: map every `ExprId` and binding to its `TypeId`.
-- **expr_phases**: records whether an expression is combinational or sequential.
-- **SemanticFacts**: name resolution, port capabilities, constant evaluation results, unused `use` diagnostics, and `@cdc_sync` / clock-domain constraints.
+- **`TypeTable`**: all known types (`Bit`, `UInt<8>`, `UInt<WIDTH>`, `Clock<D>`, `Reset<D>`, etc.), each assigned a `TypeId`.
+- **`expr_types`**: maps every `ExprId` to its `TypeId`.
+- **`binding_types`**: maps every binding (`let`, `signal`, `reg`, `in`/`out` port) to its `TypeId`.
+- **`expr_phases`**: records whether an expression is combinational or sequential.
+- **`binding_kinds`**: records whether a binding is a normal local, signal, or register.
+- **`SemanticFacts`**: name resolution, port capabilities, constant evaluation results, unused `use` diagnostics, and `@cdc_sync` / clock-domain constraints.
 
 ## The Side-Table Pattern
 
@@ -90,6 +124,42 @@ Instead of duplicating the entire AST/HIR into a separate `TypedExpr` / `TypedSt
 - **On-demand computation**: name resolution only populates resolution tables; type checking only populates type tables.
 - **Independent evolution**: adding new semantic metadata (such as CDC domain facts) does not require modifying HIR data structures.
 - **Testability**: side tables can be unit-tested independently.
+
+```mermaid
+flowchart TB
+    subgraph HIRLayer["HIR Layer"]
+        Def["Def (Stable ID)"]
+        Expr["Expr (Tree)"]
+        Local["Local (Binding)"]
+    end
+    subgraph SideTable["Side-Table Layer"]
+        RT["Resolution Table\nExprId → Def"]
+        TT["Type Table\nExprId → TypeId"]
+        CT["Capability & Domain\nSignal → Cap / CDC"]
+        CF["Const Table\nConst → Value"]
+    end
+    subgraph Result["Consumers"]
+        Elab["Elaboration"]
+        Query["Query"]
+        LSP["LSP"]
+    end
+
+    HIRLayer --> SideTable
+    SideTable --> Result
+```
+
+Conceptually, `TirDesign` looks like:
+
+```
+TirDesign {
+    hir: HirDesign,
+    type_table: Vec<Type>,
+    expr_types: Map<ExprId, TypeId>,
+    binding_types: Map<BindingId, TypeId>,
+    expr_phases: Map<ExprId, Phase>,
+    facts: SemanticFacts,
+}
+```
 
 ## From HIR to TIR
 

@@ -11,9 +11,12 @@ In a query-driven incremental compiler, language-level recursion must be strictl
 
 ## 1. Language Recursion vs. Salsa Query Cycles
 
-As documented in `docs/query-driven-cycles.md`, **a Salsa query cycle is never a Syl language diagnostic**. If a Salsa query forms a dependency cycle without a `cycle_fn`, Salsa panics with `dependency graph cycle`. All language-level recursion is explicitly detected in `syl_sema`, `syl_elab`, and `syl_session` and converted into deterministic diagnostics.
+As documented in `docs/query-driven-cycles.md`, **a Salsa query cycle is never a Syl language diagnostic**:
 
-Furthermore, `semantic_diagnostics` (`crates/syl_session/src/query/lower.rs`) uses `diagnostics_from` to return the **first non-empty stage** among **HIR → TIR → Elaboration** (deduplicated in first-seen order, excluding parse diagnostics), preventing upstream errors from cascading into noisy downstream reports.
+- If a Salsa query forms a dependency cycle without a `cycle_fn`, Salsa panics with `dependency graph cycle` (locked by `salsa_query_cycle_is_not_a_language_diagnostic`).
+- All language-level recursion is explicitly detected in `syl_sema`, `syl_elab`, and `syl_session` and converted into deterministic diagnostics (verified by `language_recursion_returns_deterministic_diagnostics` in `crates/syl_session/src/cutover_tests/cycle_tests.rs`).
+
+Furthermore, `semantic_diagnostics` (`crates/syl_session/src/query/lower.rs`) uses `diagnostics_from` to return the **first non-empty stage** among **HIR → TIR → Elaboration** (deduplicated in first-seen order, excluding parse diagnostics), preventing upstream cycle errors from cascading into noisy downstream reports.
 
 ---
 
@@ -35,19 +38,38 @@ When multiple distinct file URIs map to the same canonical `module_path`, `dupli
 
 ## 3. `const` Cycles and Evaluation Step Limits
 
-1. **Direct and cross-module `const` cycles**:
-   - For `const A = B` and `const B = A` (within one file or across `use`d modules), `TypePhaseChecker::check_const_cycle` (`crates/syl_sema/src/tir/check/cycles.rs`) emits `E_MIDDLE_CONST_CYCLE` on each cyclic initializer and blocks HWIR generation.
-   - During elaboration, `EirValidator` (`crates/syl_elab/src/eir/validate.rs`) and `EirBuilder::const_cycle` (`crates/syl_elab/src/eir/build/callable.rs`) also guard width expressions recursively and emit `E_MIDDLE_CONST_CYCLE` before hardware lowering.
-2. **Evaluation step limit (`E_MIDDLE_CONST_STEP_LIMIT`)**:
-   - `ConstEvaluator` (`crates/syl_sema/src/ir/const_mir/eval.rs`) enforces `step_limit = 10_000` steps. Demanding compile-time evaluation of a non-terminating `fn` hits `E_MIDDLE_CONST_STEP_LIMIT`.
-   - Note: symbolic width expressions that are not forced (e.g., `const WIDTH = burn(20000)` used as `UInt<WIDTH>`) remain symbolic (`call(burn, 20000)`) and emit 1 HWIR module.
-3. **Cyclic `enum` discriminants**: emit `E_MIDDLE_REQUIRES_NAT`.
+### Direct and Cross-Module `const` Cycles
+
+```syl
+const A: Nat = B
+const B: Nat = A
+```
+
+Whether within one file or across `use`d modules, `TypePhaseChecker::check_const_cycle` (`crates/syl_sema/src/tir/check/cycles.rs`) emits `E_MIDDLE_CONST_CYCLE` on each cyclic initializer and blocks HWIR generation.
+
+During elaboration, `EirValidator` (`crates/syl_elab/src/eir/validate.rs`) and `EirBuilder::const_cycle` (`crates/syl_elab/src/eir/build/callable.rs`) also guard width expressions recursively and emit `E_MIDDLE_CONST_CYCLE` before hardware lowering.
+
+### Evaluation Step Limit (`E_MIDDLE_CONST_STEP_LIMIT`)
+
+- `ConstEvaluator` (`crates/syl_sema/src/ir/const_mir/eval.rs`) enforces `step_limit = 10_000` steps. Demanding compile-time evaluation of a non-terminating `fn` hits `E_MIDDLE_CONST_STEP_LIMIT`.
+- **Symbolic preservation**: symbolic width expressions that are not forced (e.g., `const WIDTH = burn(20000)` used as `UInt<WIDTH>`) remain symbolic (`call(burn, 20000)`) and emit 1 HWIR module.
+
+### Cyclic `enum` Discriminants
+
+Cyclic `enum` discriminants emit `E_MIDDLE_REQUIRES_NAT` in TIR and semantic diagnostics.
 
 ---
 
 ## 4. Recursive `struct` and `bundle` Types
 
 Hardware types must have finite static bit widths at synthesis, so Syl forbids direct or indirect value-type recursion:
+
+```syl
+bundle Node {
+    val: UInt<8>,
+    next: Node, // Error: E_MIDDLE_RECURSIVE_BUNDLE
+}
+```
 
 - `TypePhaseChecker::check_struct` / `check_value_type_recursion` (`crates/syl_sema/src/tir/check/cycles.rs`) traverses all fields (including array elements) after substituting generic arguments.
 - Direct, mutual, or generic-instantiated recursion emits `E_MIDDLE_RECURSIVE_STRUCT` or `E_MIDDLE_RECURSIVE_BUNDLE` on the recursive field and blocks HWIR generation even if the type is unused.
@@ -75,6 +97,10 @@ flowchart TB
     Hash --> Rewrite
 ```
 
+### Algorithm Steps
+
 1. **Preserve `extern` and unique names**: `extern` modules keep their exact names; unique leaf names are sanitized (prefixing SV keywords with `syl_`).
 2. **Canonical path qualification**: colliding names are qualified as `canonical_path.join("__")` (e.g., `pkg_a__Fifo`, `pkg_b__Fifo`).
 3. **FNV-1a deterministic fallback**: any secondary collision is broken with an **FNV-1a 32-bit hash suffix** `{candidate}__h{hash:08x}` (plus `_{index}` if needed), and all `EirItem::Instance::module` references are rewritten accordingly.
+
+Because disambiguation depends only on canonical paths and hashes rather than file load order, incremental and clean builds always emit identical SystemVerilog identifiers.

@@ -5,22 +5,29 @@ description: Deep dive into Syl's static CDC graph analysis, @cdc_sync invariant
 
 # CDC and Reset Domains
 
-In traditional HDLs such as Verilog, Clock Domain Crossing (CDC) bugs rarely surface at compile time: an asynchronous signal sampled directly by a register in another clock domain often simulates cleanly as 0/1 transitions, only to fail with metastability after synthesis or tape-out.
+In traditional HDLs such as Verilog, Clock Domain Crossing (CDC) bugs rarely surface at compile time: an asynchronous signal sampled directly by a register in another clock domain often simulates cleanly as 0/1 transitions, only to fail with metastability after synthesis or tape-out. Traditional flows rely on expensive post-hoc lint tools disconnected from the language itself.
 
 Syl promotes clock domains (`Clock<D>`) and reset domains (`Reset<D>`) to first-class type parameters. Combined with static dataflow graph analysis and `@cdc_sync` boundary invariants, the compiler rejects unsynchronized crossings and reset polarity mismatches before synthesis.
 
 ---
 
-## 1. Static CDC Graph Analysis
+## 1. Design Motivation: Why Put CDC in the Compiler?
+
+1. **Types alone only guard explicit clock ports; graph analysis catches implicit combinational propagation**: Even if clock ports are typed as `Clock<DomainA>` and `Clock<DomainB>`, ordinary data signals (`Bit`, `UInt<8>`) do not carry clock-domain type parameters. Without elaboration-time dataflow tracking, passing a signal through intermediate `signal` bindings, `select` muxes, or `map` functions would lose its launch domain.
+2. **Reset polarity and mode are equally critical hardware boundaries**: Synchronous vs. asynchronous and active-high vs. active-low resets synthesize to different flip-flop templates. Mixing polarities can lock a circuit in reset forever or prevent reset altogether.
+
+---
+
+## 2. Static CDC Graph Analysis (`CdcChecker`)
 
 Syl's CDC checker (`CdcChecker` in `crates/syl_elab/src/driver/drc/cdc.rs`) runs during elaboration DRC and propagates domain tags across the signal dependency graph:
 
 1. **Launch domain tracking**: Every `reg` and synchronous memory read (`MemorySyncRead`) is bound to its sampling clock domain `D`. Combinational logic driven by that register inherits launch domain `D`.
-2. **Capture domain validation**: When a signal reaches the `next` input of a register, a synchronous write port, or an assertion in domain `D_target`, if `D != D_target` and the path does not cross a valid synchronizer boundary, `CdcChecker` emits `DriverError::CdcViolation` (`E_MIDDLE_CDC_VIOLATION`):
+2. **Combinational propagation**: Even through intermediate `signal` bindings, `select`/`match` muxes, or `map` logic, the launch domain tag propagates until it hits a legal `@cdc_sync` boundary.
+3. **Capture domain validation**: When a signal reaches the `next` input of a register, a synchronous write port (`MemoryWrite`), or a sequential assertion in domain `D_target`, if `D != D_target` and the path does not cross a valid synchronizer boundary, `CdcChecker` emits `DriverError::CdcViolation` (`E_MIDDLE_CDC_VIOLATION`):
    ```
    CDC violation: <signal> launched in <source_domain> sampled by <target> in <target_domain>
    ```
-3. **Combinational propagation**: Even through intermediate `signal` bindings, `select`/`match` muxes, or `map` logic, the launch domain tag propagates until it hits a legal `@cdc_sync` boundary.
 
 ```mermaid
 flowchart LR
@@ -30,19 +37,37 @@ flowchart LR
     Sync -->|"Re-launched in DomainB"| RegC["reg dst_ok (Clock<DomainB>)"]
 ```
 
+### Counterexample: Unsynchronized Cross-Domain Sampling
+
+```syl
+cell BadCdc<A: Domain, B: Domain>(
+    clk_a: in Clock<A>,
+    clk_b: in Clock<B>,
+    din: in Bit,
+    dout: out Bit,
+) {
+    reg r_a: Bit
+    reg r_b: Bit
+    next r_a := din
+    // Error: r_a is driven in clk_a and sampled directly in clk_b
+    next r_b := r_a
+    dout := r_b
+}
+```
+
 ---
 
-## 2. `@cdc_sync` Invariants and Semantic Checks
+## 3. `@cdc_sync` Invariants and Semantic Checks
 
-To mark legal synchronizer cells (such as a 2-flop synchronizer `Sync2FF`, handshake synchronizer, or async FIFO), Syl provides the `@cdc_sync` attribute.
+To mark legal synchronizer cells (such as `Sync2FF`, `Sync2FFAsyncLow`, `PulseSynchronizer`, or async FIFOs), Syl provides the `@cdc_sync` attribute.
 
-### Syntax and Argument Rules
+### Syntax and Argument Rules (`syl_sema`)
 
-In `syl_sema/src/tir/check/cdc_attr.rs`, `TypePhaseChecker::check_cdc_attrs` validates `@cdc_sync` on `cell` and `extern cell` declarations:
+In `crates/syl_sema/src/tir/check/cdc_attr.rs`, `TypePhaseChecker::check_cdc_attrs` validates `@cdc_sync` on `cell` and `extern cell` declarations:
 - The attribute must take exactly 3 identifier arguments: `@cdc_sync(input_port, output_port, input_clock)` (supporting flattened `interface` view ports named `{port.name}_{field.name}`).
 - Any other form emits `TirError::InvalidCdcSyncAttribute` (`E_MIDDLE_INVALID_CDC_ATTR`).
 
-### Boundary Cutting and Re-Launch
+### Boundary Cutting and Re-Launch (`syl_elab`)
 
 In `CdcChecker`, a valid `@cdc_sync` module populates `ModuleCdcSummary`:
 - `trusted_async_inputs`: marks `input_port` as a trusted asynchronous input, stopping launch-domain error propagation into the synchronizer.
@@ -51,7 +76,7 @@ In `CdcChecker`, a valid `@cdc_sync` module populates `ModuleCdcSummary`:
 
 ---
 
-## 3. Why `inplace` Is Prohibited Across `@cdc_sync`
+## 4. Why `inplace` Is Prohibited Across `@cdc_sync`
 
 Syl allows instantiating a `cell` with `inplace` to inline its body into the parent module. However, **using `inplace` on any module with `@cdc_sync` is strictly forbidden**:
 
@@ -66,7 +91,7 @@ Syl allows instantiating a `cell` with `inplace` to inline its body into the par
 
 ---
 
-## 4. `OpaqueItemSummary::cdc_crossings`
+## 5. `OpaqueItemSummary::cdc_crossings`
 
 For external IP cores or `extern cell` declarations, the compiler cannot inspect the implementation body. `OpaqueItemSummary::cdc_crossings` (`crates/syl_sema/src/summary/opaque/cdc.rs` and `model.rs`) models legal internal crossings:
 
@@ -76,13 +101,13 @@ For external IP cores or `extern cell` declarations, the compiler cannot inspect
 
 ---
 
-## 5. Reset Polarity and Reset Domain Checks
+## 6. Reset Polarity and Reset Domain Checks
 
 Syl also enforces mode, polarity, and domain consistency on `Reset` signals:
 
 ### Syntax and Type System
 
-- **Mode (`ResetMode`)**: `Sync` (default) or `Async`.
+- **Mode (`ResetMode`)**: `Sync` (default) or `Async`, defined in `syl_syntax/src/ast/reset.rs`.
 - **Polarity (`ResetPolarity`)**: `ActiveHigh` (default) or `ActiveLow`.
 - **Type parameters**: `Reset<...>` (`syl_sema/src/tir/type_system/reset.rs`) accepts up to 3 arguments: optional domain `D`, optional `Sync`/`Async`, and optional `ActiveHigh`/`ActiveLow`. Invalid qualifiers emit `E_MIDDLE_INVALID_RESET_QUALIFIER`.
 
@@ -94,5 +119,5 @@ In `crates/syl_elab/src/eir/build/statements/reset.rs`, every `reg ... reset(rst
 
 ### Assertions and SystemVerilog Emission
 
-- Assertions (`assertions.rs`) gate triggers using reset polarity (`reset` directly for `ActiveLow`, `!reset` for `ActiveHigh`).
+- Assertions (`syl_elab/src/eir/build/statements/assertions.rs`) gate triggers using reset polarity (`reset` directly for `ActiveLow`, `!reset` for `ActiveHigh`).
 - `SvPrinter::item` (`crates/syl_emit/src/sv_ir/printer.rs`) emits `or negedge <rst>` (`ActiveLow`) or `or posedge <rst>` (`ActiveHigh`) in `always_ff` sensitivity lists for `Async` resets, and `if (!<rst>)` or `if (<rst>)` inside the block.

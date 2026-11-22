@@ -5,22 +5,29 @@ description: 深度解析 Syl 跨时钟域 CDC 静态图分析、@cdc_sync 不�
 
 # 跨时钟域（CDC）与复位域分析
 
-在传统 HDL（如 Verilog）中，跨时钟域（Clock Domain Crossing, CDC）错误几乎无法在编译期被发现：异步信号直接被另一个时钟域的寄存器采样，在仿真中可能表现为正常的 0/1 跳变，直到流片或综合后的门级网表才暴露亚稳态故障。
+在传统 HDL（如 Verilog）中，跨时钟域（Clock Domain Crossing, CDC）错误几乎无法在编译期被发现：异步信号直接被另一个时钟域的寄存器采样，在仿真中可能表现为正常的 0/1 跳变，直到流片或综合后的门级网表才暴露亚稳态故障。传统流程往往依赖昂贵的第三方 CDC 静态分析工具（如 SpyGlass）在综合后补救，且与语言本身脱节。
 
 Syl 将时钟域（`Clock<D>`）与复位域（`Reset<D>`）提升为一等类型参数，并在编译期结合静态数据流图与 `@cdc_sync` 边界不变式，在进入综合前彻底拦截未同步的跨域传输与复位极性冲突。
 
 ---
 
-## 一、CDC 静态图分析模型
+## 一、设计动机：为什么把 CDC 放进编译器？
+
+1. **类型系统只解决“显式连接”，图分析解决“隐式组合穿透”**：即使端口类型标注了 `Clock<DomainA>` 与 `Clock<DomainB>`，普通数据信号（如 `Bit`、`UInt<8>`）本身并不携带时钟域参数。如果没有展开期的数据流图追踪，信号一旦经过 `signal` 中间绑定、`select` 多路选择或 `map` 组合函数，就会丢失来源域信息。
+2. **复位极性与模式同样是硬件安全边界**：同步复位与异步复位、高有效与低有效在综合后的触发器模板完全不同。混用极性会导致系统上电后永久处于复位锁定状态或根本无法复位。
+
+---
+
+## 二、CDC 静态图分析模型（`CdcChecker`）
 
 Syl 的 CDC 检查器（`CdcChecker`，位于 `crates/syl_elab/src/driver/drc/cdc.rs`）在展开阶段（DRC）运行，基于驱动事实与信号依赖图执行静态域传播分析：
 
 1. **发射域（Launch Domain）追踪**：每个寄存器（`reg`）与同步存储读（`MemorySyncRead`）绑定到其采样时钟域 `D`。从该寄存器输出的组合逻辑网络继承发射域 `D`。
-2. **采样域（Capture Domain）校验**：当信号到达另一个时钟域 `D_target` 的寄存器 `next` 输入、同步写端口或断言检查点时，若 `D != D_target` 且路径未经过合法的同步器边界，则触发 `DriverError::CdcViolation`（诊断码 `E_MIDDLE_CDC_VIOLATION`）：
+2. **组合穿透追踪**：即使信号经过了多级 `signal` 赋值、`select`/`match` 多路选择或 `map` 组合逻辑，只要没有经过合法的 `@cdc_sync` 边界，发射域标签就会沿组合路径持续传播。
+3. **采样域（Capture Domain）校验**：当信号到达另一个时钟域 `D_target` 的寄存器 `next` 输入、同步写端口（`MemoryWrite`）或时序断言检查点时，若 `D != D_target` 且路径未经过合法的同步器边界，则触发 `DriverError::CdcViolation`（诊断码 `E_MIDDLE_CDC_VIOLATION`）：
    ```
    CDC violation: <signal> launched in <source_domain> sampled by <target> in <target_domain>
    ```
-3. **组合穿透追踪**：即使信号经过了多级 `signal` 赋值、`select`/`match` 多路选择或 `map` 组合逻辑，只要没有经过合法的 `@cdc_sync` 边界，发射域标签就会沿组合路径持续传播。
 
 ```mermaid
 flowchart LR
@@ -30,19 +37,37 @@ flowchart LR
     Sync -->|"重标记为 DomainB"| RegC["reg dst_ok (Clock<DomainB>)"]
 ```
 
+### 反例：未经同步的跨域采样
+
+```syl
+cell BadCdc<A: Domain, B: Domain>(
+    clk_a: in Clock<A>,
+    clk_b: in Clock<B>,
+    din: in Bit,
+    dout: out Bit,
+) {
+    reg r_a: Bit
+    reg r_b: Bit
+    next r_a := din
+    // 错误：r_a 由 clk_a 驱动，直接被 clk_b 域寄存器采样
+    next r_b := r_a
+    dout := r_b
+}
+```
+
 ---
 
-## 二、`@cdc_sync` 不变式与语义校验
+## 三、`@cdc_sync` 不变式与语义校验
 
-为了显式标定合法的跨时钟域同步器（例如双触发器同步器 `Sync2FF`、握手同步器、异步 FIFO），Syl 提供了 `@cdc_sync` 属性。
+为了显式标定合法的跨时钟域同步器（例如双触发器同步器 `Sync2FF`、`Sync2FFAsyncLow`、脉冲同步器 `PulseSynchronizer`、异步 FIFO），Syl 提供了 `@cdc_sync` 属性。
 
-### 1. 语法与参数约束
+### 1. 语法与参数约束（`syl_sema`）
 
-在 `syl_sema/src/tir/check/cdc_attr.rs` 中，`TypePhaseChecker::check_cdc_attrs` 会在 `cell` 与 `extern cell` 声明期校验 `@cdc_sync`：
+在 `crates/syl_sema/src/tir/check/cdc_attr.rs` 中，`TypePhaseChecker::check_cdc_attrs` 会在 `cell` 与 `extern cell` 声明期校验 `@cdc_sync`：
 - 属性必须精确携带 3 个标识符参数：`@cdc_sync(input_port, output_port, input_clock)`（支持 `interface` 视图端口展开后的 `{port.name}_{field.name}` 命名）。
 - 参数数量或格式不符时，立即报告 `TirError::InvalidCdcSyncAttribute`（`E_MIDDLE_INVALID_CDC_ATTR`）。
 
-### 2. 边界截断与新域重发射
+### 2. 边界截断与新域重发射（`syl_elab`）
 
 在 `CdcChecker` 中，合法的 `@cdc_sync` 模块会生成 `ModuleCdcSummary`：
 - `trusted_async_inputs`：标记 `input_port` 为受信任的异步输入，阻断发射域向同步器内部的报错传播。
@@ -51,7 +76,7 @@ flowchart LR
 
 ---
 
-## 三、为什么禁止 `inplace` 穿透 `@cdc_sync`
+## 四、为什么禁止 `inplace` 穿透 `@cdc_sync`
 
 Syl 允许在实例化 `cell` 时使用 `inplace` 关键字将子模块内联展开到父模块中，以消除层次边界。然而，**对任何带有 `@cdc_sync` 属性的模块使用 `inplace` 会被编译器严格拒绝**：
 
@@ -66,7 +91,7 @@ Syl 允许在实例化 `cell` 时使用 `inplace` 关键字将子模块内联展
 
 ---
 
-## 四、`OpaqueItemSummary::cdc_crossings`
+## 五、`OpaqueItemSummary::cdc_crossings`
 
 对于外部 IP 核或 `extern cell`，编译器看不到其内部实现。Syl 通过 `OpaqueItemSummary::cdc_crossings`（定义于 `crates/syl_sema/src/summary/opaque/cdc.rs` 与 `model.rs`）描述外部模块的合法跨域路径：
 
@@ -76,13 +101,13 @@ Syl 允许在实例化 `cell` 时使用 `inplace` 关键字将子模块内联展
 
 ---
 
-## 五、复位极性与复位域校验
+## 六、复位极性与复位域校验
 
 除了时钟域，Syl 对复位信号（`Reset`）的模式、极性与所属域也执行严格检查，避免“高有效复位接到低有效寄存器”或“跨时钟域复位”等隐患。
 
 ### 1. 语法与类型系统
 
-- **模式（`ResetMode`）**：`Sync`（同步复位，默认）与 `Async`（异步复位）。
+- **模式（`ResetMode`）**：`Sync`（同步复位，默认）与 `Async`（异步复位），定义于 `syl_syntax/src/ast/reset.rs`。
 - **极性（`ResetPolarity`）**：`ActiveHigh`（高有效，默认）与 `ActiveLow`（低有效）。
 - **类型参数**：`Reset<...>`（位于 `syl_sema/src/tir/type_system/reset.rs`）最多接受 3 个参数：可选的域参数 `D`、可选的 `Sync`/`Async`、可选的 `ActiveHigh`/`ActiveLow`。非法限定符触发 `E_MIDDLE_INVALID_RESET_QUALIFIER`。
 
@@ -94,7 +119,7 @@ Syl 允许在实例化 `cell` 时使用 `inplace` 关键字将子模块内联展
 
 ### 3. 断言与 SystemVerilog 发射
 
-- 在断言降级（`assertions.rs`）中，复位极性决定触发门控逻辑：`ActiveLow` 直接使用 `reset`，`ActiveHigh` 使用 `!reset`。
+- 在断言降级（`syl_elab/src/eir/build/statements/assertions.rs`）中，复位极性决定触发门控逻辑：`ActiveLow` 直接使用 `reset`，`ActiveHigh` 使用 `!reset`。
 - 在后端 `SvPrinter::item`（`crates/syl_emit/src/sv_ir/printer.rs`）中：
   - 若为 `Async`，`always_ff` 敏感列表自动生成 `or negedge <rst>`（`ActiveLow`）或 `or posedge <rst>`（`ActiveHigh`）；
   - 块内条件分支自动生成 `if (!<rst>)`（`ActiveLow`）或 `if (<rst>)`（`ActiveHigh`）。
