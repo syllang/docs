@@ -1,0 +1,185 @@
+---
+title: What is Syl
+description: Meet Syl — a standalone hardware description language with native hardware semantics, independent of any host language.
+---
+
+# What is Syl
+
+Syl is a hardware description language (HDL) for digital circuit design. You use Syl to describe registers, combinational logic, pipelines, and interface connections. The Syl compiler translates your design into synthesizable SystemVerilog (supporting both single-file output and multi-file module bundles with `filelist.f`) for downstream synthesis and verification tools.
+
+This page explains Syl's design choices from first principles and how it fundamentally differs from existing HDLs.
+
+---
+
+## Two Paths in Existing HDLs
+
+Hardware description languages today follow two main paths.
+
+**Traditional HDLs: Verilog / VHDL.** These languages describe hardware structure directly, but their type systems are weak. Connecting an 8-bit signal to a 16-bit port produces no compiler error; driving the same signal from two assignments produces no compiler error either. Bugs surface only during simulation.
+
+**Embedded DSLs: Chisel / SpinalHDL.** These languages are embedded inside Scala and leverage Scala's type system for compile-time checks. Scala's type checker catches some width and port errors, while the FIRRTL backend (Chisel) or Scala runtime (SpinalHDL) performs further hardware rule checks.
+
+Both paths stem from the same historical reason: the hardware industry lacked a standalone language that combined a strong type system with native hardware semantics.
+
+Syl takes a third path: **a standalone, type-safe language with native hardware semantics.**
+
+## Syl vs Embedded DSLs
+
+"Embedded in Scala" is not an implementation detail—it dictates every layer of the developer experience.
+
+| Dimension | Chisel / SpinalHDL | Syl |
+|------|-------------------|-----|
+| **Host dependency** | Requires Scala toolchain (sbt, JVM) and Scala version management | `sylc input.syl`, a single statically linked binary |
+| **Error message path** | Scala type error → FIRRTL pass → hardware semantic error, across three translation layers | Compiler reports directly in Syl terminology in one step |
+| **Elaboration model** | Executed on Scala runtime, allowing arbitrary Scala code (including side effects) | `fn` / `const` compile-time evaluation: pure functions, zero side effects |
+| **Learning curve** | Learn Scala first, then learn the hardware library's idioms | Learn a single language designed specifically for hardware |
+| **Clock domain semantics** | Clocks are ordinary wires; cross-domain connections have no language-level checks | `Clock<D>` / `Reset<D>` are type parameters; cross-domain connections and reset polarity mismatches are rejected at compile time |
+| **Hierarchy control** | `Component` (SpinalHDL) or `Module` (Chisel), with no dedicated syntax for inlining | `cell` (independent hierarchy by default), `inplace` marks inline expansion decided at instantiation |
+| **Interface direction** | `Flipped` / `IMasterSlave` configured via runtime method calls | `view source / sink` declared at the syntax level and fixed at compile time |
+
+The core takeaway of this table is: **every advantage of an embedded DSL (reusing the host language's power) comes with a corresponding cost (the host language leaks into hardware semantics).** Syl refuses that package deal.
+
+## What Problems Syl Solves
+
+### New Problems Introduced by Embedded DSLs
+
+Chisel and SpinalHDL solved the type-safety gap of traditional HDLs, but they introduced a different class of problems.
+
+**Host language leakage.** When you write `RegInit(0.U(8.W))` in Chisel, the line passes Scala's type checker, but the real question is: "What hardware semantics does the Scala expression `0.U(8.W)` generate?" When something goes wrong, the error passes through the Scala compiler, then through FIRRTL passes, before finally reaching your code. Multiple translation layers mean multiple layers of noise.
+
+**Unpredictable elaboration.** Because elaboration runs on the Scala runtime, it can execute arbitrary code—file I/O, network requests, mutable state. This means the same Chisel module instantiated in different contexts can produce different hardware. Debugging requires understanding both the Scala execution path and the hardware generation logic.
+
+**Toolchain startup cost.** Setting up a Chisel project requires installing sbt, a JVM, the right Scala version, and configuring `build.sbt`. Going from `git clone` to seeing your first error often takes 10–30 minutes. With Syl, going from downloading the compiler to compiling your first file takes seconds.
+
+### Syl's Solution: Put Hardware Semantics in the Language
+
+What Syl does not do: it does not use Scala as a metalanguage to generate code.
+
+What Syl does: it designs a language where **the compiler understands what a hardware module, a clock, a reset, and a valid-ready handshake are from the very beginning**.
+
+This means:
+
+```syl
+cell AddOne(x: in UInt<8>, y: out UInt<8>) {
+    y := x + 1
+}
+```
+
+When the compiler reports an error, it says:
+- `expected 'UInt<8>', found 'UInt<16>'` — the error directly gives the expected and actual types, with no irrelevant stack trace
+- `multiple drivers for signal 'y'` — reported directly during hardware semantic analysis
+- `port 'b' not connected in instance 'inst'` — the compiler knows what a "port connection" is without external tools
+
+Every error speaks directly in hardware terms.
+
+## What Syl Is Not
+
+**Syl is not a synthesis tool.** The Syl compiler outputs SystemVerilog; you use standard synthesis tools (such as Yosys or Design Compiler) to convert SV into a netlist.
+
+**Syl is not a verification framework.** Syl performs static checks, but does not provide formal verification or a simulation environment. Verification still uses existing SV simulation flows (such as Verilator).
+
+**Syl is not general-purpose.** Syl is designed exclusively for digital hardware, not analog circuits, mixed-signal, or software programming.
+
+**Syl is not a drop-in replacement for Chisel/SpinalHDL.** Syl is a different design choice: if you accept the cost of a standalone language (learning new syntax, a growing ecosystem), you get more direct error messages, side-effect-free compile-time evaluation, and a zero-host-dependency compiler.
+
+## Syl vs Verilog
+
+| Feature | Verilog | Syl |
+|------|---------|-----|
+| Port connections | No type or width checks | Checked at compile time |
+| Multiple driver detection | Not checked | Compile-time error |
+| Width inference | Partial | Explicit declaration or inference |
+| Generic parameters | `parameter` string/value substitution | Type-safe generics |
+
+The difference between Syl and Verilog is the difference between traditional HDLs and type-safe HDLs—Chisel/SpinalHDL also provide this. The difference between Syl and embedded DSLs is what makes Syl unique.
+
+## Current Capabilities and Engineering Status
+
+Syl features a complete frontend-to-SystemVerilog compiler pipeline backed by a declaration-level incremental query engine built on Salsa 0.28.2, enabling millisecond-level incremental re-checking and responsive LSP interaction for large projects. The compiler emits synthesizable SystemVerilog—including multi-file `EmittedSvBundle` outputs with `filelist.f`, source-location comments, synchronous/asynchronous and active-high/low reset polarity, and synthesizable RAM primitives—verified through Verilator simulation and Yosys synthesis gates. The standard library under `examples/std/` provides 13 core modules covering stream interfaces, arbiters, FIFOs, skid buffers, and clock-domain-crossing synchronizers.
+
+Syl is well suited for: small-to-medium digital system designs, protocol and datapath prototyping, education, and research on static analyzability.
+
+## More Examples
+
+### Module with Generic Parameters
+
+```syl
+cell Counter<W: Nat>(
+    enable: in Bit,
+    load: in UInt<W>,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W>
+    signal next_value: UInt<W> :=
+        select {
+            enable => value + 1,
+            default => value,
+        }
+    next value := next_value
+    count := value
+}
+```
+
+`<W: Nat>` declares a type parameter `W` that must be a natural number. You specify the concrete value at instantiation:
+
+```syl
+let cnt8 = place Counter<8>(enable: en, count: cnt_val)
+```
+
+### Using Interfaces and Views
+
+Syl's `interface` groups related ports together. `view` defines the port directions seen from different perspectives:
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+The sender's view is `source` (driving payload and valid, receiving ready). The receiver's view is `sink` (receiving payload and valid, driving ready).
+
+### Registers and Next-State Logic
+
+```syl
+cell ShiftRegister(clk: in Clock<D>, rst: in Reset<D>, data: in Bit, q: out Bit) {
+    reg r0: Bit reset(rst, 0)
+    reg r1: Bit reset(rst, 0)
+    reg r2: Bit reset(rst, 0)
+
+    next r0 := data
+    next r1 := r0
+    next r2 := r1
+    q := r2
+}
+```
+
+Three registers chained into a shift register. On each clock cycle, data shifts right by one bit.
+
+## Getting Started
+
+The Syl compiler is built in Rust. On a system with the Rust toolchain installed, clone the repository and run:
+
+```
+cargo build --release
+./target/release/sylc input.syl
+```
+
+The compiler accepts one or more `.syl` source files and writes SystemVerilog code to standard output or a specified output directory.
+
+Detailed installation and usage instructions are in the [CLI Reference](/docs/reference/cli).
+
+If you have questions about using Syl or feedback on its design, please open an issue in the project repository.

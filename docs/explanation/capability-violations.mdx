@@ -1,0 +1,86 @@
+---
+title: Capability Violations
+description: How the Syl compiler enforces port direction capabilities.
+---
+
+# Capability Violations
+
+The Syl compiler verifies that every read and write on a signal is consistent with its declared direction. This page explains the capability checking rules.
+
+---
+
+## Port Directions
+
+Syl ports have three directions:
+
+- `in`: driven externally; read-only inside the module
+- `out`: driven by the module; write-only inside the module
+- `inout`: bidirectional read and write
+
+## Checking Rules
+
+### `in` Ports Cannot Be Driven
+
+```syl
+cell Bad(x: in Bit) {
+    x := 1    // Error: cannot drive an 'in' port
+}
+```
+
+### `out` Ports Cannot Be Read
+
+```syl
+cell Bad(y: out Bit) {
+    signal s: Bit := y    // Error: cannot read an 'out' port
+}
+```
+
+### `inout` Ports Can Be Read and Written
+
+```syl
+cell Bus(bus: inout Bit) {
+    signal s: Bit := bus    // Readable
+    bus := 1                // Drivable
+}
+```
+
+## Internal Signals
+
+Internal `signal` and `reg` declarations can be freely read and written:
+
+```syl
+cell Good(y: out Bit) {
+    signal internal: Bit    // Internal signal
+    internal := 1           // Can be driven
+    y := internal           // Can be read
+}
+```
+
+## Common Mistakes
+
+### Reading from an `out` Port
+
+```syl
+cell Top(y: out Bit) {
+    signal s: Bit := y    // Error
+}
+```
+
+Use an internal `signal` to hold values that also need to be read.
+
+### Driving an `in` Port
+
+```syl
+cell Top(x: in Bit) {
+    x := 1    // Error
+}
+```
+
+### Misusing `inout` Ports
+
+```syl
+cell Top(bus: inout Bit) {
+    bus := 1
+    // Watch for driver conflicts when driving and reading in the same cycle
+}
+```

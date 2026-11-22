@@ -1,0 +1,101 @@
+---
+title: 诊断索引
+description: Syl 编译器各阶段诊断代码的完整权威列表。
+---
+
+# 诊断索引
+
+本文列出 Syl 编译器各阶段的核心诊断代码。每个条目均直接对应编译器源码（`syl_syntax`、`syl_session`、`syl_sema`、`sylc`、`syl_hw`、`syl_emit`）中的实际定义。
+
+---
+
+## 词法与语法阶段（`syl_syntax`）
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| `E_SYNTAX_UNEXPECTED_CHARACTER` | error | 词法分析器遇到无法识别的字符 |
+| `E_SYNTAX_UNTERMINATED_STRING` | error | 未闭合的字符串字面量 |
+| `E_SYNTAX_UNSUPPORTED_STRING_ESCAPE` | error | 不支持的字符串转义序列 |
+| `E_SYNTAX_PARSE` | error | 语法解析错误（无法匹配预期语法结构） |
+| `E_SYNTAX_DOC_COMMENT` | error | 文档注释语法或位置错误 |
+
+## 会话、导入与模块路径（`syl_session`）
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| `E_IMPORT_RESOLVE` | error | 无法解析 `use` 导入的模块文件路径 |
+| `E_INVALID_MODULE_PATH` | error | 非法的模块路径格式 |
+| `E_DUPLICATE_MODULE_FILE` | error | 多个文件 URI 映射到同一个规范 `module_path` |
+
+## HIR 与名字解析阶段（`syl_sema`）
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| `E_MIDDLE_UNKNOWN_IMPORT` | error | `use` 导入的目标符号在目标模块中不存在 |
+| `E_MIDDLE_UNRESOLVED_NAME` | error | 找不到标识符对应的声明 |
+
+## 类型、常量、CDC 与语义检查阶段（`syl_sema`）
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| `E_MIDDLE_TYPE_MISMATCH` | error | 赋值、表达式或端口连接类型/位宽不匹配 |
+| `E_MIDDLE_RETURN_TYPE_MISMATCH` | error | 函数返回值类型与签名不匹配 |
+| `E_MIDDLE_MISSING_RETURN` | error | 非空返回类型函数缺少 `return` |
+| `E_MIDDLE_IMMUTABLE_ASSIGNMENT` | error | 尝试修改不可变绑定 |
+| `E_MIDDLE_HARDWARE_STMT_IN_FN` | error | 在纯函数 `fn` 中使用了硬件语句 |
+| `E_MIDDLE_CONST_CYCLE` | error | 检测到 `const` 常量求值循环依赖 |
+| `E_MIDDLE_CONST_STEP_LIMIT` | error | 编译期常量求值超过步数上限（10,000 步） |
+| `E_MIDDLE_REQUIRES_NAT` | error | 期望自然数 `Nat` 常量表达式 |
+| `E_MIDDLE_RECURSIVE_STRUCT` | error | 检测到递归 `struct` 定义 |
+| `E_MIDDLE_RECURSIVE_BUNDLE` | error | 检测到递归 `bundle` 定义 |
+| `E_MIDDLE_DUPLICATE_ENUM_DISCRIMINANT` | error | 枚举判别值重复 |
+| `E_MIDDLE_ENUM_DISCRIMINANT_OUT_OF_RANGE` | error | 枚举判别值超出指定位宽范围 |
+| `E_MIDDLE_ENUM_DISCRIMINANT_NOT_ONEHOT` | error | `@layout(onehot)` / `@layout(flags)` 判别值非独热码 |
+| `E_MIDDLE_MISSING_AGGREGATE_FIELD` | error | 聚合构造缺少必要字段 |
+| `E_MIDDLE_UNKNOWN_AGGREGATE_FIELD` | error | 聚合构造或访问了不存在的字段 |
+| `E_MIDDLE_UNKNOWN_METHOD` | error | 未找到对应的方法 |
+| `E_MIDDLE_AMBIGUOUS_METHOD` | error | 方法调用存在歧义 |
+| `E_MIDDLE_INVALID_CDC_ATTR` | error | `@cdc_sync` 属性参数格式非法（需 `(input_port, output_port, input_clock)`） |
+| `E_MIDDLE_INVALID_RESET_QUALIFIER` | error | `Reset<...>` 类型或 `reset(...)` 限定符非法 |
+
+## 展开与设计规则检查阶段（`syl_sema` / `syl_elab`）
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| `E_MIDDLE_DUPLICATE_HARDWARE_DRIVER` | error | 多驱动冲突：同一信号被多个来源驱动 |
+| `E_MIDDLE_MISSING_HARDWARE_DRIVER` | error | 缺失驱动：`out` 端口或输出信号未被驱动 |
+| `E_MIDDLE_OVERLAPPING_HARDWARE_DRIVER` | error | 重叠驱动：`select unique` 分支条件可能同时为真 |
+| `E_MIDDLE_CDC_VIOLATION` | error | 跨时钟域违规：未经 `@cdc_sync` 同步的跨域采样 |
+| `E_MIDDLE_INPLACE_ON_CDC_SYNC` | error | 禁止对 `@cdc_sync` 模块使用 `inplace` 内联展开 |
+| `E_MIDDLE_INPLACE_ON_EXTERN_CELL` | error | 禁止对 `extern cell` 使用 `inplace` |
+| `E_MIDDLE_RESET_DOMAIN_MISMATCH` | error | `Reset<D>` 与 `Clock<C>` 时钟域不匹配 |
+| `E_MIDDLE_RESET_CONFIG_CONFLICT` | error | 寄存器 `reset(...)` 极性/模式与 `Reset<...>` 类型冲突 |
+| `E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE` | error | `mem` 声明必须使用数组类型 |
+| `E_MIDDLE_MEMORY_OP_STATEMENT_ONLY` | error | `mem_write` / `mem_read_sync` 只能作为语句调用 |
+| `E_MIDDLE_MEMORY_TARGET_NOT_MEM` | error | 存储器操作的目标不是 `mem` 声明 |
+| `E_MIDDLE_DIRECT_DRIVE_TO_MEM` | error | 禁止对 `mem` 变量直接或 `next` 赋值 |
+| `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT` | error | 同一存储器存在非互斥的多写端口冲突 |
+| `E_MIDDLE_ASSERT_STATEMENT_ONLY` | error | `assert` 只能作为语句使用 |
+| `E_MIDDLE_ERROR_STATEMENT_ONLY` | error | `error` 只能作为语句使用 |
+| `E_MIDDLE_ASSERT_REQUIRES_CONDITION` | error | `assert` 缺少条件表达式 |
+| `E_MIDDLE_ERROR_REQUIRES_MESSAGE` | error | `error` 缺少消息参数 |
+| `E_MIDDLE_ASSERT_CONDITION_MUST_BE_BIT` | error | `assert` 条件必须为 `Bit` 类型 |
+| `E_MIDDLE_ASSERT_REQUIRES_CLOCK` | error | 时序 `assert` 缺少有效时钟上下文 |
+| `E_MIDDLE_UNSUPPORTED_HW_VALUE_EXPR` | error | 不支持的硬件值表达式（含 `map` 递归展开） |
+
+## 命令行与清单阶段（`sylc`）
+
+| 代码 | 级别 | 描述 |
+|------|------|------|
+| `E_CLI` | error | CLI 参数错误或输出文件冲突（如 `filelist.f` 与模块文件同名） |
+| `E_IO` | error | 文件读写 I/O 错误 |
+| `E_EMIT` | error | SystemVerilog 发射阶段错误 |
+| `E_MANIFEST_PARSE` | error | 项目清单文件解析失败 |
+| `E_MANIFEST_INVALID` | error | 项目清单配置非法 |
+| `E_OPAQUE_SUMMARY_PARSE` | error | 不透明摘要文件解析失败 |
+| `E_OPAQUE_SUMMARY_INVALID` | error | 不透明摘要内容非法 |
+| `E_PROJECT` | error | 项目级配置或依赖错误 |
+
+## 后端验证（`syl_hw` / `syl_emit`）
+
+后端采用结构化诊断类型（`HwValidationDiagnostic` 与 `VerilogError`）校验网表与 SV 语法完整性，涵盖：`DuplicateModule`、`DuplicateBinding`、`DuplicateInstanceBinding`、`UnknownInstanceTarget`、`UnknownInstanceParam`、`UnknownInstancePort`、`UnknownReference`、`InvalidIdentifier`、`InvalidWidth`，以及 SV 文本层的 `ModuleWithoutName`、`UnmatchedEndModule`、`UnmatchedDelimiter`、`UnclosedModule`、`UnsupportedFunctionCall` 等。

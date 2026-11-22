@@ -1,0 +1,141 @@
+---
+title: Testing and Contributing
+description: How to run quality_gate.sh, check_std_sim.sh (Verilator + Yosys), understand architecture contracts, the no-inline-tests rule, and public API snapshot checks.
+---
+
+# Testing and Contributing
+
+Welcome to Testing and Contributing! This page helps new contributors get up to speed quickly. We start with how to run tests and the full quality gate, then explain the Syl compiler's verification architecture—including unit test rules, architecture contract tests, golden tests, conformance tests, and Verilator + Yosys simulation/synthesis gates—and finish with code quality checks and the contribution workflow.
+
+---
+
+## Running Tests
+
+The Syl compiler uses Cargo to manage tests. From the repository root, run:
+
+```bash
+cargo test
+```
+
+This runs unit and integration tests across all crates.
+
+To run tests for a specific crate:
+
+```bash
+cargo test -p syl_syntax
+cargo test -p syl_sema
+cargo test -p syl_elab
+```
+
+Architecture contract tests live in `sylc`:
+
+```bash
+cargo test -p sylc --test architecture_*
+```
+
+Conformance tests are also standalone:
+
+```bash
+cargo test -p sylc --test conformance
+```
+
+### One-Command Quality Gate (`scripts/quality_gate.sh`)
+
+Before opening a PR, run the repository's quality gate script:
+
+```bash
+./scripts/quality_gate.sh
+```
+
+`quality_gate.sh` executes the following steps in order:
+1. `cargo fmt --all --check`
+2. `cargo clippy --workspace --all-targets -- -D warnings`
+3. `cargo test --workspace --all-targets --no-fail-fast`
+4. `scripts/parser_fuzz_smoke.sh` (runs `syl_fuzz` parser corpus smoke tests)
+5. `scripts/check_examples.sh` (compiles examples, runs Verilator lint, and invokes `scripts/check_std_sim.sh`)
+6. `scripts/check_docs_syl.py` (parses all ```` ```syl ```` fenced blocks across `*.md` files)
+7. `scripts/check_public_api.py --check` (public API snapshot and consumer validation)
+8. `cargo doc --workspace --no-deps`
+9. `git diff --check`, debt-marker scan (`MUST_FIX|SHOULD_FIX|FIXME|TODO|HACK|XXX`), and stray temp-file checks
+
+## Testing Architecture
+
+Syl's test suite is organized into five layers.
+
+### Unit Tests (No Inline Tests Rule)
+
+Each crate includes unit tests targeting fine-grained behavior such as individual parser rules or type-checking logic.
+
+**No Inline Tests Rule**: Non-test production files under `crates/*/src/` contain **zero inline `#[test]` items**. Unit tests live in separate `*tests.rs` / `tests.rs` submodules or `crates/*/tests/` integration files, keeping production code and test code physically separated.
+
+Additionally, `crates/sylc/tests/architecture_markers_test.rs` enforces `< 700` code lines per `.rs` file via `architecture_rust_files_stay_under_700_lines`.
+
+### Architecture Contract Tests
+
+Architecture contract tests are integration tests under `sylc/tests/` prefixed with `architecture_`:
+
+- `architecture_phase1_ir.rs`: verifies single-owner IRs and end-to-end compilation flow
+- `architecture_phase2_frontend.rs`: verifies frontend parsing and error recovery
+- `architecture_phase3_sema.rs`: verifies semantic analysis public fact interfaces
+- `architecture_phase4_elab.rs`: verifies every elaboration sub-stage exposes its outputs
+- `architecture_phase5_opaque.rs`: verifies opaque summary registration and querying
+- `architecture_phase6_backend.rs`: verifies stable SystemVerilog backend emission
+- `architecture_phase7_query_lsp.rs`: verifies the query engine never triggers elaboration
+- `architecture_phase8_std.rs`: verifies the standard library compiles through the same pipeline
+
+These contract tests serve two purposes:
+1. **Enforcing architectural boundaries**: verifying crate dependency rules (e.g., `syl_sema` production code cannot depend on `syl_elab`).
+2. **Verifying stage outputs**: checking structural completeness of each stage's output (e.g., TIR → elaboration → HW IR → SystemVerilog).
+
+### Golden Tests
+
+Golden tests compare compiler output byte-for-byte against expected files stored in `sylc/tests/golden/` (such as `golden/phase6_child_top.sv`). Intentional format changes require updating golden files; unintended changes are caught as regressions.
+
+### Conformance Tests
+
+Conformance tests verify language feature support and error detection under `conformance/`:
+
+```
+conformance/
+├── parse/       # Parser tests
+│   ├── positive/  # Valid syntax
+│   └── negative/  # Expected syntax errors
+├── sema/        # Semantic analysis tests
+│   ├── positive/
+│   └── negative/
+└── elab/        # Elaboration tests
+    ├── positive/
+    └── negative/
+```
+
+Each `.syl` test case is paired with a `.codes` file describing expected diagnostics.
+
+### Verilator Simulation & Yosys Synthesis (`scripts/check_std_sim.sh`)
+
+`scripts/check_std_sim.sh` verifies 6 core stdlib packages (`pulse`, `skid`, `arbiter`, `cdc`, `mem`, `fifo`) against real hardware tools:
+- **Verilator lint & C++ co-simulation**: compiles and runs `verilator --cc --exe --build` with `tests/sim/<package>_test.cpp` for `EdgeDetector`, `PulseStretcher`, `WordSkidBuffer`, `FixedPriorityArbiter4`, `RoundRobinArbiter4`, `Sync2FF`, `Sync2FFAsyncLow`, `PulseSynchronizer`, `SinglePortRam`, `SimpleDualPortRam`, `DistributedRam`, `SyncFifo`, and `StreamSyncFifo`.
+- **Yosys synthesis gate**: when `yosys` is installed, runs `hierarchy -check; proc; memory; check -assert; stat` on `mem.sv` and `cdc.sv` to guarantee synthesizability.
+
+## Code Quality Checks
+
+- **Cargo clippy**: `cargo clippy --workspace --all-targets -- -D warnings`
+- **Public API snapshot**: `scripts/check_public_api.py --check` extracts rustdoc JSON for all workspace library crates, forbids public glob re-exports, diffs against `api/public-surface.txt`, and validates `api/public-api-consumers.md`.
+- **Mermaid & readtime checks**: `pnpm check:mermaid <mdx-file>` and `pnpm check:readtime <mdx-file>` for documentation.
+
+## Contribution Workflow
+
+### Reporting Issues
+
+Open a GitHub Issue with: observed behavior, expected behavior, a minimal reproducible example, and environment/diagnostic output.
+
+### Submitting PRs
+
+- **Stay focused**: one PR per issue.
+- **Explain why**: describe what changed, why, and how it was verified.
+- **Note user-visible impact**: document CLI, diagnostic, or public API changes and update `api/public-surface.txt`.
+- **Pass CI**: run `./scripts/quality_gate.sh` locally before submitting.
+
+## Next Steps
+
+- [Repository Map](/docs/explanation/repository-map): crate dependencies and responsibilities
+- [Compilation Pipeline](/docs/explanation/pipeline): execution details of each stage

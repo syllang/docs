@@ -1,0 +1,89 @@
+---
+title: Width and Type Mismatches
+description: How the Syl compiler checks type and bit-width consistency, including early interception via check_fn and check_map.
+---
+
+# Width and Type Mismatches
+
+The Syl compiler checks type and bit-width consistency across every assignment, expression, function body, and combinational map. This page explains the rules, early declaration-level interception, and common mistakes.
+
+---
+
+## Checking Rules
+
+### Assignment Type Matching
+
+The left-hand side and right-hand side of an assignment must have the exact same type:
+
+```syl
+signal a: UInt<8> := 42       // Valid: UInt<8> = UInt<8>
+signal b: UInt<16> := a       // Error: UInt<16> != UInt<8>
+```
+
+The compiler never implicitly widens or truncates bit widths.
+
+### Binary Operator Type Matching
+
+Both operands of a binary operation must have matching types:
+
+```syl
+signal r: UInt<8> := a + b    // Valid: both are UInt<8>
+# signal s: UInt<8> := x + y  // Error: x is UInt<8>, y is UInt<16>
+```
+
+### Select Branch Type Consistency
+
+All branches of `select` and `match` must return the same type:
+
+```syl
+signal s: UInt<8> := select {
+    a => 1,                    // UInt<8>
+    b => 2,                    // UInt<8>
+    default => 0,              // UInt<8>
+}
+```
+
+## Early Interception with `check_fn` and `check_map`
+
+In earlier designs, type errors inside a pure `fn` or combinational `map` could remain hidden until a `cell` instantiated or called them. In the current architecture, the TIR pass runs `check_fn` and `check_map` independently on every `fn` and `map` declaration:
+
+- **`check_fn`**: Validates parameter types, local bindings, control-flow branches, and `return` types against the function signature at the declaration site, without waiting for a call site.
+- **`check_map`**: Validates map input/output port types, `select`/`match` branch consistency, and expression widths at the declaration site, catching errors even in uninstantiated maps.
+
+This declaration-level interception lets the IDE/LSP report diagnostics immediately while editing `fn` or `map` definitions, rather than deferring them to downstream elaboration.
+
+## Difference Between `Bit` and `UInt<1>`
+
+`Bit` and `UInt<1>` are distinct types:
+
+```syl
+signal b: Bit
+signal u: UInt<1>
+
+# u := b    // Error
+# b := u    // Error
+```
+
+## Common Mistakes
+
+### Implicit Width Extension
+
+```syl
+signal narrow: UInt<4> := 15
+signal wide: UInt<8>
+wide := narrow    // Error: UInt<8> != UInt<4>
+```
+
+### Literal Out of Range
+
+```syl
+signal a: UInt<4> := 16    // Error: exceeds 0-15 range
+```
+
+### Function Call Argument Type Mismatch
+
+```syl
+fn add(a: UInt<8>, b: UInt<8>) -> UInt<8> { return a + b }
+signal x: UInt<16>
+# add(x, 1)    // Error: UInt<16> != UInt<8>
+```

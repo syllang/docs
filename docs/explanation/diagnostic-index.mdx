@@ -1,0 +1,101 @@
+---
+title: Diagnostic Index
+description: Authoritative list of Syl compiler diagnostic codes across all compilation stages.
+---
+
+# Diagnostic Index
+
+This page lists the core diagnostic codes emitted by the Syl compiler. Every entry corresponds directly to definitions in the compiler crates (`syl_syntax`, `syl_session`, `syl_sema`, `sylc`, `syl_hw`, `syl_emit`).
+
+---
+
+## Lexer & Parser (`syl_syntax`)
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `E_SYNTAX_UNEXPECTED_CHARACTER` | error | Lexer encountered an unrecognized character |
+| `E_SYNTAX_UNTERMINATED_STRING` | error | Unterminated string literal |
+| `E_SYNTAX_UNSUPPORTED_STRING_ESCAPE` | error | Unsupported escape sequence in string literal |
+| `E_SYNTAX_PARSE` | error | Syntax parse error (unexpected token or structure) |
+| `E_SYNTAX_DOC_COMMENT` | error | Malformed or misplaced doc comment |
+
+## Session, Imports & Module Paths (`syl_session`)
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `E_IMPORT_RESOLVE` | error | Failed to resolve file path for `use` import |
+| `E_INVALID_MODULE_PATH` | error | Invalid module path format |
+| `E_DUPLICATE_MODULE_FILE` | error | Multiple file URIs map to the same canonical `module_path` |
+
+## HIR & Name Resolution (`syl_sema`)
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `E_MIDDLE_UNKNOWN_IMPORT` | error | Imported symbol does not exist in target module |
+| `E_MIDDLE_UNRESOLVED_NAME` | error | Identifier cannot be resolved to any declaration |
+
+## Type, Const, CDC & Semantic Checking (`syl_sema`)
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `E_MIDDLE_TYPE_MISMATCH` | error | Type or bit-width mismatch in assignment, expression, or port |
+| `E_MIDDLE_RETURN_TYPE_MISMATCH` | error | Function return type does not match signature |
+| `E_MIDDLE_MISSING_RETURN` | error | Non-unit function is missing a `return` statement |
+| `E_MIDDLE_IMMUTABLE_ASSIGNMENT` | error | Attempted assignment to an immutable binding |
+| `E_MIDDLE_HARDWARE_STMT_IN_FN` | error | Hardware statement used inside a pure `fn` |
+| `E_MIDDLE_CONST_CYCLE` | error | Cyclic dependency in `const` evaluation |
+| `E_MIDDLE_CONST_STEP_LIMIT` | error | Compile-time constant evaluation exceeded 10,000 steps |
+| `E_MIDDLE_REQUIRES_NAT` | error | Expected a `Nat` constant expression |
+| `E_MIDDLE_RECURSIVE_STRUCT` | error | Recursive `struct` definition detected |
+| `E_MIDDLE_RECURSIVE_BUNDLE` | error | Recursive `bundle` definition detected |
+| `E_MIDDLE_DUPLICATE_ENUM_DISCRIMINANT` | error | Duplicate enum discriminant value |
+| `E_MIDDLE_ENUM_DISCRIMINANT_OUT_OF_RANGE` | error | Enum discriminant exceeds declared bit width |
+| `E_MIDDLE_ENUM_DISCRIMINANT_NOT_ONEHOT` | error | Discriminant violates `@layout(onehot)` / `@layout(flags)` |
+| `E_MIDDLE_MISSING_AGGREGATE_FIELD` | error | Missing required field in aggregate literal |
+| `E_MIDDLE_UNKNOWN_AGGREGATE_FIELD` | error | Unknown field in aggregate literal or access |
+| `E_MIDDLE_UNKNOWN_METHOD` | error | Method not found on target type |
+| `E_MIDDLE_AMBIGUOUS_METHOD` | error | Ambiguous method call |
+| `E_MIDDLE_INVALID_CDC_ATTR` | error | Invalid `@cdc_sync` attribute; requires `(input_port, output_port, input_clock)` |
+| `E_MIDDLE_INVALID_RESET_QUALIFIER` | error | Invalid `Reset<...>` type or `reset(...)` qualifier |
+
+## Elaboration & Design Rule Checks (`syl_sema` / `syl_elab`)
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `E_MIDDLE_DUPLICATE_HARDWARE_DRIVER` | error | Multiple drivers on the same signal |
+| `E_MIDDLE_MISSING_HARDWARE_DRIVER` | error | `out` port or output signal has no driver |
+| `E_MIDDLE_OVERLAPPING_HARDWARE_DRIVER` | error | Overlapping conditions in `select unique` |
+| `E_MIDDLE_CDC_VIOLATION` | error | Unsynchronized cross-clock-domain signal sampling |
+| `E_MIDDLE_INPLACE_ON_CDC_SYNC` | error | `inplace` is forbidden on `@cdc_sync` modules |
+| `E_MIDDLE_INPLACE_ON_EXTERN_CELL` | error | `inplace` is forbidden on `extern cell` |
+| `E_MIDDLE_RESET_DOMAIN_MISMATCH` | error | `Reset<D>` domain does not match `Clock<C>` domain |
+| `E_MIDDLE_RESET_CONFIG_CONFLICT` | error | Register `reset(...)` mode/polarity conflicts with `Reset<...>` type |
+| `E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE` | error | `mem` declaration requires an array type |
+| `E_MIDDLE_MEMORY_OP_STATEMENT_ONLY` | error | `mem_write` / `mem_read_sync` must be called as statements |
+| `E_MIDDLE_MEMORY_TARGET_NOT_MEM` | error | Memory operation target is not a `mem` declaration |
+| `E_MIDDLE_DIRECT_DRIVE_TO_MEM` | error | Direct or `next` assignment to a `mem` variable is forbidden |
+| `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT` | error | Non-mutually-exclusive write ports on the same memory |
+| `E_MIDDLE_ASSERT_STATEMENT_ONLY` | error | `assert` must be used as a statement |
+| `E_MIDDLE_ERROR_STATEMENT_ONLY` | error | `error` must be used as a statement |
+| `E_MIDDLE_ASSERT_REQUIRES_CONDITION` | error | `assert` is missing a condition expression |
+| `E_MIDDLE_ERROR_REQUIRES_MESSAGE` | error | `error` is missing a message argument |
+| `E_MIDDLE_ASSERT_CONDITION_MUST_BE_BIT` | error | `assert` condition must have type `Bit` |
+| `E_MIDDLE_ASSERT_REQUIRES_CLOCK` | error | Sequential `assert` requires a valid clock context |
+| `E_MIDDLE_UNSUPPORTED_HW_VALUE_EXPR` | error | Unsupported hardware value expression (including recursive `map`) |
+
+## CLI & Manifests (`sylc`)
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `E_CLI` | error | CLI argument error or output filename collision (e.g., `filelist.f` vs module file) |
+| `E_IO` | error | File I/O error |
+| `E_EMIT` | error | SystemVerilog emission error |
+| `E_MANIFEST_PARSE` | error | Failed to parse project manifest |
+| `E_MANIFEST_INVALID` | error | Invalid project manifest configuration |
+| `E_OPAQUE_SUMMARY_PARSE` | error | Failed to parse opaque summary file |
+| `E_OPAQUE_SUMMARY_INVALID` | error | Invalid opaque summary content |
+| `E_PROJECT` | error | Project-level configuration or dependency error |
+
+## Backend Validation (`syl_hw` / `syl_emit`)
+
+The backend uses structured diagnostic types (`HwValidationDiagnostic` and `VerilogError`) to validate netlist and SV syntax integrity, including `DuplicateModule`, `DuplicateBinding`, `DuplicateInstanceBinding`, `UnknownInstanceTarget`, `UnknownInstanceParam`, `UnknownInstancePort`, `UnknownReference`, `InvalidIdentifier`, `InvalidWidth`, as well as SV text checks (`ModuleWithoutName`, `UnmatchedEndModule`, `UnmatchedDelimiter`, `UnclosedModule`, `UnsupportedFunctionCall`).

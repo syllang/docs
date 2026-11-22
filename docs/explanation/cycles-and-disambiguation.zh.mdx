@@ -1,0 +1,106 @@
+---
+title: 循环诊断与跨模块命名消歧
+description: 对照 query-driven-cycles.md 与 EirModule::disambiguate，深度解析 const 循环、递归类型、模块导入环、重复 module_path 与确定性硬件命名消歧算法。
+---
+
+# 循环诊断与跨模块命名消歧
+
+在增量查询驱动的编译器中，“语言层面的递归与循环”和“Salsa 查询图循环”必须严格区分：Salsa 查询循环属于编译器内部 bug，而用户代码中的 `const` 循环、递归 `struct`/`bundle`、模块导入环与重复模块路径必须返回确定性的诊断信息。同时，当多个模块拥有相同的叶名时，后端必须生成确定且顺序无关的 SystemVerilog 唯一标识符。
+
+---
+
+## 一、语言递归 vs Salsa 查询循环
+
+根据 `docs/query-driven-cycles.md` 的核心约定：**Salsa 查询循环永远不是 Syl 的语言诊断**。
+
+- 如果某个 Salsa 查询自身形成依赖环（且未配置 `cycle_fn`），Salsa 会直接触发 `dependency graph cycle` panic（由 `salsa_query_cycle_is_not_a_language_diagnostic` 测试锁定）。
+- 所有合法或非法的语言级递归，都在 `syl_sema`、`syl_elab` 与 `syl_session` 中显式检测并转换为确定性诊断（由 `crates/syl_session/src/cutover_tests/cycle_tests.rs` 中的 `language_recursion_returns_deterministic_diagnostics` 验证）。
+
+此外，`semantic_diagnostics`（`crates/syl_session/src/query/lower.rs`）采用 `diagnostics_from` 策略：按 **HIR → TIR → Elaboration** 顺序返回**第一个非空阶段**的去重诊断（不包含 Parse 诊断），确保上游循环错误不会引发下游雪崩式误报。
+
+---
+
+## 二、模块导入环与重复 `module_path`
+
+### 1. 模块导入环（Import Cycles）
+
+Syl 允许模块之间相互 `use` 导入（无可见性修饰符限制）：
+- 若相互 `use` 的符号均存在，编译器不产生任何诊断（若无 `cell` 则生成 0 个 HWIR 模块）。
+- 若 `use` 引用了不存在的符号，HIR 阶段会在 `use` 位置报告 `E_MIDDLE_UNKNOWN_IMPORT`，并在引用处报告 `E_MIDDLE_UNRESOLVED_NAME`。
+
+### 2. 重复 `module_path`（`E_DUPLICATE_MODULE_FILE`）
+
+当两个不同的文件 URI 映射到同一个规范 `module_path` 时，`duplicate_module_diagnostics`（`crates/syl_session/src/query/lower.rs`）会将其注入每个 `analysis_for_symbols` 的 HIR 输出中（即使文件是空模块）：
+- 按字典序排列所有冲突 URI，为第一个之后的每个 URI 发射 `E_DUPLICATE_MODULE_FILE`（来源 `"syl_session"`），并通过 `DiagnosticRelatedInfo` 指向首个 URI。
+- `files_for_module` / `file_for_module` 确定性地选择字典序第一个 URI，同时阻断 HWIR 生成。
+
+---
+
+## 三、`const` 循环与常量求值步数限制
+
+### 1. 直接与跨模块 `const` 循环
+
+```syl
+const A: Nat = B
+const B: Nat = A
+```
+
+无论在单文件内还是通过 `use` 跨文件，`TypePhaseChecker::check_const_cycle`（`crates/syl_sema/src/tir/check/cycles.rs`）会检测到依赖环，并在每个循环常量初始化器上报告 `E_MIDDLE_CONST_CYCLE`，同时阻断 HWIR 生成。
+
+在展开阶段，`EirValidator`（`crates/syl_elab/src/eir/validate.rs`）与 `EirBuilder::const_cycle`（`crates/syl_elab/src/eir/build/callable.rs`）也会递归保护位宽表达式，在硬件降级前报告 `E_MIDDLE_CONST_CYCLE`。
+
+### 2. 求值步数上限（`E_MIDDLE_CONST_STEP_LIMIT`）
+
+- `ConstEvaluator`（`crates/syl_sema/src/ir/const_mir/eval.rs`）内置 `step_limit = 10_000` 步上限。当编译期常量求值（如无限递归 `fn`）超过 10,000 步时，报告 `E_MIDDLE_CONST_STEP_LIMIT`。
+- **符号化保留边界**：若表达式仅作为符号化类型参数（例如 `const WIDTH = burn(20000)` 用于 `UInt<WIDTH>`）而未被强制求值，编译器保留符号形式 `call(burn, 20000)` 并正常生成 HWIR。
+
+### 3. 循环 `enum` 判别值
+
+枚举判别值若形成循环依赖，在 TIR 与语义阶段报告 `E_MIDDLE_REQUIRES_NAT`。
+
+---
+
+## 四、递归 `struct` 与 `bundle`
+
+硬件类型在综合时必须具有有限的静态位宽，因此 Syl 禁止任何直接或间接的值类型递归：
+
+```syl
+bundle Node {
+    val: UInt<8>,
+    next: Node, // 错误：E_MIDDLE_RECURSIVE_BUNDLE
+}
+```
+
+- `TypePhaseChecker::check_struct` / `check_value_type_recursion`（`crates/syl_sema/src/tir/check/cycles.rs`）会在替换泛型参数后遍历所有字段（含数组元素类型）。
+- 无论直接递归、相互递归还是通过泛型实例化产生的递归，都会在递归字段上报告 `E_MIDDLE_RECURSIVE_STRUCT` 或 `E_MIDDLE_RECURSIVE_BUNDLE`，即使该类型未被任何 `cell` 使用也会阻断 HWIR 生成。
+- 展开路径通过 `StructExpansionKey` `(DefId, Vec<TirGenericArg>)` 追踪，并受 `MAX_TYPE_EXPANSION_DEPTH = 64` 深度上限保护。
+- 对于递归 `map` 内联展开，`EirBuilder::map_cycle` 会触发 `E_MIDDLE_UNSUPPORTED_HW_VALUE_EXPR` 并阻断 HWIR。
+
+---
+
+## 五、跨模块确定性硬件命名消歧（`EirModule::disambiguate`）
+
+在大型多文件工程中，不同模块路径下可能定义了同名的 `cell`（例如 `pkg_a::Fifo` 与 `pkg_b::Fifo`）。如果直接以叶名 `Fifo` 发射 SystemVerilog，会导致 `module Fifo` 命名冲突。
+
+Syl 在 `crates/syl_elab/src/eir/disambiguate.rs` 中通过 `EirModule::disambiguate` 实现**确定性、顺序无关**的跨模块命名消歧：
+
+```mermaid
+flowchart TB
+    In["EirModule 列表"] --> Extern{"是否为 extern 模块?"}
+    Extern -->|"是"| Keep["保留原始名称"]
+    Extern -->|"否"| Unique{"叶名是否全局唯一?"}
+    Unique -->|"是"| Sanitize["规范化标识符\n(关键字加 syl_ 前缀)"]
+    Unique -->|"否 (发生冲突)"| Qualify["使用规范路径拼接:\ncanonical_path.join(\"__\")"]
+    Qualify --> Collide2{"拼接后仍冲突?"}
+    Collide2 -->|"是"| Hash["附加 FNV-1a 32-bit 哈希:\n{candidate}__h{hash:08x}"]
+    Collide2 -->|"否"| Rewrite["重写 EirItem::Instance::module"]
+    Hash --> Rewrite
+```
+
+### 算法步骤与源码对照
+
+1. **保留外部与唯一名称**：`extern` 模块保持原名；全局唯一的叶名仅做合法化清洗（若与 SV 关键字冲突则加 `syl_` 前缀）。
+2. **规范路径限定**：发生叶名冲突的模块统一展开为 `canonical_path.join("__")`（如 `pkg_a__Fifo` 与 `pkg_b__Fifo`）。
+3. **FNV-1a 确定性兜底**：若限定名仍发生二次碰撞，则附加 **FNV-1a 32-bit 哈希后缀** `{candidate}__h{hash:08x}`（必要时再加 `_{index}`），并同步重写所有 `EirItem::Instance::module` 引用。
+
+由于整个消歧过程仅依赖规范路径与哈希，完全不依赖文件加载或遍历顺序，从而保证增量编译与全量编译输出的 SystemVerilog 标识符完全一致。

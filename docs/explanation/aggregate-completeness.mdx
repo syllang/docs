@@ -1,0 +1,89 @@
+---
+title: Aggregate Completeness
+description: How the Syl compiler checks completeness of bundle fields, interface views, and match expressions.
+---
+
+# Aggregate Completeness
+
+The Syl compiler checks completeness for `bundle` construction, `interface` views, `match` expressions, and module instantiations. This page explains the rules.
+
+---
+
+## Bundle Construction Completeness
+
+Every field must be provided when constructing a bundle:
+
+```syl
+bundle Pair { left: Bit, right: Bit }
+
+signal p: Pair := Pair { left: 1, right: 0 }    // Valid
+# signal q: Pair := Pair { left: 1 }             // Error: missing 'right'
+```
+
+## Interface View Completeness
+
+Every field of an interface must be accounted for by its views:
+
+```syl
+interface Bad {
+    a: Bit
+    b: Bit
+    view v { out a }
+    // Error: 'b' is not covered by view 'v'
+}
+```
+
+Each view must include or explicitly handle all interface fields.
+
+## Match Exhaustiveness
+
+`match` expressions must cover every enum variant:
+
+```syl
+enum State { Idle, Run, Done }
+
+signal next: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+    // Error: missing State.Done branch
+}
+```
+
+## Instantiation Port Completeness
+
+All ports must be connected at instantiation:
+
+```syl
+cell Sub(a: in Bit, b: out Bit)
+cell Top(y: out Bit) {
+    let s = place Sub(a: y)
+    // Error: port 'b' of Sub is not connected
+}
+```
+
+## Common Mistakes
+
+### Missing Bundle Field
+
+```syl
+bundle Wide { a: Bit, b: Bit, c: Bit }
+signal w: Wide := Wide { a: 1, b: 0 }    // Error: missing 'c'
+```
+
+### Missing Match Branch
+
+```syl
+enum State { A, B, C }
+signal next: State := match state {
+    State.A => State.B,
+    State.B => State.C,
+    // Error: missing State.C
+}
+```
+
+### Missing Instantiation Port
+
+```syl
+cell Inst(x: in Bit, y: out Bit, z: in Bit)
+let i = place Inst(x: 1, y: out_sig)    // Error: 'z' is not connected
+```

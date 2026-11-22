@@ -1,0 +1,238 @@
+---
+title: Why Static Analyzability Matters
+description: Understand why Syl's static analysis is more direct than embedded DSLs and what real problems compile-time checks solve.
+---
+
+# Why Static Analyzability Matters
+
+This page explains what "static analyzability" means for hardware designers and how Syl's approach differs from embedded DSLs.
+
+---
+
+## Two Levels of Static Analysis
+
+Static analysis in hardware can happen at two levels.
+
+**Traditional HDL level (Verilog / VHDL).** The compiler only handles syntax and basic semantic checks. Width mismatches, unconnected ports, and multiple drivers are left for simulation to uncover. Developers write code → run simulation → inspect waveforms → locate → fix, with each cycle taking tens of minutes to hours.
+
+**Type-safe HDL level (Chisel / SpinalHDL / Syl).** The compiler (or compiler-like passes) checks widths, port connections, and driver rules before generating a netlist. Developers write code → compile → read errors → fix, catching a large class of bugs without simulation.
+
+Syl and Chisel/SpinalHDL both sit at this level. However, "doing static analysis" and "how static analysis is done" are two different questions.
+
+## How Embedded DSLs Do Static Analysis
+
+Static analysis in Chisel and SpinalHDL passes through three layers:
+
+1. **The Scala compiler** checks Scala syntax and types. `RegInit(0.U(8.W))` passes because Scala sees a valid expression.
+2. **The hardware library runtime** executes Scala code and builds an internal graph structure. Width checks and multiple-driver detection happen here.
+3. **Backend passes** (such as FIRRTL) perform another layer of hardware rule checks.
+
+At each layer, error messages must be translated. A width mismatch in the Scala compiler can look like:
+
+```
+type mismatch;
+ found   : chisel3.core.UInt
+ required: chisel3.core.UInt
+```
+
+Both types are named `UInt`, but they come from different hardware generation contexts. The developer has to read Scala compiler output and understand the hardware library's type hierarchy to map the error back to their own code.
+
+## How Syl Does Static Analysis
+
+From parsing to code generation, Syl operates entirely under Syl semantics. The compiler natively understands:
+
+- **cell**: a hardware unit with ports, internal signals, and connection rules
+- **interface / view**: a group of ports and their directional relationships
+- **Clock\<D\> / Reset\<D\>**: clock domains as part of the type system
+- **driver**: the driving source of a signal; a signal may have only one driver
+- **port connection**: port bindings at instantiation must be complete
+
+Because the language natively supports these concepts, compiler errors speak directly in hardware terms:
+
+```
+error[E_MIDDLE_TYPE_MISMATCH]: expected 'UInt<8>', found 'Bit'
+  ┌─ input.syl:2:9
+  │
+2 │     y := x
+  │         ^ expected 'UInt<8>', found 'Bit'
+```
+
+Error path: parsing → semantic analysis → type checking → hardware rule checking, all inside the Syl compiler, with no host-language translation layer.
+
+## What Syl Checks at Compile Time
+
+### Type Checking
+
+```syl
+cell Bad(x: in UInt<8>, y: out UInt<16>) {
+    y := x
+}
+```
+
+`x` is 8 bits and `y` is 16 bits. The compiler reports a type mismatch. In Verilog, this assignment compiles without error: `x` is placed in the lower 8 bits of `y` and the upper 8 bits are zero-padded. If the designer intended the upper 8 bits to carry another signal, the bug is only caught in simulation.
+
+### Multiple Driver Checking
+
+```syl
+cell DoubleDrive(y: out UInt<8>) {
+    y := 1
+    y := 2
+}
+```
+
+The same output `y` is assigned twice. The compiler reports a multiple-driver conflict. In Verilog, multiple drivers manifest as `X` (unknown) in simulation, forcing the designer to trace waveforms backward to find the source.
+
+### Port Connection Checking
+
+```syl
+cell Sub(a: in UInt<8>, b: out UInt<8>) { }
+
+cell Top(y: out UInt<8>) {
+    let inst = place Sub(a: y)
+}
+```
+
+When instantiating `Sub`, only port `a` is connected while `b` is omitted. The compiler reports a missing connection. In Verilog, an unconnected port defaults to high-impedance (`Z`), which is rarely what the designer intended.
+
+### Signal Direction (Capability) Checking
+
+```syl
+cell Top(x: in UInt<8>, y: out UInt<8>) {
+    x := 1
+}
+```
+
+`x` is declared as `in`, yet the module body assigns to it. The compiler reports a capability violation: `in` ports can only be read, never driven.
+
+### Constant Evaluation Checking
+
+```syl
+const W: Nat = 4
+
+cell Top(y: out UInt<W>) {
+    y := 1
+}
+```
+
+`W` evaluates to 4 at compile time, producing a port of width `UInt<4>`. If `W` cannot be determined at compile time (for example, if it depends on a runtime value), the compiler reports an error.
+
+### Select Branch Checking
+
+```syl
+signal s: UInt<8> := select priority {
+    a => 1,
+    b => 2,
+    default => 3,
+}
+```
+
+The compiler verifies that all branches return the same type. If any branch returns `UInt<16>`, the compiler reports a type mismatch.
+
+In Verilog, different branches of a `case` statement can assign values of different widths without any compile-time error.
+
+### Enum Match Exhaustiveness Checking
+
+```syl
+enum State {
+    Idle,
+    Run,
+    Done,
+}
+
+signal next_state: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+}
+```
+
+The compiler checks that `match` covers every enum variant. The example above omits `Done`, so the compiler reports an inexhaustive match.
+
+In Verilog, `case` statements do not require covering all branches; uncovered cases silently retain their previous value, which is often unintended.
+
+Enum variants must be referenced by qualified name (`State.Idle`) in expressions. Qualified names allow the compiler to determine the variant's enum type directly from the expression structure.
+
+### Enum Encoding Layout
+
+Syl's `enum` supports explicit discriminants and hardware representation widths:
+
+```syl
+enum Opcode: UInt<4> {
+    Nop = 0,
+    Load,
+    Store = 8,
+    Halt,
+}
+```
+
+- Variants without explicit values increment from the previous value: `Load = 1`, `Halt = 9`
+- `: UInt<4>` specifies a 4-bit hardware width; all discriminants must fit within that width
+- The compiler infers the minimum width from the largest discriminant rather than the variant count
+
+In addition, the built-in `@layout` attribute supports two specialized encoding modes:
+
+```syl
+@layout(flags)
+enum Access: Bits<4> {
+    Read,
+    Write,
+    Exec,
+    Admin,
+}
+```
+
+`@layout(flags)` automatically assigns one-hot values (`Read = 0b0001`, `Write = 0b0010`) and allows bitwise combination. `@layout(onehot)` assigns the same encoding values, but represents mutually exclusive states and forbids combination.
+
+## The Cost of Static Analyzability
+
+Static analyzability is not free. Different approaches carry different costs.
+
+**Traditional HDLs:** Almost no compile-time constraints, but the designer bears the verification burden. Every module connection must be verified manually or via lint tools. Simulation time grows linearly with design size.
+
+**Embedded DSLs:** Require learning and maintaining the host language (Scala) and its toolchain. Interpreting Scala compiler errors requires extra experience. Side effects during elaboration (file I/O, mutable state) add another debugging dimension.
+
+**Syl:** Requires learning a new language's syntax and type system. The standard library is smaller than Chisel/SpinalHDL, and the ecosystem is younger than Scala's. In exchange, the compiler speaks to you directly in hardware semantics, and elaboration is purely functional and predictable.
+
+## A Concrete Example: Full Comparison
+
+Suppose you want to design a simple accumulator: on each clock cycle, add an 8-bit input to an internal accumulator and output the current sum.
+
+Verilog version:
+
+```verilog
+module Accumulator(
+    input clk,
+    input rst,
+    input [7:0] din,
+    output reg [7:0] dout
+);
+    always @(posedge clk) begin
+        if (rst)
+            dout <= 0;
+        else
+            dout <= dout + din;
+    end
+endmodule
+```
+
+This code compiles, but leaves several questions open: is `rst` active-high or active-low? If `din` becomes 16 bits wide, will `dout` silently truncate or extend? What happens on addition overflow?
+
+Syl version:
+
+```syl
+cell Accumulator<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    din: in UInt<8>,
+    dout: out UInt<8>,
+) {
+    reg value: UInt<8> reset(rst, 0)
+
+    signal next_value: UInt<8> := value + din
+    next value := next_value
+    dout := value
+}
+```
+
+- Port directions are explicit. The compiler checks that `dout` is only driven and never read.
+- Widths are explicit. If `din` changes to `UInt<16>`, the addition result type changes and the compiler requires you to handle the width change explicitly.
+- `reset(rst, 0)` explicitly specifies the reset signal and reset value. The compiler checks that the reset signal type and value type match.
