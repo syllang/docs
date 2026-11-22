@@ -123,6 +123,11 @@ skid_buffer 是一个基本的流水线缓冲。它在上下游之间提供一�
 ## 5. 通道阵列（mvp/lane_array.syl）
 
 ```syl
+bundle Packet<W: nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+
 const LANES: nat = 2
 
 cell Lane<W: nat = 8, D: Domain>(
