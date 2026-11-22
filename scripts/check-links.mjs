@@ -88,6 +88,25 @@ function validateLink(href, page, catalog) {
     };
   }
 
+  const isZhPage = page.url === '/zh/docs' || page.url.startsWith('/zh/docs/');
+  if (isZhPage && (normalized === '/docs' || normalized.startsWith('/docs/'))) {
+    const zhEquivalent = `/zh${normalized}`;
+    if (catalog.pages.has(zhEquivalent)) {
+      return {
+        ok: false,
+        message: `cross-locale link from zh page to ${normalized}; use ${zhEquivalent} instead`,
+      };
+    }
+  } else if (!isZhPage && (normalized === '/zh/docs' || normalized.startsWith('/zh/docs/'))) {
+    const enEquivalent = normalized.replace(/^\/zh/, '');
+    if (catalog.pages.has(enEquivalent)) {
+      return {
+        ok: false,
+        message: `cross-locale link from en page to ${normalized}; use ${enEquivalent} instead`,
+      };
+    }
+  }
+
   if (!hash) {
     return { ok: true };
   }
