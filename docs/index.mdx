@@ -1,4 +1,73 @@
 ---
-title: Quick Start
-description: Install sylc, compile an example or your file, read diagnostics, and write SystemVerilog.
+title: Syl Documentation
+description: Static-analyzable hardware description language with a Salsa incremental compiler, CDC and reset-domain checks, 13 std.* modules, and SystemVerilog emission.
 ---
+
+# Syl Documentation
+
+Syl is a statically analyzable hardware description language (HDL) designed to catch hardware bugs—missing drivers, overlapping drivers, width mismatches, CDC violations, and reset-domain mismatches—before SystemVerilog emission.
+
+This documentation is organized according to the **Diátaxis** framework into four distinct quadrants, so you can find the right level of detail whether you are writing your first `cell`, migrating an existing RTL codebase, looking up a grammar rule, or studying the Salsa incremental compiler.
+
+---
+
+## The Four Quadrants
+
+| Quadrant | Purpose | Start Here |
+| :--- | :--- | :--- |
+| **[Tutorials](/docs/tutorials)** | Learning-oriented, step-by-step hands-on lessons | [Your First Cell](/docs/tutorials/first-cell) |
+| **[How-To Guides](/docs/how-to)** | Task-oriented recipes for real engineering problems | [How-To Overview](/docs/how-to) |
+| **[Reference](/docs/reference)** | Information-oriented specifications, grammar, CLI, and `std.*` | [Reference Overview](/docs/reference) |
+| **[Explanation](/docs/explanation)** | Understanding-oriented architecture, static checks, and design rationale | [What Is Syl?](/docs/explanation/what-is-syl) |
+
+---
+
+## Recommended Reading Paths
+
+### 1. New to Syl (Hands-On)
+1. [Your First Cell](/docs/tutorials/first-cell) — Install `sylc`, write a combinational module, and emit SystemVerilog.
+2. [Sequential Counter & Simulation](/docs/tutorials/sequential-counter-sim) — Add `Clock<D>`, `Reset<D>`, `reg`, and simulate with Verilator.
+3. [Multi-File Projects](/docs/tutorials/multi-file-project) — Structure packages with `syl.toml` and `import`.
+4. [Interfaces & Pipelines](/docs/tutorials/interfaces-and-pipelines) — Build typed `interface`/`view` buses and valid/ready pipelines.
+5. [CDC & Async FIFO](/docs/tutorials/cdc-and-fifo) — Cross clock domains safely with `cdc` annotations and `std.fifo`.
+
+### 2. Migrating from Verilog, SystemVerilog, VHDL, Chisel, or SpinalHDL
+- **Verilog / SystemVerilog engineers**: [Migrating from Verilog](/docs/how-to/from-verilog) → [Structural Design](/docs/how-to/structural-design) → [SystemVerilog Emission](/docs/how-to/systemverilog-emission)
+- **VHDL engineers**: [Migrating from VHDL](/docs/how-to/from-vhdl) → [Bool vs Bit](/docs/how-to/bool-vs-bit)
+- **Chisel / SpinalHDL engineers**: [Migrating from Chisel](/docs/how-to/from-chisel) or [Migrating from SpinalHDL](/docs/how-to/from-spinalhdl) → [Elaboration vs Hardware](/docs/how-to/elaboration-vs-hardware)
+
+### 3. Production Tooling & Verification
+- **Project Configuration**: [Configure `syl.toml`](/docs/how-to/configure-syl-toml) & [Manifest & Opaque Schema](/docs/reference/manifest-and-opaque-schema)
+- **CLI & IDE**: [Using `sylc`](/docs/how-to/sylc), [LSP & Editors (`syl_lsp`)](/docs/how-to/lsp-and-editors), [LSP Reference](/docs/reference/lsp)
+- **Simulation & Synthesis**: [Verilator & Yosys](/docs/how-to/verilator-and-yosys), [Synthesizable RAM & FIFO](/docs/how-to/synthesizable-ram-fifo), [Extern & IP Integration](/docs/how-to/extern-and-ip)
+- **CDC & Reset Safety**: [CDC & Async Reset](/docs/how-to/cdc-and-async-reset) & [CDC & Reset Domains](/docs/explanation/cdc-and-reset-domains)
+
+### 4. Compiler Internals & Contributors
+- [What Is Syl?](/docs/explanation/what-is-syl) & [Why Static Analyzability?](/docs/explanation/why-static-analyzability)
+- [Compiler Pipeline](/docs/explanation/pipeline) & [Salsa Incremental Architecture](/docs/explanation/salsa-incremental-architecture)
+- [Syntax & AST](/docs/explanation/syntax-ast) → [HIR & TIR](/docs/explanation/hir-and-tir) → [Elab & EIR](/docs/explanation/elab-and-eir) → [Const MIR & Map IR](/docs/explanation/const-mir-and-map-ir) → [HW & SV IR](/docs/explanation/hw-and-sv-ir)
+- [Repository Map](/docs/explanation/repository-map) & [Testing & Contributing](/docs/explanation/testing-and-contributing)
+
+---
+
+## Production-Grade Syl at a Glance
+
+### Salsa Incremental Engine
+Syl's compiler (`sylc`) and language server (`syl_lsp`) share a **Salsa-based incremental query database**. Editing a single `.syl` file only recomputes the affected syntax, HIR/TIR, elaboration, and static-check queries, giving sub-second diagnostics in your editor and fast incremental builds in CI. See [Salsa Incremental Architecture](/docs/explanation/salsa-incremental-architecture).
+
+### `syl.toml` Workspace & Package Manifest
+Multi-file projects are configured via `syl.toml`, which defines package names, source roots, target SystemVerilog emission options, and `extern` IP bindings. See [Configure `syl.toml`](/docs/how-to/configure-syl-toml) and [Manifest & Opaque Schema](/docs/reference/manifest-and-opaque-schema).
+
+### Static Hardware Guarantees
+Every `sylc check` run verifies:
+- **Driver completeness & exclusivity**: No undriven outputs (`E_MIDDLE_MISSING_HARDWARE_DRIVER`) and no multiple drivers (`E_MIDDLE_DUPLICATE_HARDWARE_DRIVER`).
+- **Width & type safety**: Exact bit-width matching (`E_MIDDLE_TYPE_MISMATCH`) and `Bool` vs `Bit` separation.
+- **Clock & Reset Domain Crossing (CDC/RDC)**: Explicit `Clock<D>` and `Reset<D>` domain tracking (`E_MIDDLE_CDC_VIOLATION`), reset polarity consistency, and synthesizable RAM/FIFO inference.
+
+See the [Diagnostic Index](/docs/explanation/diagnostic-index) and [Diagnostics Reference](/docs/reference/diagnostics).
+
+### 13 `std.*` Standard Library Modules
+Syl ships with 13 built-in standard library modules covering arithmetic, bit manipulation, synchronization, FIFOs, memories, arbiters, and bus protocols. See [Standard Library Reference](/docs/reference/standard-library) and [Standard Library Patterns](/docs/how-to/standard-library).
+
+### `syl_lsp` & Editor Support
+`syl_lsp` provides real-time diagnostics, hover types/widths, go-to-definition, and workspace symbol search powered by the same Salsa database as `sylc`. See [LSP & Editors](/docs/how-to/lsp-and-editors).
