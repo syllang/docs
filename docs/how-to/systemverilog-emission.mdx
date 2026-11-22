@@ -1,0 +1,71 @@
+---
+title: SystemVerilog Emission
+description: Multi-file SystemVerilog emission with --out-dir, --filelist, --source-comments, and deterministic cross-module naming.
+---
+
+`sylc emit` lowers elaborated Syl hardware modules into clean, synthesizable SystemVerilog. This guide covers port/assignment mapping, multi-file emission, filelist generation, and deterministic naming.
+
+## Port and Assignment Mapping
+
+Each Syl `cell` maps to a SystemVerilog `module`. Port directions and hardware primitives map as follows:
+
+| Syl | SystemVerilog |
+| :--- | :--- |
+| `in Bit` | `input wire` |
+| `out Bit` | `output wire` |
+| `inout Bit` | `inout wire` |
+| `in UInt<W>` | `input [W-1:0]` |
+| `out UInt<W>` | `output [W-1:0]` |
+| `y := expr` | `assign y = expr;` |
+| `next r := expr` | `always_ff @(posedge clk) r <= expr;` |
+| `reg r reset(rst, val)` | `always_ff @(posedge clk ...) if (rst) r <= val; else ...` |
+
+## Single-File vs. Multi-File Emission
+
+### Single-File (`--out`)
+
+```bash
+sylc emit --out build/design.sv src/top.syl
+```
+
+All elaborated modules are emitted into `build/design.sv` in dependency order.
+
+### Multi-File (`--out-dir` and `--filelist`)
+
+For larger designs, synthesis tools and Verilator work best with one module per file and a dependency-ordered filelist:
+
+```bash
+sylc emit --out-dir build/sv --filelist build/sv/filelist.f src/top.syl
+```
+
+- `--out-dir <DIR>` writes `<ModuleName>.sv` for each elaborated module into `<DIR>`.
+- `--filelist <PATH>` writes a dependency-ordered list of `.sv` paths (defaults to `<out-dir>/filelist.f`), ready to pass to `verilator -f build/sv/filelist.f` or Vivado/Yosys.
+
+## Source Comments (`--source-comments`)
+
+Pass `--source-comments` to embed Syl file paths and line numbers into the generated SystemVerilog:
+
+```bash
+sylc emit --out-dir build/sv --source-comments src/top.syl
+```
+
+This makes it straightforward to trace synthesis warnings or simulation waveforms back to the original `.syl` line.
+
+## Deterministic Cross-Module Naming Disambiguation
+
+When a generic `cell` (e.g. `Fifo<W, D>`) is instantiated with multiple parameterizations, or when two packages define modules with the same name, `sylc` deterministically disambiguates the emitted SystemVerilog module names (for example, encoding parameter values or package prefixes) so that:
+
+1. Repeated runs on the same source always produce identical module names and filelists.
+2. No two distinct elaborations collide in the flat SystemVerilog global module namespace.
+
+## Quality Assurance & Known Limitations
+
+Before writing `.sv` output, `sylc` validates:
+
+1. **SV AST integrity**: Checks structural completeness of the lowered SystemVerilog IR.
+2. **Textual well-formedness**: Verifies balanced delimiters and module closures.
+3. **Verilator & Yosys smoke tests**: Standard library and example outputs are continuously verified in CI.
+
+**Known limitations**:
+- Emitted SystemVerilog is structural and direct; area/timing optimization is left to downstream synthesis tools.
+- VHDL output and custom emission templates are not supported.

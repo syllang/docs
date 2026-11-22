@@ -1,0 +1,23 @@
+---
+title: From Chisel
+description: Migrate from Chisel (Scala) to Syl, comparing Module, RegInit, Wire, MuxCase, Bundle, and elaboration-time generation.
+---
+
+Chisel embeds hardware construction in Scala; Syl is a standalone language with a built-in elaboration phase. You get similar expressive power (`for` unrolling, `bundle`, `interface`, `Stream`) without JVM startup overhead or runtime-vs-elaboration confusion.
+
+## Concept Mapping
+
+| Chisel (Scala) | Syl | Notes |
+| :--- | :--- | :--- |
+| `class Foo extends Module` | `cell Foo<D: Domain>(...)` | Explicit `Clock<D>` and `Reset<D, ...>`. |
+| `IO(new Bundle { ... })` | `bundle` / `interface` | Directional `view` replaces `Flipped(...)`. |
+| `Wire(UInt(8.W))` | `signal x: UInt<8> := ...` | Single `:=` driver. |
+| `RegInit(0.U(8.W))` | `reg x: UInt<8> reset(rst, 0)` | Updated via `next x := ...`. |
+| `MuxCase` / `when` | `select priority { ... }` | Expression-oriented, always has `default`. |
+| `Decoupled(T)` | `std.stream.Stream<T>` | `source` and `sink` views. |
+| Scala `for (i <- 0 until n)` | `for i in 0..N { ... }` | Built-in elaboration loop. |
+
+## Key Differences
+
+- **No last-connect semantics**: Chisel's `when` / `:=` allows multiple assignments where the last one wins. Syl enforces a **single driver** (`:=` or `next`) per signal/register, using `select` for priority.
+- **Standalone compiler**: `sylc` compiles directly to SystemVerilog in milliseconds without SBT/JVM.

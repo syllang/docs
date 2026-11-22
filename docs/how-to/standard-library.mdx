@@ -1,0 +1,35 @@
+---
+title: Standard Library
+description: Usage patterns across all 13 std.* standard library modules in Syl.
+---
+
+Syl's standard library (`std.*`) provides 13 verified, synthesizable building blocks. Pass `--std-root` (or configure `std_roots` in `syl.toml`) to import them.
+
+## All 13 `std.*` Modules
+
+| Module | Purpose | Key Exports |
+| :--- | :--- | :--- |
+| `std.logic` | Combinational bit/vector utilities | Priority encoders, decoders, mux helpers |
+| `std.bundle` | Bundle packing and unpacking | Width-safe struct conversions |
+| `std.stream` | Valid/ready handshake interface | `Stream<T>` (`source` / `sink` views) |
+| `std.skid` | 2-entry skid buffer | `SkidBuffer<T, D>` (breaks combinational `ready`) |
+| `std.stage` | Pipeline stage primitives | `Stage`, `stage_from_stream`, `stage_link`, `halt_link`, `drop_link` |
+| `std.pipeline` | High-level pipeline builders | Multi-stage pipeline composition |
+| `std.arbiter` | Multi-input stream arbitration | Round-robin and fixed-priority arbiters |
+| `std.fifo` | Synchronous FIFOs | `SyncFifo<T, DEPTH, D>` |
+| `std.mem` | Synthesizable RAM wrappers | Single-port and dual-port BRAM/distributed RAM |
+| `std.cdc` | Clock-domain crossing synchronizers | 2-FF bit synchronizer, handshake/Gray-code CDC |
+| `std.pulse` | Edge detectors and pulse generators | Rising/falling edge, single-cycle pulse |
+| `std.assert` | Elaboration & simulation assertions | Compile-time and runtime assertion helpers |
+| `std.vendor` | Vendor-specific blackbox wrappers | `extern cell` templates for FPGA/ASIC primitives |
+
+## Importing Standard Library Modules
+
+```syl
+use std.stream.Stream
+use std.fifo.SyncFifo
+use std.cdc.Sync2FF
+use std.pulse.RisingEdge
+```
+
+Every `std.*` module is continuously checked with `sylc check`, simulated in Verilator, and synthesized with Yosys.

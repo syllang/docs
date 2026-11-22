@@ -1,0 +1,41 @@
+---
+title: How-to Guides
+description: Practical, task-oriented recipes for configuring Syl projects, emitting SystemVerilog, applying hardware design patterns, verifying with Verilator/Yosys, and migrating from other HDLs.
+---
+
+This section provides goal-oriented, step-by-step guides for real-world Syl hardware engineering workflows. Every code example and configuration snippet is verified against the `sylc` compiler (`7608b0d`).
+
+## Project & Tooling
+
+- [Configure syl.toml](/docs/how-to/configure-syl-toml): Set up `[project]`, `[paths]`, multi-package workspaces, and automatic manifest discovery.
+- [Using sylc](/docs/how-to/sylc): Run `sylc check` and `sylc emit`, inspect JSON diagnostics, and render `SourceMap` spans.
+- [SystemVerilog Emission](/docs/how-to/systemverilog-emission): Multi-file emission (`--out-dir`), `--filelist`, `--source-comments`, and deterministic cross-module naming.
+- [Extern Modules & IP Integration](/docs/how-to/extern-and-ip): Author JSON/TOML Opaque Summaries (`schema_version = 1`), `domain_behavior`, and `cdc_crossings`.
+- [LSP & Editors](/docs/how-to/lsp-and-editors): Configure `syl-lsp`, `syl.toml` hot-reload, incremental sync, and asynchronous DRC diagnostics.
+- [Rust Embedding](/docs/how-to/rust-embedding): Embed `syl_session::AnalysisHost` and `AnalysisSnapshot` (`Send + Sync`) in Rust tools.
+- [AI Coding Assistant Prompt](/docs/how-to/ai-prompt): Production system prompt for generating valid Syl hardware code.
+
+## Hardware Patterns
+
+- [Stream & Handshake](/docs/how-to/stream): Valid/Ready backpressure, `std.skid`, `std.arbiter`, and `std.fifo` composition.
+- [Pipeline](/docs/how-to/pipeline): Multi-stage pipelines, `std.stage`, `std.pipeline`, stall propagation, and flushing.
+- [Interfaces & Bundles](/docs/how-to/interfaces): Directional `Bundle` definitions, `flip`, and `std.bundle` utilities.
+- [Parameterization](/docs/how-to/parameterization): Compile-time generics, `const` parameters, `check_fn`/`check_map`, and structural generation.
+- [Standard Library](/docs/how-to/standard-library): Usage patterns across all 13 `std.*` modules.
+- [Examples & Simulation](/docs/how-to/examples): End-to-end examples and simulation entry points.
+
+## Advanced Hardware & Verification
+
+- [CDC & Async Reset](/docs/how-to/cdc-and-async-reset): `@cdc_sync` boundary synchronizers, `std.cdc`, and `Reset<D, Sync|Async, ActiveHigh|ActiveLow>`.
+- [Synthesizable RAM & FIFO](/docs/how-to/synthesizable-ram-fifo): `mem`, `mem_write`, `mem_read_sync`, `std.mem`, and `std.fifo` for BRAM/distributed RAM.
+- [Verilator & Yosys Verification](/docs/how-to/verilator-and-yosys): `scripts/check_std_sim.sh`, C++17 Verilator testbenches, and Yosys synthesis checks.
+
+## Migrating to Syl
+
+- [From Verilog / SystemVerilog](/docs/how-to/from-verilog)
+- [From VHDL](/docs/how-to/from-vhdl)
+- [From Chisel](/docs/how-to/from-chisel)
+- [From SpinalHDL](/docs/how-to/from-spinalhdl)
+- [bool vs bit](/docs/how-to/bool-vs-bit)
+- [Elaboration vs Hardware](/docs/how-to/elaboration-vs-hardware)
+- [Structural Design](/docs/how-to/structural-design)

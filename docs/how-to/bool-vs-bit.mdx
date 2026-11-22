@@ -1,0 +1,37 @@
+---
+title: bool vs bit
+description: Understand the strict separation between compile-time Bool and hardware Bit in Syl.
+---
+
+One of the most important rules in Syl is that **`Bool` and `Bit` are completely distinct types** and are never interchangeable.
+
+## Comparison
+
+| Aspect | `Bool` | `Bit` |
+| :--- | :--- | :--- |
+| **Phase** | Compile-time (Elaboration) | Runtime (Hardware wire) |
+| **Literals** | `true`, `false` | `0`, `1` |
+| **Used in `if`** | Yes (`if cond { ... }`) | No (compile error) |
+| **Used in `select`** | No | Yes (`select { en => a, default => b }`) |
+| **Emitted to SV?** | No (evaluated away) | Yes (`logic` / `wire`) |
+
+## Why Syl Separates Them
+
+In Verilog or Chisel, it is easy to confuse a compile-time parameter check with a runtime hardware multiplexer. In Syl:
+- `if` only accepts `Bool` and **eliminates** the untaken branch at elaboration time (zero hardware generated).
+- `select` only accepts `Bit` conditions and **synthesizes** a hardware multiplexer.
+
+```syl
+-- Compile-time choice (Bool)
+if USE_BYPASS {
+    out_sig := in_sig
+} else {
+    out_sig := reg_sig
+}
+
+-- Runtime multiplexer (Bit)
+out_sig := select {
+    bypass_en => in_sig,
+    default => reg_sig,
+}
+```

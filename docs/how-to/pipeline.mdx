@@ -1,0 +1,70 @@
+---
+title: Pipeline
+description: Build multi-stage hardware pipelines with std.stage and std.pipeline, including stall propagation and flushing.
+---
+
+Pipelining splits a multi-cycle computation into sequential stages so that a new operation can enter on every clock cycle. While latency remains $N$ cycles, steady-state throughput reaches one result per cycle.
+
+## Standard Library `std.stage` Components
+
+```syl
+use std.stage.Stage
+use std.stage.stage_from_stream
+use std.stage.stage_to_stream
+use std.stage.stage_link
+use std.stage.halt_link
+use std.stage.drop_link
+```
+
+### `stage_from_stream` & `stage_to_stream`
+
+Convert between external `Stream<T>` handshakes and internal `Stage` signals:
+
+```syl
+use std.stream.Stream
+use std.stage.stage_from_stream
+use std.stage.stage_to_stream
+
+let in_stage = place stage_from_stream<UInt<8>>(stream: input_stream)
+let out_stream = place stage_to_stream<UInt<8>>(stage: last_stage)
+```
+
+### `stage_link`
+
+Connects two pipeline stages across a clock-edge register boundary. Combinational logic can be placed between stages:
+
+```syl
+let linked = place stage_link<UInt<8>, D>(
+    clk: clk,
+    rst: rst,
+    up: in_stage,
+)
+```
+
+### `halt_link` (Stall Propagation)
+
+When `halt` is `1`, `halt_link` freezes the upstream stage and holds its current data:
+
+```syl
+let halted = place halt_link<UInt<8>>(
+    up: in_stage,
+    halt: stall_signal,
+)
+```
+
+### `drop_link` (Pipeline Flush)
+
+When `drop` is `1`, `drop_link` invalidates the current transaction so it does not propagate downstream:
+
+```syl
+let dropped = place drop_link<UInt<8>>(
+    up: in_stage,
+    drop: flush_signal,
+)
+```
+
+## Design Checklist
+
+1. **Balance stage depth**: Keep combinational logic between `stage_link` boundaries roughly equal to maximize $F_{\max}$.
+2. **Stall vs. Flush**: Use `halt_link` when downstream is not ready; use `drop_link` for branch mispredictions or exceptions.
+3. **Stream boundaries**: Wrap pipeline entry and exit with `stage_from_stream` / `stage_to_stream` for clean backpressure integration.

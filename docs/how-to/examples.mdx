@@ -1,0 +1,29 @@
+---
+title: Examples & Simulation
+description: End-to-end Syl hardware examples and Verilator/Yosys simulation entry points.
+---
+
+The Syl repository includes runnable examples under `examples/` covering combinational logic, counters, `Stream` pipelines, FIFOs, and CDC synchronizers.
+
+## Running an Example with `sylc`
+
+```bash
+# Type-check and run DRC on an example
+sylc check --std-root examples/std examples/counter.syl
+
+# Emit SystemVerilog
+sylc emit --std-root examples/std --out build/counter.sv examples/counter.syl
+```
+
+## Standard Library Simulation (`scripts/check_std_sim.sh`)
+
+To verify that emitted SystemVerilog simulates identically to hardware expectations, run the Verilator + Yosys suite:
+
+```bash
+./scripts/check_std_sim.sh
+```
+
+This script:
+1. Emits SystemVerilog for `std.*` modules using `sylc emit`.
+2. Compiles C++17 Verilator testbenches and runs cycle-accurate simulations.
+3. Runs Yosys (`proc; memory; check -assert; stat`) to verify synthesizability and memory inference.

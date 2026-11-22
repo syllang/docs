@@ -1,0 +1,126 @@
+---
+title: Extern Modules and IP Integration
+description: Integrate vendor IP and Verilog modules in Syl using extern cell, JSON/TOML Opaque Summaries (schema_version = 1), domain_behavior, and cdc_crossings.
+---
+
+Syl interoperates with existing Verilog/SystemVerilog IP cores and pre-compiled vendor macros via `extern cell` declarations and **Opaque Summary** metadata files.
+
+## Declaring an `extern cell`
+
+An `extern cell` declares the typed port signature of an external module without a body:
+
+```syl
+extern cell VendorSyncFifo<D_W: Domain, D_R: Domain>(
+    wclk: in Clock<D_W>,
+    rclk: in Clock<D_R>,
+    wdata: in UInt<8>,
+    wen: in Bit,
+    rdata: out UInt<8>,
+    ren: in Bit,
+    empty: out Bit,
+    full: out Bit,
+)
+```
+
+Instantiate it with `place` just like any Syl `cell`:
+
+```syl
+cell Top<D_W: Domain, D_R: Domain>(
+    wclk: in Clock<D_W>,
+    rclk: in Clock<D_R>,
+    wdata: in UInt<8>,
+    wen: in Bit,
+    ren: in Bit,
+    rdata: out UInt<8>,
+) {
+    signal empty: Bit
+    signal full: Bit
+    let fifo = place VendorSyncFifo(
+        wclk: wclk,
+        rclk: rclk,
+        wdata: wdata,
+        wen: wen,
+        rdata: rdata,
+        ren: ren,
+        empty: empty,
+        full: full,
+    )
+}
+```
+
+## Opaque Summaries (`schema_version = 1`)
+
+By default, `sylc` infers a conservative summary from the `extern cell` signature (`out` ports are assumed driven). For vendor IP that crosses clock domains or has specific combinational/sequential behavior, supply an **Opaque Summary** in JSON or TOML and register it in `syl.toml` under `[paths].opaque_summaries`.
+
+### TOML Example (`ip/vendor_fifo.toml`)
+
+```toml
+schema_version = 1
+
+[[modules]]
+name = "VendorSyncFifo"
+domain_behavior = "cdc_boundary"
+
+[[modules.cdc_crossings]]
+from_domain = "D_W"
+to_domain = "D_R"
+kind = "fifo_gray"
+```
+
+### JSON Example (`ip/vendor_fifo.json`)
+
+```json
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "name": "VendorSyncFifo",
+      "domain_behavior": "cdc_boundary",
+      "cdc_crossings": [
+        {
+          "from_domain": "D_W",
+          "to_domain": "D_R",
+          "kind": "fifo_gray"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Registering in `syl.toml` and Verifying
+
+Add the summary path to `syl.toml`:
+
+```toml
+[project]
+name = "ip_demo"
+
+[paths]
+workspace_roots = ["src"]
+opaque_summaries = ["ip/vendor_fifo.toml"]
+```
+
+Then run `sylc check --manifest syl.toml src/top.syl`. `sylc` loads the Opaque Summary at the VFS boundary and uses `domain_behavior` and `cdc_crossings` during CDC DRC.
+
+## Common Use Cases
+
+### Third-Party IP Cores
+
+```syl
+extern cell DDRController<D: Domain>(
+    clk: in Clock<D>,
+    addr: in UInt<32>,
+    data: inout UInt<64>,
+    ready: out Bit,
+)
+```
+
+### Wrapping Legacy Verilog Modules
+
+Declare the Verilog module's ports as an `extern cell`, instantiate it in Syl, and pass both the legacy `.v`/`.sv` files and `sylc emit` output to your synthesis or simulation tool.
+
+## Caveats
+
+- Syl cannot inspect the internal logic of an `extern cell`.
+- Port names, widths, and directions in `extern cell` must match the underlying Verilog/SV module exactly; mismatches cause downstream synthesis or simulation failures.

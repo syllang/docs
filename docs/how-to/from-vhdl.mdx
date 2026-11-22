@@ -1,0 +1,38 @@
+---
+title: From VHDL
+description: Migrate from VHDL to Syl, mapping entity/architecture, process, signal/variable, and generate statements.
+---
+
+VHDL engineers will find Syl's strong typing and explicitness familiar, but with far less boilerplate: `entity` and `architecture` are unified into a single `cell`, and `std_logic` ambiguity is replaced by `Bit` and `UInt<W>`.
+
+## Concept Mapping
+
+| VHDL | Syl | Notes |
+| :--- | :--- | :--- |
+| `entity` + `architecture` | `cell` | Single unified declaration. |
+| `std_logic` | `Bit` | Strictly two-state (`0` / `1`). |
+| `unsigned(W-1 downto 0)` | `UInt<W>` | Exact width checked at compile time. |
+| `process(clk)` | `reg` + `next` | Implicitly bound to `Clock<D>`. |
+| `process(all)` | `signal` + `select` / `match` | Exhaustive, latch-free combinational logic. |
+| `generic (...)` | `<W: Nat, D: Domain>` | Type-level and `const` parameters. |
+| `record` | `bundle` | Composable with `interface` views. |
+| `for i in 0 to N-1 generate` | `for i in 0..N { ... }` | Elaboration-time unrolling. |
+
+## Example: Entity + Process to `cell`
+
+```syl
+cell Register8<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    d: in UInt<8>,
+    en: in Bit,
+    q: out UInt<8>,
+) {
+    reg r: UInt<8> reset(rst, 0)
+    next r := select {
+        en => d,
+        default => r,
+    }
+    q := r
+}
+```

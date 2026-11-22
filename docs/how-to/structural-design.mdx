@@ -1,0 +1,45 @@
+---
+title: Structural Design
+description: Compose hierarchical hardware modules in Syl using cell, place, interface views, and for-loop generation.
+---
+
+Syl encourages **structural, hierarchical design**: small, single-purpose `cell`s composed together with `place` and typed `interface` views.
+
+## Instantiating Submodules with `place`
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_stream: in Stream<UInt<8>>.sink,
+    out_stream: out Stream<UInt<8>>.source,
+) {
+    let stage1 = place SkidBuffer<UInt<8>, D>(
+        clk: clk,
+        rst: rst,
+        input: in_stream,
+    )
+
+    let stage2 = place SyncFifo<UInt<8>, 16, D>(
+        clk: clk,
+        rst: rst,
+        input: stage1.output,
+        output: out_stream,
+    )
+}
+```
+
+## Generating Arrays of Instances
+
+Combine `for i in 0..N` with `place` to build multi-lane datapaths, crossbars, or systolic arrays:
+
+```syl
+for i in 0..4 {
+    let core = place ProcessingElement<D>(
+        clk: clk,
+        rst: rst,
+        din: lanes_in[i],
+        dout: lanes_out[i],
+    )
+}
+```

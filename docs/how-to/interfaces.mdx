@@ -1,0 +1,72 @@
+---
+title: Interfaces & Bundles
+description: Design typed inter-module protocols using bundle, interface, directional views, and std.bundle utilities.
+---
+
+Well-defined interfaces prevent wiring bugs and make hardware modules reusable. Syl's `bundle` and `interface` constructs express data payloads, control signals, and directional contracts directly in the type system.
+
+## Anatomy of a Hardware Protocol
+
+1. **Data signals**: Payload, addresses, byte enables.
+2. **Control signals**: `valid`, `ready`, `last`, `resp`.
+3. **Directional contract**: Which side drives each signal.
+
+## Step-by-Step Protocol Design
+
+### 1. Define Data Payloads with `bundle`
+
+```syl
+bundle AxiAddress<W: Nat> {
+    addr: UInt<W>,
+    len: UInt<8>,
+    size: UInt<3>,
+    burst: UInt<2>,
+}
+
+bundle AxiData<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+```
+
+### 2. Define Directional Views with `interface`
+
+```syl
+interface AxiWriteAddr<W: Nat> {
+    payload: AxiAddress<W>
+    valid: Bit
+    ready: Bit
+
+    view master {
+        out payload
+        out valid
+        in ready
+    }
+
+    view slave {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+### 3. Use Views on `cell` Ports
+
+```syl
+cell AxiMaster(
+    write_addr: out AxiWriteAddr<32>.master,
+    write_data: out AxiWriteData<32>.master,
+)
+
+cell AxiSlave(
+    write_addr: in AxiWriteAddr<32>.slave,
+    write_data: in AxiWriteData<32>.slave,
+)
+```
+
+## Single-Interface vs. Multi-Interface Encapsulation
+
+- **Single-interface** (`Stream<T>`): Ideal for point-to-point unidirectional channels.
+- **Multi-interface**: Complex buses (like AXI4) group separate `AxiWriteAddr`, `AxiWriteData`, and `AxiWriteResp` channels so each channel can be independently buffered or pipelined.
+- **`std.bundle`**: Provides helper utilities for packing, unpacking, and width-safe bundle transformations.

@@ -1,0 +1,126 @@
+---
+title: 外部模块与 IP 集成
+description: 在 Syl 中使用 extern cell、JSON/TOML Opaque Summary（schema_version = 1）、domain_behavior 与 cdc_crossings 集成外部 IP 核。
+---
+
+Syl 通过 `extern cell` 声明与 **Opaque Summary（不透明摘要）** 元数据文件，与现有的 Verilog/SystemVerilog IP 核及预编译厂商宏无缝协同工作。
+
+## 声明 `extern cell`
+
+`extern cell` 仅声明外部模块的端口签名，不包含实现体：
+
+```syl
+extern cell VendorSyncFifo<D_W: Domain, D_R: Domain>(
+    wclk: in Clock<D_W>,
+    rclk: in Clock<D_R>,
+    wdata: in UInt<8>,
+    wen: in Bit,
+    rdata: out UInt<8>,
+    ren: in Bit,
+    empty: out Bit,
+    full: out Bit,
+)
+```
+
+使用 `place` 实例化外部模块，方式与普通 Syl `cell` 完全一致：
+
+```syl
+cell Top<D_W: Domain, D_R: Domain>(
+    wclk: in Clock<D_W>,
+    rclk: in Clock<D_R>,
+    wdata: in UInt<8>,
+    wen: in Bit,
+    ren: in Bit,
+    rdata: out UInt<8>,
+) {
+    signal empty: Bit
+    signal full: Bit
+    let fifo = place VendorSyncFifo(
+        wclk: wclk,
+        rclk: rclk,
+        wdata: wdata,
+        wen: wen,
+        rdata: rdata,
+        ren: ren,
+        empty: empty,
+        full: full,
+    )
+}
+```
+
+## Opaque Summary（`schema_version = 1`）
+
+默认情况下，`sylc` 会根据 `extern cell` 签名推断保守摘要（默认 `out` 端口均被驱动）。对于跨时钟域 IP 或具有特定组合/时序行为的模块，请编写 JSON 或 TOML 格式的 **Opaque Summary**，并在 `syl.toml` 的 `[paths].opaque_summaries` 中注册。
+
+### TOML 示例（`ip/vendor_fifo.toml`）
+
+```toml
+schema_version = 1
+
+[[modules]]
+name = "VendorSyncFifo"
+domain_behavior = "cdc_boundary"
+
+[[modules.cdc_crossings]]
+from_domain = "D_W"
+to_domain = "D_R"
+kind = "fifo_gray"
+```
+
+### JSON 示例（`ip/vendor_fifo.json`）
+
+```json
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "name": "VendorSyncFifo",
+      "domain_behavior": "cdc_boundary",
+      "cdc_crossings": [
+        {
+          "from_domain": "D_W",
+          "to_domain": "D_R",
+          "kind": "fifo_gray"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 在 `syl.toml` 中注册并实测
+
+将摘要文件路径加入 `syl.toml`：
+
+```toml
+[project]
+name = "ip_demo"
+
+[paths]
+workspace_roots = ["src"]
+opaque_summaries = ["ip/vendor_fifo.toml"]
+```
+
+随后运行 `sylc check --manifest syl.toml src/top.syl`。`sylc` 会在 VFS 边界加载该摘要，并在 CDC DRC 阶段使用 `domain_behavior` 与 `cdc_crossings` 进行跨时钟域检查。
+
+## 常见使用场景
+
+### 第三方 IP 核
+
+```syl
+extern cell DDRController<D: Domain>(
+    clk: in Clock<D>,
+    addr: in UInt<32>,
+    data: inout UInt<64>,
+    ready: out Bit,
+)
+```
+
+### 包装既有 Verilog 模块
+
+将既有 Verilog 模块的端口声明为 `extern cell`，在 Syl 中实例化；综合或仿真时，将原 `.v`/`.sv` 文件与 `sylc emit` 的输出一并交给下游工具即可。
+
+## 注意事项
+
+- 外部模块的实现不在 Syl 中，编译器无法检查其内部逻辑。
+- `extern cell` 的端口名、位宽与方向必须与实际 Verilog/SV 模块严格一致，否则会导致综合报错或仿真失败。

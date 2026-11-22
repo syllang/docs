@@ -1,0 +1,73 @@
+---
+title: LSP and Editors
+description: Configure syl-lsp for VS Code, Neovim, and Helix, with automatic syl.toml discovery, hot-reload, incremental sync, and async DRC.
+---
+
+`syl-lsp` is the official Language Server Protocol (LSP) implementation for Syl. It communicates over `stdin`/`stdout` and provides real-time type checking, navigation, and asynchronous Design Rule Checks (DRC).
+
+## Starting the Language Server
+
+```bash
+syl-lsp
+```
+
+## Architecture Highlights
+
+- **Automatic `syl.toml` Discovery & Hot-Reload**: On initialization, `syl-lsp` discovers the nearest `syl.toml` above the workspace root. It watches `syl.toml` via `workspace/didChangeWatchedFiles` and reloads `workspace_roots`, `package_roots`, and `opaque_summaries` automatically on save.
+- **Incremental Document Synchronization**: Edits in the editor are synced incrementally to `syl_session::AnalysisHost` without re-parsing unchanged files.
+- **Asynchronous Background DRC**: Fast syntax and type diagnostics are published immediately, while heavier elaboration DRC runs on a background worker channel so typing remains responsive.
+
+## Supported Editor Capabilities
+
+1. **Hover**: Displays inferred types, clock domains, and parameter values on expressions and signals.
+2. **Go to Definition**: Jumps to signal, `cell`, `bundle`, `enum`, and cross-file module declarations.
+3. **Find References**: Locates all usages of a symbol across the workspace.
+4. **Completions**: Suggests ports, local signals, `std.*` modules, and keywords at the cursor.
+5. **Diagnostics**: Publishes syntax, semantic, and DRC errors/warnings with exact spans (including `syl.toml` parse errors).
+6. **Document Symbols**: Outlines `cell`, `bundle`, `enum`, `fn`, and `map` definitions in the current file.
+
+## Editor Configuration
+
+### VS Code
+
+Configure a custom LSP client pointing to `syl-lsp`:
+
+```json
+{
+  "lsp": {
+    "syl": {
+      "command": ["syl-lsp"]
+    }
+  }
+}
+```
+
+### Neovim
+
+```lua
+vim.lsp.start({
+  name = "syl",
+  cmd = { "syl-lsp" },
+  root_dir = vim.fs.root(0, { "syl.toml", ".git" }),
+})
+```
+
+### Helix
+
+Add to `~/.config/helix/languages.toml`:
+
+```toml
+[language-server.syl]
+command = "syl-lsp"
+
+[[language]]
+name = "syl"
+language-servers = ["syl"]
+scope = "source.syl"
+file-types = ["syl"]
+```
+
+## Current Limitations
+
+- Rename refactoring and code actions (quick fixes) are not yet supported.
+- Signature help for `cell` instantiations is not yet implemented.

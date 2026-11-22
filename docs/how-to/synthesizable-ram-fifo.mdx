@@ -1,0 +1,70 @@
+---
+title: Synthesizable RAM & FIFO
+description: Model BRAM, distributed RAM, and synchronous FIFOs using mem, mem_write, mem_read_sync, std.mem, and std.fifo.
+---
+
+Using register arrays (`reg arr: [DEPTH] UInt<W>`) for large memories forces synthesis tools to map every bit to flip-flops, exhausting LUT/FF resources. Syl provides dedicated memory primitives (`mem`, `mem_write`, `mem_read_sync`) and standard library wrappers (`std.mem`, `std.fifo`) that infer FPGA Block RAM (BRAM) and distributed RAM cleanly.
+
+## Memory Primitives: `mem`, `mem_write`, `mem_read_sync`
+
+Declare a memory array with `mem`:
+
+```syl
+cell SimpleDualPortRam<W: Nat, DEPTH: Nat, D: Domain>(
+    clk: in Clock<D>,
+    we: in Bit,
+    waddr: in UInt<clog2(DEPTH)>,
+    wdata: in UInt<W>,
+    re: in Bit,
+    raddr: in UInt<clog2(DEPTH)>,
+    rdata: out UInt<W>,
+) {
+    mem ram: [DEPTH] UInt<W>
+
+    mem_write(ram, waddr, wdata, we)
+    rdata := mem_read_sync(ram, raddr, re)
+}
+```
+
+### How `sylc` Lowers Memory Primitives
+
+- `mem ram: [DEPTH] UInt<W>` emits a standard SystemVerilog memory array `logic [W-1:0] ram [0:DEPTH-1];`.
+- `mem_write(ram, waddr, wdata, we)` emits a synchronous write block `always_ff @(posedge clk) if (we) ram[waddr] <= wdata;`.
+- `mem_read_sync(ram, raddr, re)` emits a synchronous registered read `always_ff @(posedge clk) if (re) rdata <= ram[raddr];`, which matches FPGA BRAM inference templates in Vivado, Quartus, and Yosys.
+
+## Using `std.mem`
+
+For common memory topologies, import `std.mem` instead of writing raw primitives:
+
+- **Single-port RAM**: Shared address bus for read/write.
+- **Simple dual-port RAM**: Independent read and write ports (1W1R).
+- **True dual-port RAM**: Two independent read/write ports.
+
+## Building Synchronous FIFOs with `std.fifo`
+
+`std.fifo.SyncFifo` combines `mem` storage with read/write pointers and `Stream<T>` handshake interfaces:
+
+```syl
+use std.stream.Stream
+use std.fifo.SyncFifo
+
+cell FifoWrapper<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_stream: in Stream<UInt<32>>.sink,
+    out_stream: out Stream<UInt<32>>.source,
+) {
+    let fifo = place SyncFifo<UInt<32>, 64, D>(
+        clk: clk,
+        rst: rst,
+        input: in_stream,
+        output: out_stream,
+    )
+}
+```
+
+## Synthesis Guidelines
+
+1. **Synchronous reads for BRAM**: Always use `mem_read_sync` for depths $\ge 64$ so Yosys/Vivado can infer Block RAM instead of distributed LUTRAM.
+2. **Power-of-two depths**: Keep `DEPTH` a power of two when possible to simplify pointer wrap-around and avoid comparator overhead.
+3. **No reset on `mem` contents**: BRAMs do not support single-cycle bulk reset; only reset the read/write pointers.

@@ -1,0 +1,80 @@
+---
+title: Configure syl.toml
+description: Set up syl.toml with [project], [paths], multi-package workspaces, std_roots, opaque_summaries, and automatic manifest discovery.
+---
+
+A `syl.toml` manifest defines the root of a Syl hardware project, its package search paths, standard library roots, and external IP opaque summaries. Both `sylc` and `syl-lsp` automatically discover the nearest `syl.toml` by walking up from the target file or workspace directory.
+
+## Minimal `syl.toml`
+
+For a single-package project with source files under `src/`, place a `syl.toml` at the repository root:
+
+```toml
+[project]
+name = "uart_core"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+workspace_roots = ["src"]
+```
+
+If `[paths].workspace_roots` is omitted, `syl_session` defaults to the directory containing `syl.toml`.
+
+## Full Schema Reference
+
+`syl.toml` uses strict TOML decoding (`deny_unknown_fields`): any unrecognized section or key causes a manifest load error.
+
+### `[project]`
+
+| Key | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | `string` | No | Human-readable project name. |
+| `version` | `string` | No | Semantic version string (e.g. `"0.1.0"`). |
+| `edition` | `string` | No | Language edition identifier (e.g. `"2026"`). |
+
+### `[paths]`
+
+All relative paths in `[paths]` are resolved relative to the directory containing `syl.toml` (not the current working directory).
+
+| Key | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `workspace_roots` | `string[]` | `["."]` | Directories scanned for this project's `.syl` modules. |
+| `std_roots` | `string[]` | `[]` | Directories providing `std.*` standard library modules. |
+| `package_roots` | `string[]` | `[]` | Additional external package roots (e.g. shared IP libraries). |
+| `opaque_summaries` | `string[]` | `[]` | Paths to JSON or TOML Opaque Summary files for `extern` modules. |
+
+## Multi-Package Workspaces and Shared IP
+
+In a monorepo with a shared IP library and a local standard library checkout, configure `package_roots` and `std_roots`:
+
+```toml
+[project]
+name = "soc_top"
+version = "0.2.0"
+edition = "2026"
+
+[paths]
+workspace_roots = ["rtl"]
+std_roots = ["vendor/syl-std"]
+package_roots = ["../common_ip/rtl", "third_party/axi_lite"]
+opaque_summaries = [
+  "ip/pll_summary.json",
+  "ip/serdes_summary.toml",
+]
+```
+
+## Automatic Discovery vs. Explicit `--manifest`
+
+1. **Automatic upward discovery**: When you run `sylc check rtl/top.syl` or open a file in `syl-lsp`, `ProjectManifest::discover` walks up ancestor directories from `rtl/top.syl` until it finds `syl.toml`.
+2. **Explicit override**: Pass `--manifest path/to/syl.toml` to `sylc check` or `sylc emit` when testing an alternate configuration or running in CI from outside the project tree:
+
+```bash
+sylc check --manifest ./boards/fpga/syl.toml rtl/top.syl
+```
+
+3. **CLI flag overrides**: `--std-root` and `--package-root` on `sylc` append or override the paths declared in `syl.toml`.
+
+## Live Reload in `syl-lsp`
+
+`syl-lsp` watches `syl.toml` via `workspace/didChangeWatchedFiles`. Saving changes to `workspace_roots`, `package_roots`, or `opaque_summaries` triggers a workspace reload and re-runs diagnostics across open files without restarting the editor. If `syl.toml` contains a syntax error or unknown field, `syl-lsp` publishes the parse error directly on `syl.toml`.

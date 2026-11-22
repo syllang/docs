@@ -1,0 +1,117 @@
+---
+title: Stream & Handshake
+description: Using the Stream interface for valid-ready handshakes, backpressure, std.skid, std.arbiter, and std.fifo composition.
+---
+
+The `Stream` interface is the standard mechanism for passing data between Syl modules. It implements the valid-ready handshake protocol—the same flow-control foundation used by AXI-Stream and TileLink.
+
+## The Valid-Ready Handshake
+
+A producer and consumer coordinate transfers using two control signals:
+
+- **`valid`**: Driven by the producer. Indicates `payload` is valid on the current cycle.
+- **`ready`**: Driven by the consumer. Indicates the consumer can accept `payload` on the current cycle.
+
+A transfer (handshake) occurs on a clock edge when both `valid` and `ready` are `1`.
+
+```mermaid
+flowchart TB
+    S["Producer"]
+    R["Consumer"]
+    P["payload"]
+    V["valid"]
+    RD["ready"]
+
+    S --> P
+    S --> V
+    RD --> S
+    P --> R
+    V --> R
+    R --> RD
+```
+
+## The `Stream<T>` Interface
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+- `T` is the payload type (e.g. `UInt<8>` or a `bundle`).
+- `source` view: Producer perspective (`payload` and `valid` are `out`, `ready` is `in`).
+- `sink` view: Consumer perspective (`payload` and `valid` are `in`, `ready` is `out`).
+
+## Producer and Consumer
+
+```syl
+cell Producer<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    stream: out Stream<UInt<8>>.source,
+) {
+    reg data: UInt<8> reset(rst, 0)
+    signal handshake: Bit := stream.valid and stream.ready
+
+    next data := select {
+        handshake => data + 1,
+        default => data,
+    }
+
+    stream.payload := data
+    stream.valid := 1
+}
+
+cell Consumer<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    stream: in Stream<UInt<8>>.sink,
+) {
+    signal handshake: Bit := stream.valid and stream.ready
+
+    reg received: UInt<8> reset(rst, 0)
+    next received := select {
+        handshake => stream.payload,
+        default => received,
+    }
+
+    stream.ready := 1
+}
+```
+
+## Backpressure & Composing `std.skid`, `std.arbiter`, and `std.fifo`
+
+When a downstream consumer stalls (`ready == 0`), the upstream producer must hold `valid` and `payload` stable until `ready` returns to `1`. To break combinational `ready` paths or buffer bursts, compose `Stream` with standard library modules:
+
+- **`std.skid`**: Inserts a 2-entry skid buffer to register both `valid`/`payload` and `ready`, breaking combinational backpressure loops without losing throughput.
+- **`std.fifo`**: Decouples producer and consumer rates with a synchronous circular buffer (`SyncFifo`).
+- **`std.arbiter`**: Arbitrates multiple `Stream<T>.sink` inputs onto a single `Stream<T>.source` output (round-robin or fixed priority).
+
+```syl
+use std.stream.Stream
+use std.skid.SkidBuffer
+use std.fifo.SyncFifo
+
+-- Decouple combinational ready path with a skid buffer, then buffer bursts in a FIFO
+let skidded = place SkidBuffer<UInt<8>, D>(clk: clk, rst: rst, input: in_stream)
+let buffered = place SyncFifo<UInt<8>, 16, D>(clk: clk, rst: rst, input: skidded.output)
+```
+
+## Common Pitfalls
+
+1. **Combinational loop on `ready`**: Never drive `source.valid` combinationally from `source.ready`.
+2. **Dropping `valid` under stall**: Once `valid` is `1` and `ready` is `0`, `valid` and `payload` must remain unchanged on the next cycle.

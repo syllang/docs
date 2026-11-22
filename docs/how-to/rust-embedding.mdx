@@ -1,0 +1,64 @@
+---
+title: Rust Embedding
+description: Embed syl_session::AnalysisHost, Send + Sync AnalysisSnapshot, and EmitOptions in Rust applications and custom build tools.
+---
+
+The Syl compiler is written in Rust and exposes a modular set of crates (`syl_session`, `syl_syntax`, `syl_sema`, `syl_elab`, `syl_emit`, `syl_query`) for embedding into custom build tools, CI runners, and editor plugins.
+
+## Adding Dependencies
+
+```toml
+[dependencies]
+syl_session = { path = "crates/syl_session" }
+syl_emit = { path = "crates/syl_emit" }
+```
+
+## Session & `AnalysisHost` / `AnalysisSnapshot`
+
+`syl_session::AnalysisHost` manages project configuration (`syl.toml`), virtual filesystem state, and incremental updates. Calling `host.snapshot()` produces an immutable `AnalysisSnapshot` that implements `Send + Sync`, allowing you to run queries and DRC on background threads without blocking edits.
+
+```rust
+use syl_session::{AnalysisHost, ProjectConfig};
+use std::path::Path;
+
+let mut host = AnalysisHost::new(ProjectConfig::from_manifest(Path::new("syl.toml"))?);
+host.open_document("src/top.syl", source_code.to_string(), 1);
+
+let snapshot = host.snapshot();
+// `snapshot` is Send + Sync and can be moved to a worker thread
+let diagnostics = snapshot.diagnostics();
+for diag in &diagnostics {
+    println!("{diag}");
+}
+```
+
+## Compiling and Emitting SystemVerilog (`EmitOptions`)
+
+Use `EmitOptions` to configure single-file or multi-file emission with optional source comments:
+
+```rust
+use syl_emit::{EmitOptions, SystemVerilogBackend};
+
+let options = EmitOptions {
+    source_comments: true,
+    ..EmitOptions::default()
+};
+let sv_output = SystemVerilogBackend::with_options(options).emit(&hwir)?;
+```
+
+## Query API
+
+`AnalysisSnapshot` also exposes LSP-grade semantic queries:
+
+```rust
+let hover = snapshot.hover_at("src/top.syl", position)?;
+let definition = snapshot.definition_at("src/top.syl", position)?;
+let completions = snapshot.completions_at("src/top.syl", position)?;
+```
+
+## Use Cases
+
+- Custom hardware build systems and Bazel/Cargo integrations
+- Automated CI linting and DRC gates
+- IDE plugins and web playgrounds
+- Property-based testing harnesses

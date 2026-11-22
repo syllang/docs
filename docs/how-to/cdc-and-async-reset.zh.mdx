@@ -1,0 +1,119 @@
+---
+title: CDC 与异步复位
+description: 编写 @cdc_sync 边界同步器、使用 std.cdc，以及配置 Reset<D, Sync|Async, ActiveHigh|ActiveLow> 复位极性。
+---
+
+跨时钟域（CDC）错误与复位极性不匹配是硬件设计中最难在仿真阶段暴露的缺陷。Syl 将**时钟域（`Domain`）**与**复位模式/极性（`Reset<D, Mode, Polarity>`）**直接编码进类型系统，并在展开期 DRC 阶段进行严格静态检查。
+
+## 复位模式与极性（`Reset<D, Mode, Polarity>`）
+
+Syl 的 `Reset` 类型包含三个类型级参数：
+
+1. **`D: Domain`**：该复位信号所属的时钟域。
+2. **模式（Mode）**：`Sync`（同步复位）或 `Async`（异步复位）。
+3. **极性（Polarity）**：`ActiveHigh`（高电平有效）或 `ActiveLow`（低电平有效）。
+
+### 声明同步高有效复位
+
+```syl
+cell CounterSyncHigh<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    en: in Bit,
+    count: out UInt<8>,
+) {
+    reg q: UInt<8> reset(rst, 0)
+    next q := select {
+        en => q + 1,
+        default => q,
+    }
+    count := q
+}
+```
+
+### 声明异步低有效复位（`async, active_low`）
+
+当面向 ASIC 标准单元或需要异步低有效复位（`rst_n`）的 FPGA IP 时，声明 `Reset<D, Async, ActiveLow>`，并在 `reg` 的 `reset` 子句中显式指定 `async, active_low`：
+
+```syl
+cell CounterAsyncLow<D: Domain>(
+    clk: in Clock<D>,
+    rst_n: in Reset<D, Async, ActiveLow>,
+    en: in Bit,
+    count: out UInt<8>,
+) {
+    reg q: UInt<8> reset(rst_n, 0, async, active_low)
+    next q := select {
+        en => q + 1,
+        default => q,
+    }
+    count := q
+}
+```
+
+`sylc` 会生成精确对应的 SystemVerilog 敏感列表与极性判断：
+
+```systemverilog
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) q <= 8'd0;
+    else ...
+end
+```
+
+如果端口声明为 `ActiveLow` 而 `reset(...)` 遗漏了 `active_low`（或反之），`sylc check` 会在展开期直接报错拦截。
+
+## 跨时钟域（`@cdc_sync` 与 `std.cdc`）
+
+默认情况下，`sylc` 禁止在属于 `D_DST` 域的寄存器或组合逻辑中直接读取来自 `D_SRC` 域的信号。安全跨时钟域有两种方式：
+
+### 1. 使用标准库 `std.cdc`
+
+对于单比特控制信号，直接使用 `std.cdc` 中的两级触发器同步器：
+
+```syl
+use std.cdc.Sync2FF
+
+cell Top<D_FAST: Domain, D_SLOW: Domain>(
+    clk_fast: in Clock<D_FAST>,
+    clk_slow: in Clock<D_SLOW>,
+    rst_slow: in Reset<D_SLOW, Sync, ActiveHigh>,
+    req_fast: in Bit,
+    req_slow: out Bit,
+) {
+    let sync = place Sync2FF<D_FAST, D_SLOW>(
+        clk_dst: clk_slow,
+        rst_dst: rst_slow,
+        din: req_fast,
+        dout: req_slow,
+    )
+}
+```
+
+### 2. 编写自定义 `@cdc_sync` 边界同步器
+
+当需要自定义同步器（如多周期握手或格雷码指针同步器）时，使用 `@cdc_sync` 注解标记该 `cell`：
+
+```syl
+@cdc_sync
+cell CustomBitSync<D_SRC: Domain, D_DST: Domain>(
+    clk_dst: in Clock<D_DST>,
+    rst_dst: in Reset<D_DST, Sync, ActiveHigh>,
+    din: in Bit,
+    dout: out Bit,
+) {
+    reg stage1: Bit reset(rst_dst, 0)
+    reg stage2: Bit reset(rst_dst, 0)
+
+    next stage1 := din
+    next stage2 := stage1
+    dout := stage2
+}
+```
+
+`@cdc_sync` 告知 `sylc` 的 CDC DRC 检查器：该 `cell` 是经过审计的跨时钟域边界。切勿将未经握手或格雷码编码的多比特总线直接跨时钟域传输。
+
+## 工程检查清单
+
+- 始终确保 `Reset<D, Mode, Polarity>` 与 `reg ... reset(rst, val, ...)` 的模式和极性完全一致。
+- 优先使用 `std.cdc`，避免重复手写基础同步器。
+- 将 `@cdc_sync` 严格限制在专用的、经过审计的同步器模块上。

@@ -1,0 +1,25 @@
+---
+title: Elaboration vs Hardware
+description: Separate compile-time elaboration (Nat, Bool, fn, for, if) from runtime hardware (Bit, UInt, signal, reg).
+---
+
+Every Syl program executes in two distinct phases:
+
+1. **Elaboration (Compile-Time)**: Evaluates `const`, `fn`, `if`, and `for` to construct a static hardware netlist.
+2. **Hardware (Runtime)**: The resulting `signal`s, `reg`s, `mem`s, and `cell` instances that run on silicon or in simulation.
+
+## Phase Separation Table
+
+| Construct | Phase | Can read `signal`/`reg`? | Generates hardware? |
+| :--- | :--- | :--- | :--- |
+| `Nat`, `Bool` | Elaboration | N/A | No |
+| `fn`, `const` | Elaboration | No | No |
+| `if cond` | Elaboration | No (`cond` is `Bool`) | Only the taken branch |
+| `for i in 0..N` | Elaboration | No (`N` is `Nat`) | `N` unrolled copies |
+| `Bit`, `UInt<W>` | Hardware | Yes | Yes |
+| `signal`, `reg`, `mem` | Hardware | Yes | Yes |
+| `select`, `match` | Hardware | Yes | Yes (muxes) |
+
+## Common Pitfall
+
+You cannot write `if my_signal == 1 { ... }` because `my_signal` is a runtime hardware signal, not a compile-time `Bool`. Use `select` instead.
