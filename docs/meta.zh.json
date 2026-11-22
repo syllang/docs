@@ -3,14 +3,9 @@
   "icon": "docs",
   "pages": [
     "index",
-    "introduction",
-    "migration",
-    "language",
-    "static-checks",
-    "patterns",
-    "tooling",
+    "tutorials",
+    "how-to",
     "reference",
-    "internals",
-    "project"
+    "explanation"
   ]
 }

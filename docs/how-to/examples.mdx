@@ -33,7 +33,7 @@ This script:
 ### 1. Parameterized Blinky / Counter
 
 ```syl
-cell Counter<W: Nat, D: Domain>(
+cell Counter<W: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D, Sync, ActiveHigh>,
     en: in Bit,
@@ -59,7 +59,7 @@ cell NonZeroFilter(
     in_s: in Stream<UInt<8>>.sink,
     out_s: out Stream<UInt<8>>.source,
 ) {
-    signal keep: Bit := in_s.payload != 0
+    signal keep: Bit := not (in_s.payload eq 0)
     out_s.payload := in_s.payload
     out_s.valid := in_s.valid and keep
     in_s.ready := select {
@@ -83,15 +83,15 @@ cell TrafficLight<D: Domain>(
     reg state: LightState reset(rst, LightState.Red)
     next state := select {
         tick => match state {
-            LightState.Red => LightState.Green,
-            LightState.Green => LightState.Yellow,
-            LightState.Yellow => LightState.Red,
+            .Red => LightState.Green,
+            .Green => LightState.Yellow,
+            .Yellow => LightState.Red,
         },
         default => state,
     }
     is_green := match state {
-        LightState.Green => 1,
-        default => 0,
+        .Green => 1,
+        _ => 0,
     }
 }
 ```

@@ -12,7 +12,7 @@ description: 完整的 Syl 参考设计分析。
 ## 1. 计数器（mvp/counter.syl）
 
 ```syl
-cell Counter<W: Nat, D: Domain>(
+cell Counter<W: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
     enable: in Bit,
@@ -34,7 +34,7 @@ cell Counter<W: Nat, D: Domain>(
 
 这个示例展示：
 
-- 泛型参数 `W: Nat` 和 `D: Domain`
+- 泛型参数 `W: nat` 和 `D: Domain`
 - 模块返回值语法 `-> value: UInt<W>`
 - `reg` 寄存器声明和 `reset`
 - `select priority` 多条件选择
@@ -47,14 +47,14 @@ cell Counter<W: Nat, D: Domain>(
 ```syl
 enum AluOp { Add, Xor }
 
-map select_result<W: Nat>(
+map select_result<W: nat>(
     op: AluOp,
     base: UInt<W>,
     xor_value: UInt<W>,
 ) -> UInt<W> =
     match op {
-        AluOp.Add => base + 1,
-        AluOp.Xor => xor_value,
+        .Add => base + 1,
+        .Xor => xor_value,
     }
 ```
 
@@ -114,7 +114,7 @@ skid_buffer 是一个基本的流水线缓冲。它在上下游之间提供一�
 
 ## 4. 流水线 ALU（pipeline_user.syl）
 
-这个示例在[流水线](/zh/docs/patterns/pipeline)文章中已有完整分析。它展示了：
+这个示例在[流水线](/zh/docs/how-to/pipeline)文章中已有完整分析。它展示了：
 
 - 标准库的 `stage_from_stream`、`stage_link`、`stage_to_stream`
 - 多级流水线的组合
@@ -123,9 +123,27 @@ skid_buffer 是一个基本的流水线缓冲。它在上下游之间提供一�
 ## 5. 通道阵列（mvp/lane_array.syl）
 
 ```syl
+bundle Packet<W: nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+
+const LANES: nat = 2
+
+cell Lane<W: nat = 8, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_stream: in Stream<Packet<W>>.sink,
+    out_stream: out Stream<Packet<W>>.source,
+) {
+    out_stream.valid := in_stream.valid
+    out_stream.payload := in_stream.payload
+    in_stream.ready := out_stream.ready
+}
+
 cell MiniTop<
-    W: Nat = DATA_W,
-    N: Nat = LANES,
+    W: nat = DATA_W,
+    N: nat = LANES,
     D: Domain,
 >(
     clk: in Clock<D>,
@@ -167,23 +185,23 @@ use std.stage.stage_to_stream
 use std.stage.halt_link
 use std.stage.drop_link
 
-const DATA_W: Nat = 32
+const DATA_W: nat = 32
 
 enum AluOp { Add, Xor }
 
-bundle AluCmd<W: Nat> {
+bundle AluCmd<W: nat> {
     op: AluOp,
     a: UInt<W>,
     b: UInt<W>,
     last: Bit,
 }
 
-bundle AluRsp<W: Nat> {
+bundle AluRsp<W: nat> {
     data: UInt<W>,
     last: Bit,
 }
 
-cell PipelinedAlu<W: Nat, D: Domain>(
+cell PipelinedAlu<W: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
     stall_decode: in Bit,
@@ -198,7 +216,7 @@ cell PipelinedAlu<W: Nat, D: Domain>(
     let out_stream = place stage_to_stream<AluCmd<W>>(stage: filtered_response)
 
     rsp_out.valid := out_stream.valid
-    rsp_out.payload := AluRsp<W> { data: execute_cmd(decode_cmd(out_stream.payload)), last: out_stream.payload.last }
+    rsp_out.payload := AluRsp<W> { data: out_stream.payload.a + out_stream.payload.b, last: out_stream.payload.last }
     out_stream.ready := rsp_out.ready
 }
 ```

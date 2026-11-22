@@ -24,11 +24,13 @@ Syl 支持三种泛型参数：
 ### 基本用法
 
 ```syl
-cell Counter<W: Nat>(
+cell Counter<W: nat = 8, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
     enable: in Bit,
     count: out UInt<W>,
 ) {
-    reg value: UInt<W>
+    reg value: UInt<W> reset(rst, 0)
     next value := value + 1
     count := value
 }
@@ -48,7 +50,7 @@ let cnt16 = place Counter<16>(enable: en, count: cnt16_out)
 泛型参数可以有默认值：
 
 ```syl
-cell Counter<W: Nat = 8>(
+cell Counter<W: nat = 8>(
     enable: in Bit,
     count: out UInt<W>,
 )
@@ -64,8 +66,8 @@ let cnt32 = place Counter<32>(enable: en, count: out)  // W = 32
 参数值可以是编译期表达式：
 
 ```syl
-const DATA_W: Nat = 32
-const ADDR_W: Nat = clog2(16)
+const DATA_W: nat = 32
+const ADDR_W: nat = clog2(16)
 
 cell Memory(
     data: in UInt<DATA_W>,
@@ -136,7 +138,7 @@ cell Buffer<T, D: Domain>(
 可以在模块体内检查参数合法性：
 
 ```syl
-cell FIFO<W: Nat, D: Domain>(
+cell FIFO<W: nat, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D>,
     data_in: in UInt<W>,
@@ -148,6 +150,7 @@ cell FIFO<W: Nat, D: Domain>(
     if W > 1024 {
         compile_error("FIFO width exceeds implementation limit")
     }
+    data_out := data_in
 }
 ```
 
@@ -162,7 +165,7 @@ cell FIFO<W: Nat, D: Domain>(
 最常见的参数化模式：
 
 ```syl
-cell Adder<W: Nat>(
+cell Adder<W: nat>(
     a: in UInt<W>,
     b: in UInt<W>,
     result: out UInt<W>,
@@ -216,7 +219,7 @@ cell ComputeUnit<T>(
 ### 实例化时省略必选参数
 
 ```syl
-cell Counter<W: Nat>(enable: in Bit, count: out UInt<W>)
+cell Counter<W: nat>(enable: in Bit, count: out UInt<W>)
 
 # let c = place Counter(enable: en, count: out)  // 错误：缺少 W
 ```
@@ -226,7 +229,7 @@ cell Counter<W: Nat>(enable: in Bit, count: out UInt<W>)
 ### 参数值不合法
 
 ```syl
-cell Mem<W: Nat>(data: in UInt<W>) {
+cell Mem<W: nat>(data: in UInt<W>) {
     if W > 64 { compile_error("width too large") }
 }
 

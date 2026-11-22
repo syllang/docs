@@ -1,6 +1,6 @@
 ---
 title: CDC & Async Reset
-description: Write @cdc_sync boundary synchronizers, use std.cdc, and configure Reset<D, Sync|Async, ActiveHigh|ActiveLow> polarity.
+description: Write @cdc_sync(din, dout, clk_dst) boundary synchronizers, use std.cdc, and configure Reset<D, Sync|Async, ActiveHigh|ActiveLow> polarity.
 ---
 
 Clock-Domain Crossing (CDC) bugs and reset polarity mismatches are among the hardest hardware defects to catch in simulation. Syl encodes both **clock domains** (`Domain`) and **reset mode/polarity** (`Reset<D, Mode, Polarity>`) directly in the type system and enforces them during elaboration DRC.
@@ -62,7 +62,7 @@ end
 
 If `rst_n` is declared `ActiveLow` but `reset(...)` omits `active_low` (or vice versa), `sylc check` rejects the design at elaboration time.
 
-## Clock-Domain Crossing (`@cdc_sync` & `std.cdc`)
+## Clock-Domain Crossing (`@cdc_sync(din, dout, clk_dst)` & `std.cdc`)
 
 By default, `sylc` forbids reading a signal from domain `D_SRC` inside a register or combinational path belonging to domain `D_DST`. To cross domains safely:
 
@@ -80,21 +80,21 @@ cell Top<D_FAST: Domain, D_SLOW: Domain>(
     req_fast: in Bit,
     req_slow: out Bit,
 ) {
-    let sync = place Sync2FF<D_FAST, D_SLOW>(
-        clk_dst: clk_slow,
-        rst_dst: rst_slow,
-        din: req_fast,
-        dout: req_slow,
+    let sync = place Sync2FF<D_SLOW>(
+        dst_clk: clk_slow,
+        dst_rst: rst_slow,
+        async_in: req_fast,
     )
+    req_slow := sync
 }
 ```
 
-### 2. Writing Custom `@cdc_sync` Boundary Synchronizers
+### 2. Writing Custom `@cdc_sync(din, dout, clk_dst)` Boundary Synchronizers
 
-When you need a custom synchronizer (such as a multi-cycle handshake or Gray-coded pointer synchronizer), annotate the `cell` with `@cdc_sync`:
+When you need a custom synchronizer (such as a multi-cycle handshake or Gray-coded pointer synchronizer), annotate the `cell` with `@cdc_sync(din, dout, clk_dst)`:
 
 ```syl
-@cdc_sync
+@cdc_sync(din, dout, clk_dst)
 cell CustomBitSync<D_SRC: Domain, D_DST: Domain>(
     clk_dst: in Clock<D_DST>,
     rst_dst: in Reset<D_DST, Sync, ActiveHigh>,
@@ -110,20 +110,20 @@ cell CustomBitSync<D_SRC: Domain, D_DST: Domain>(
 }
 ```
 
-The `@cdc_sync` attribute tells `sylc`'s CDC DRC pass that this `cell` is an intentional, audited domain-crossing boundary. Multi-bit buses without handshake/Gray-code synchronization should still never be passed raw across domains.
+The `@cdc_sync(din, dout, clk_dst)` attribute tells `sylc`'s CDC DRC pass that this `cell` is an intentional, audited domain-crossing boundary. Multi-bit buses without handshake/Gray-code synchronization should still never be passed raw across domains.
 
 ## Checklist
 
 - Always match `Reset<D, Mode, Polarity>` with `reg ... reset(rst, val, ...)`.
 - Prefer `std.cdc` over hand-rolled synchronizers whenever possible.
-- Restrict `@cdc_sync` to dedicated, audited synchronizer cells.
+- Restrict `@cdc_sync(din, dout, clk_dst)` to dedicated, audited synchronizer cells.
 
 ## Error Comparison & Troubleshooting
 
 | Diagnostic / Mistake | Why It Fails | Correct Pattern |
 | :--- | :--- | :--- |
 | `reg q reset(rst_n, 0)` on `Reset<D, Async, ActiveLow>` | Polarity/mode mismatch between port and `reg` | `reg q reset(rst_n, 0, async, active_low)` |
-| Reading `D_A` signal inside `D_B` `reg` | Unsynchronized clock-domain crossing | Route through `std.cdc.Sync2FF` or `@cdc_sync` cell |
+| Reading `D_A` signal inside `D_B` `reg` | Unsynchronized clock-domain crossing | Route through `std.cdc.Sync2FF` or `@cdc_sync(din, dout, clk_dst)` cell |
 | Passing `UInt<8>` directly through `Sync2FF` | Multi-bit bus skew across 2-FF synchronizer | Use `std.cdc` handshake or Gray-code FIFO |
 
 ## Complete Multi-Domain Example
@@ -142,11 +142,11 @@ cell DualDomainBridge<D_FAST: Domain, D_SLOW: Domain>(
     reg req_latched: Bit reset(rst_fast, 0, async, active_low)
     next req_latched := trigger_fast
 
-    let sync = place Sync2FF<D_FAST, D_SLOW>(
-        clk_dst: clk_slow,
-        rst_dst: rst_slow,
-        din: req_latched,
-        dout: ack_slow,
+    let sync = place Sync2FF<D_SLOW>(
+        dst_clk: clk_slow,
+        dst_rst: rst_slow,
+        async_in: req_latched,
     )
+    ack_slow := sync
 }
 ```

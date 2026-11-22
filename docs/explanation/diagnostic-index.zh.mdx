@@ -63,8 +63,6 @@ description: Syl 编译器各阶段诊断代码的完整权威列表。
 | 代码 | 级别 | 描述 |
 |------|------|------|
 | `E_MIDDLE_DUPLICATE_HARDWARE_DRIVER` | error | 多驱动冲突：同一信号被多个来源驱动 |
-| `E_MIDDLE_MISSING_HARDWARE_DRIVER` | error | 缺失驱动：`out` 端口或输出信号未被驱动 |
-| `E_MIDDLE_OVERLAPPING_HARDWARE_DRIVER` | error | 重叠驱动：`select unique` 分支条件可能同时为真 |
 | `E_MIDDLE_CDC_VIOLATION` | error | 跨时钟域违规：未经 `@cdc_sync` 同步的跨域采样 |
 | `E_MIDDLE_INPLACE_ON_CDC_SYNC` | error | 禁止对 `@cdc_sync` 模块使用 `inplace` 内联展开 |
 | `E_MIDDLE_INPLACE_ON_EXTERN_CELL` | error | 禁止对 `extern cell` 使用 `inplace` |

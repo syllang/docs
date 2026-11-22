@@ -14,7 +14,7 @@ If you are coming from Verilog or SystemVerilog, Syl replaces implicit latches, 
 | `always_comb` | `signal` + `select priority/unique` | No accidental latches; exhaustiveness checked. |
 | `always_ff @(posedge clk)` | `reg r: UInt<8> reset(rst, 0)` + `next r := ...` | Clock domain & reset polarity checked at compile time. |
 | `generate for (genvar i=0; ...)` | `for i in 0..N { ... }` | Elaboration-time structural unrolling. |
-| `localparam` / `parameter` | `const` / `<W: Nat>` | Compile-time `Nat` and `Bool` types. |
+| `localparam` / `parameter` | `const` / `<W: nat>` | Compile-time `Nat` and `Bool` types. |
 | `struct packed` | `bundle` | Strongly typed, nestable. |
 | `interface` + `modport` | `interface` + `view` | Directional views enforced on `cell` ports. |
 
@@ -71,15 +71,15 @@ cell UartFsm<D: Domain>(
     reg state: UartState reset(rst, UartState.Idle)
 
     next state := match state {
-        UartState.Idle => select { start_tx => UartState.Start, default => UartState.Idle },
-        UartState.Start => UartState.Data,
-        UartState.Data => select { bit_done => UartState.Stop, default => UartState.Data },
-        UartState.Stop => UartState.Idle,
+        .Idle => select { start_tx => UartState.Start, default => UartState.Idle },
+        .Start => UartState.Data,
+        .Data => select { bit_done => UartState.Stop, default => UartState.Data },
+        .Stop => UartState.Idle,
     }
 
     busy := match state {
-        UartState.Idle => 0,
-        default => 1,
+        .Idle => 0,
+        _ => 1,
     }
 }
 ```
@@ -89,13 +89,17 @@ cell UartFsm<D: Domain>(
 SystemVerilog `generate for (genvar i = 0; i < N; i = i + 1)` maps directly to Syl's elaboration-time `for i in 0..N`:
 
 ```syl
-cell VectorAnd<N: Nat>(
+cell BitAnd(a: in Bit, b: in Bit, y: out Bit) {
+    y := a and b
+}
+
+cell VectorAnd<N: nat = 8,>(
     a: in [N] Bit,
     b: in [N] Bit,
     y: out [N] Bit,
 ) {
-    for i in 0..N {
-        y[i] := a[i] and b[i]
+    let lanes = for i in 0..N {
+        place BitAnd(a: a[i], b: b[i], y: y[i])
     }
 }
 ```

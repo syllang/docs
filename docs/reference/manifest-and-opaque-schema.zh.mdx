@@ -89,10 +89,10 @@ Opaque Summary 用于描述 `extern cell` 的内部驱动、消费与时钟域�
       "endpoints": [],
       "driven_fields": ["out_data", "out_valid"],
       "consumed_fields": ["in_data", "in_valid"],
-      "domain_behavior": "same_domain",
-      "latency_class": "registered",
+      "domain_behavior": "clockless",
+      "latency_class": "sequential",
       "protocol_preservation": "preserved",
-      "trust_boundary": "trusted",
+      "trust_boundary": "trusted_precompiled",
       "backend_constraints": []
     }
   ]
@@ -109,8 +109,8 @@ kind = "extern_cell"
 callable = "VendorCdcBridge"
 driven_fields = ["dst_data", "dst_valid"]
 consumed_fields = ["src_data", "src_valid"]
-domain_behavior = "cdc_crossings"
-latency_class = "registered"
+domain_behavior = "clockless"
+latency_class = "sequential"
 ```
 
 ---

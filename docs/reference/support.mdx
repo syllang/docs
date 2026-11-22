@@ -20,7 +20,7 @@ Before asking for help, try the following checks:
 5. Check `reg` reset declarations: ensure `reset(rst, value)` matches the clock domain.
 6. Check `let` vs. `signal`: `let` is a name alias, while `signal` creates a hardware wire.
 
-Compiler diagnostics include source locations and error codes that you can look up in [Diagnostics](./diagnostics).
+Compiler diagnostics include source locations and error codes that you can look up in [Diagnostics](/docs/reference/diagnostics).
 
 ## Understanding Compiler Output
 
@@ -76,6 +76,6 @@ See `CONTRIBUTING.md` in the repository. Contributions are especially welcome in
 When compilation fails, work through errors in this order:
 
 1. **Fix the first error:** Subsequent errors are often cascading effects of the first one.
-2. **Look up the error code:** Search the code (e.g., `E_MIDDLE_TYPE_MISMATCH`) in [Diagnostics](./diagnostics).
+2. **Look up the error code:** Search the code (e.g., `E_MIDDLE_TYPE_MISMATCH`) in [Diagnostics](/docs/reference/diagnostics).
 3. **Minimize the reproduction:** Strip unrelated modules and signals down to the smallest failing `.syl` file.
 4. **Check recent changes:** Isolate what changed since the last working build.

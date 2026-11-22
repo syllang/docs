@@ -10,19 +10,19 @@ Using register arrays (`reg arr: [DEPTH] UInt<W>`) for large memories forces syn
 Declare a memory array with `mem`:
 
 ```syl
-cell SimpleDualPortRam<W: Nat, DEPTH: Nat, D: Domain>(
+cell SimpleDualPortRam<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, D: Domain>(
     clk: in Clock<D>,
     we: in Bit,
-    waddr: in UInt<clog2(DEPTH)>,
+    waddr: in UInt<ADDR_W>,
     wdata: in UInt<W>,
     re: in Bit,
-    raddr: in UInt<clog2(DEPTH)>,
+    raddr: in UInt<ADDR_W>,
     rdata: out UInt<W>,
 ) {
     mem ram: [DEPTH] UInt<W>
 
-    mem_write(ram, waddr, wdata, we)
-    rdata := mem_read_sync(ram, raddr, re)
+    mem_write(ram, clk, we, waddr, wdata)
+    mem_read_sync(ram, clk, re, raddr, rdata)
 }
 ```
 
@@ -45,20 +45,29 @@ For common memory topologies, import `std.mem` instead of writing raw primitives
 `std.fifo.SyncFifo` combines `mem` storage with read/write pointers and `Stream<T>` handshake interfaces:
 
 ```syl
-use std.stream.Stream
 use std.fifo.SyncFifo
 
 cell FifoWrapper<D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D, Sync, ActiveHigh>,
-    in_stream: in Stream<UInt<32>>.sink,
-    out_stream: out Stream<UInt<32>>.source,
+    push: in Bit,
+    pop: in Bit,
+    wdata: in UInt<32>,
+    rdata: out UInt<32>,
+    full: out Bit,
+    empty: out Bit,
+    count: out UInt<7>,
 ) {
-    let fifo = place SyncFifo<UInt<32>, 64, D>(
+    let fifo = place SyncFifo<32, 64, 6, 7, D>(
         clk: clk,
         rst: rst,
-        input: in_stream,
-        output: out_stream,
+        push: push,
+        pop: pop,
+        wdata: wdata,
+        rdata: rdata,
+        full: full,
+        empty: empty,
+        count: count,
     )
 }
 ```
@@ -80,7 +89,7 @@ cell FifoWrapper<D: Domain>(
 ## Complete Parameterized Ring-Buffer Example
 
 ```syl
-cell RingBuffer<W: Nat, DEPTH: Nat, D: Domain>(
+cell RingBuffer<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, CNT_W: nat = 7, D: Domain>(
     clk: in Clock<D>,
     rst: in Reset<D, Sync, ActiveHigh>,
     push: in Bit,
@@ -91,25 +100,27 @@ cell RingBuffer<W: Nat, DEPTH: Nat, D: Domain>(
     full: out Bit,
 ) {
     mem storage: [DEPTH] UInt<W>
-    reg wptr: UInt<clog2(DEPTH)> reset(rst, 0)
-    reg rptr: UInt<clog2(DEPTH)> reset(rst, 0)
-    reg count: UInt<clog2(DEPTH) + 1> reset(rst, 0)
+    reg wptr: UInt<ADDR_W> reset(rst, 0)
+    reg rptr: UInt<ADDR_W> reset(rst, 0)
+    reg count: UInt<CNT_W> reset(rst, 0)
 
-    signal do_push: Bit := push and !full
-    signal do_pop: Bit := pop and !empty
+    signal is_empty: Bit := count eq 0
+    signal is_full: Bit := count eq DEPTH
+    signal do_push: Bit := push and not is_full
+    signal do_pop: Bit := pop and not is_empty
 
-    mem_write(storage, wptr, wdata, do_push)
-    rdata := mem_read_sync(storage, rptr, do_pop)
+    mem_write(storage, clk, do_push, wptr, wdata)
+    mem_read_sync(storage, clk, do_pop, rptr, rdata)
 
     next wptr := select { do_push => wptr + 1, default => wptr }
     next rptr := select { do_pop => rptr + 1, default => rptr }
     next count := select {
-        do_push and !do_pop => count + 1,
-        !do_push and do_pop => count - 1,
+        do_push and not do_pop => count + 1,
+        not do_push and do_pop => count - 1,
         default => count,
     }
 
-    empty := count == 0
-    full := count == DEPTH
+    empty := is_empty
+    full := is_full
 }
 ```
