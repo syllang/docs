@@ -1,0 +1,72 @@
+---
+title: Bounds and Indexing
+description: How the Syl compiler checks array indices and bit-slice bounds.
+---
+
+# Bounds and Indexing
+
+The Syl compiler verifies that array indices and bit selections fall within valid bounds. This page explains the checking rules.
+
+---
+
+## Array Index Checking
+
+### Within Bounds
+
+```syl
+signal arr: [4] UInt<8>
+signal x: UInt<8> := arr[0]    // Valid
+signal y: UInt<8> := arr[3]    // Valid
+signal z: UInt<8> := arr[4]    // Error: index 4 is out of range 0-3
+```
+
+### Compile-Time Indices
+
+Indices known at compile time are checked statically. Runtime indices (provided by hardware signals) cannot be fully checked at compile time.
+
+```syl
+const IDX: Nat = 2
+signal a: UInt<8> := arr[IDX]     // Valid: known at compile time
+signal sel: UInt<8>
+signal b: UInt<8> := arr[sel]     // Runtime selection, not checked at compile time
+```
+
+## Bit Selection Checking
+
+```syl
+signal value: UInt<8>
+signal low: Bit := value[0]        // Valid
+signal high: Bit := value[7]       // Valid
+# signal out_of_range: Bit := value[8]  // Error: bit 8 is out of range for UInt<8>
+```
+
+## Range Slice Checking
+
+```syl
+signal value: UInt<8>
+signal nibble: UInt<4> := value[0..4]    // Valid
+# signal bad: UInt<4> := value[4..9]     // Error: end index 9 is out of range
+```
+
+## Common Mistakes
+
+### Array Out of Bounds
+
+```syl
+signal arr: [4] UInt<8>
+signal x: UInt<8> := arr[4]    // Error
+```
+
+### Bit Selection Out of Bounds
+
+```syl
+signal value: UInt<8>
+signal b: Bit := value[8]      // Error: only 0-7 are valid
+```
+
+### Reversed Range Order
+
+```syl
+signal value: UInt<8>
+# signal x: UInt<4> := value[4..0]  // Error: in [start..end], start must be < end
+```

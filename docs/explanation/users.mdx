@@ -1,0 +1,151 @@
+---
+title: Users Guide
+description: Target users and suitable use cases for Syl.
+---
+
+# Users Guide
+
+This page explains who Syl is designed for and what kinds of projects it fits best, helping you decide whether Syl is right for you.
+
+---
+
+## Who Syl Is For
+
+**Students learning hardware description languages.** The Syl compiler performs thorough compile-time checks with clear error messages, making it well suited for learning digital circuit design.
+
+**Engineers exploring language design.** One of Syl's core goals is static analyzability. If you are interested in this direction, Syl is a working research platform.
+
+**Teams doing rapid architecture prototyping.** If your team needs to validate hardware architectures early, Syl catches connection and width errors at compile time, reducing simulation turnaround.
+
+## Who Syl Is Not For
+
+**Production tape-out teams.** Syl is still in an early stage and the compiler may contain undiscovered bugs. It is not recommended for tape-out projects.
+
+**Teams requiring mature ecosystems.** Waveform debugging, coverage analysis, and full IDE integrations are still evolving. If you need a battle-tested toolchain, consider Verilog or VHDL.
+
+**Mixed-signal designers.** Syl only supports digital circuit description, not analog or mixed-signal design.
+
+## Suitable Project Types
+
+Syl is well suited for:
+
+- Small digital modules (counters, adders, shift registers)
+- Finite state machines (FSMs)
+- Stream interface processing logic
+- Pipelined datapaths
+- Protocol parsers
+
+## Typical Workflow
+
+A typical workflow with Syl:
+
+1. Describe the hardware design in Syl
+2. Run the `sylc` compiler to check for compile-time errors
+3. Fix type mismatches, missing connections, and driver conflicts based on compiler diagnostics
+4. Emit SystemVerilog code from the compiler
+5. Verify the emitted SV with standard simulation tools (e.g., Verilator)
+6. Synthesize the SV into a netlist using standard synthesis tools (e.g., Yosys)
+
+## Learning Path
+
+If you are new to Syl, we recommend the following order:
+
+1. Read "What is Syl" to understand the core concepts
+2. Read the Language Basics section to learn the type system and syntax
+3. Explore the example designs in `examples/mvp/`
+4. Modify the examples and observe the compiler's diagnostics
+5. Read the Patterns section for interfaces, pipelines, and common idioms
+
+## Migrating from Other Languages
+
+If you are coming from another HDL, here is a quick mapping:
+
+**From Verilog.** Syl's `cell` corresponds to Verilog's `module`, `:=` corresponds to `assign`, and `next` corresponds to sequential logic. Port directions are mandatory in Syl and cannot be omitted. `inout` ports must be declared explicitly and are never inferred.
+
+**From Chisel.** Chisel's `Wire` corresponds to Syl's `signal`, `RegInit` corresponds to `reg reset(rst, init)`, and `:=` has similar semantics. Syl does not require importing a host library.
+
+**From SpinalHDL.** SpinalHDL's `Bool` corresponds to Syl's `Bit`, `Bits(width)` corresponds to `UInt<W>`, and `Area` corresponds to `cell`.
+
+## Writing Maintainable Syl Code
+
+### Naming Conventions
+
+- Module names in PascalCase: `Counter`, `StreamBuffer`
+- Port and signal names in snake_case or camelCase: `data_in`, `valid`, `ready`
+- Constants in UPPER_CASE: `DATA_WIDTH`, `FIFO_DEPTH`
+- Type parameters as single uppercase letters: `W`, `T`, `D`
+
+### Module Organization
+
+A file typically contains one primary module and its related type definitions. Closely related modules can live in the same file. Cross-file references use `use` path imports.
+
+### Comments
+
+Syl uses `#` for line comments. Comments should explain *why* something is done—the code itself already expresses *what* it does.
+
+## Example Projects
+
+The `examples/` directory in the repository includes these reference designs:
+
+- `mvp/counter.syl`: counter with enable and reset
+- `mvp/lane_array.syl`: lane array demonstrating generic parameters and arrays
+- `mvp/stream_buffer.syl`: stream buffer demonstrating interfaces and views
+- `mvp/com_alu.syl`: combinational ALU demonstrating `map` and `match`
+- `pipeline_user.syl`: pipelined ALU demonstrating `Stream` and `Stage` from the standard library
+
+## Recommended File Layout
+
+A typical Syl project layout:
+
+```
+project/
+├── src/
+│   ├── top.syl       # Top-level module
+│   ├── counter.syl   # Submodule
+│   └── types.syl     # Type definitions
+├── vendor/
+│   └── ip.syl        # External module declarations
+└── build.sv          # Compiler output
+```
+
+Pass all source files when compiling:
+
+```
+sylc src/top.syl src/counter.syl src/types.syl vendor/ip.syl -o build.sv
+```
+
+## Common Errors and Fixes
+
+### Port Direction Error
+
+```syl
+cell Bad(x: in Bit) {
+    x := 1  // Error: 'in' port cannot be driven
+}
+```
+
+`in` ports are driven externally and can only be read inside the module. Use `out` if the module needs to drive the port.
+
+### Type Width Mismatch
+
+```syl
+cell Bad(x: in UInt<8>, y: out UInt<16>) {
+    y := x  // Error: UInt<8> cannot be assigned to UInt<16>
+}
+```
+
+An 8-bit signal cannot be assigned directly to a 16-bit port. Use an explicit type conversion or extension.
+
+### Unconnected Port
+
+```syl
+cell Sub(a: in Bit, b: out Bit) { }
+
+cell Top(y: out Bit) {
+    let inst = place Sub(a: y)  // Error: port 'b' not connected
+}
+```
+
+All ports must be connected at instantiation. Unconnected ports are reported as compile-time errors.
+
+Each example can be compiled standalone: `sylc examples/mvp/counter.syl`.

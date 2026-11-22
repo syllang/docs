@@ -1,0 +1,83 @@
+---
+title: Missing Drivers
+description: How the Syl compiler detects undriven outputs and missing assignments.
+---
+
+# Missing Drivers
+
+The Syl compiler checks that every `out` port and output signal is assigned. Every output must have at least one driver.
+
+---
+
+## Checking Rules
+
+Every `out` port must be driven inside the module:
+
+```syl
+cell Bad(y: out Bit) {
+    // Error: y is not driven
+}
+```
+
+```syl
+cell Good(y: out Bit) {
+    y := 1    // Valid
+}
+```
+
+## Conditional Assignment
+
+When a port is driven by a conditional expression, the compiler checks that all branches are covered:
+
+```syl
+cell Conditional(y: out Bit, enable: in Bit) {
+    y := select {
+        enable => 1,
+        default => 0,
+    }
+    // Valid: all branches drive y
+}
+```
+
+## Driving via Instantiation
+
+If a port is connected to a submodule instance's output, the submodule counts as its driver:
+
+```syl
+cell Top(y: out Bit) {
+    let d = place Driver(y: y)
+    // Valid: Driver drives y
+}
+```
+
+## Common Mistakes
+
+### Forgetting to Connect an Output
+
+```syl
+cell Top(y: out Bit) {
+    // Error: y is neither assigned nor connected
+}
+```
+
+### Uncovered Conditional Branches
+
+```syl
+cell Top(y: out Bit, sel: in Bit) {
+    signal internal: UInt<8>
+    y := select {
+        sel => 1,
+        // missing default branch
+    }
+}
+```
+
+Ensure `select` or `match` covers all cases.
+
+### Unbound Module Return Value
+
+```syl
+cell Top -> result: UInt<8> {
+    // Error: result is not assigned
+}
+```

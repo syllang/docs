@@ -1,0 +1,31 @@
+{
+  "title": "Explanation",
+  "icon": "lightbulb",
+  "pages": [
+    "index",
+    "---Design Philosophy---",
+    "what-is-syl",
+    "why-static-analyzability",
+    "users",
+    "---Static Analysis Model---",
+    "driver-overlap",
+    "missing-drivers",
+    "capability-violations",
+    "bounds-and-indexing",
+    "aggregate-completeness",
+    "width-and-type-mismatches",
+    "cdc-and-reset-domains",
+    "cycles-and-disambiguation",
+    "diagnostic-index",
+    "---Compiler Internals & Incremental Engine---",
+    "pipeline",
+    "salsa-incremental-architecture",
+    "syntax-ast",
+    "hir-and-tir",
+    "const-mir-and-map-ir",
+    "elab-and-eir",
+    "hw-and-sv-ir",
+    "repository-map",
+    "testing-and-contributing"
+  ]
+}

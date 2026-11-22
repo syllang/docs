@@ -1,0 +1,31 @@
+{
+  "title": "原理解析",
+  "icon": "lightbulb",
+  "pages": [
+    "index",
+    "---设计哲学与定位---",
+    "what-is-syl",
+    "why-static-analyzability",
+    "users",
+    "---静态分析模型---",
+    "driver-overlap",
+    "missing-drivers",
+    "capability-violations",
+    "bounds-and-indexing",
+    "aggregate-completeness",
+    "width-and-type-mismatches",
+    "cdc-and-reset-domains",
+    "cycles-and-disambiguation",
+    "diagnostic-index",
+    "---编译器内部与增量引擎---",
+    "pipeline",
+    "salsa-incremental-architecture",
+    "syntax-ast",
+    "hir-and-tir",
+    "const-mir-and-map-ir",
+    "elab-and-eir",
+    "hw-and-sv-ir",
+    "repository-map",
+    "testing-and-contributing"
+  ]
+}

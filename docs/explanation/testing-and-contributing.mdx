@@ -1,0 +1,44 @@
+---
+title: Testing and Contributing
+description: How to run quality_gate.sh, check_std_sim.sh (Verilator + Yosys), understand the no-inline-tests rule, and pass public API snapshot checks.
+---
+
+# Testing and Contributing
+
+Welcome to Testing and Contributing! This page helps new contributors get up to speed on running the test suite, understanding the multi-layer verification architecture (Verilator simulation, Yosys synthesis, architecture contracts, golden tests, and conformance tests), and following repository conventions.
+
+---
+
+## Running Tests and the Quality Gate
+
+Run the full quality gate from the repository root:
+
+```bash
+./scripts/quality_gate.sh
+```
+
+`quality_gate.sh` executes in order:
+1. `cargo fmt --all --check`
+2. `cargo clippy --workspace --all-targets -- -D warnings`
+3. `cargo test --workspace --all-targets --no-fail-fast`
+4. `scripts/parser_fuzz_smoke.sh`
+5. `scripts/check_examples.sh` (compiles examples, runs Verilator lint, and invokes `scripts/check_std_sim.sh`)
+6. `scripts/check_docs_syl.py` (parses all ```` ```syl ```` blocks across `*.md` files)
+7. `scripts/check_public_api.py --check` (public API snapshot and consumer validation)
+8. `cargo doc --workspace --no-deps`
+9. `git diff --check`, debt-marker scan (`MUST_FIX|SHOULD_FIX|FIXME|TODO|HACK|XXX`), and stray file checks
+
+## Testing Architecture
+
+1. **Unit tests (No Inline Tests Rule)**: Non-test production files under `crates/*/src/` contain **zero inline `#[test]` items**. Tests live in separate `*tests.rs` / `tests.rs` submodules or `crates/*/tests/` integration files. Additionally, `architecture_rust_files_stay_under_700_lines` enforces `< 700` code lines per `.rs` file.
+2. **Architecture contract tests (`sylc/tests/architecture_*.rs`)**: Enforce crate dependency boundaries and stage output contracts across Phases 1–8.
+3. **Golden & Conformance tests**: Byte-for-byte SV comparisons in `sylc/tests/golden/` and positive/negative `.syl` + `.codes` suites in `conformance/`.
+4. **Stdlib Simulation & Synthesis (`scripts/check_std_sim.sh`)**: Compiles 6 stdlib packages (`pulse`, `skid`, `arbiter`, `cdc`, `mem`, `fifo`), runs Verilator C++ co-simulation against `tests/sim/<package>_test.cpp`, and runs Yosys synthesis checks (`hierarchy -check; proc; memory; check -assert; stat`) on `mem.sv` and `cdc.sv`.
+5. **Public API Snapshot (`scripts/check_public_api.py --check`)**: Extracts rustdoc JSON for all workspace library crates, forbids public glob re-exports, diffs against `api/public-surface.txt`, and validates `api/public-api-consumers.md`.
+
+## Contributing Workflow
+
+1. Keep PRs focused on a single issue.
+2. Document what changed, why, and how it was verified.
+3. Update `api/public-surface.txt` if public APIs change.
+4. Ensure `./scripts/quality_gate.sh` passes locally before submitting.

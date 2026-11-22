@@ -1,0 +1,72 @@
+---
+title: Elaboration and EIR
+description: Deep dive into the elaboration stage — targeted module_eir_stage, EirModule::disambiguate, mem primitive lowering, and DRC.
+---
+
+# Elaboration and EIR
+
+Welcome to the Elaboration and EIR chapter! This page dives into the most complex stage of the compiler: elaboration. We review its inputs and outputs, walk through its 9-step internal pipeline, highlight targeted `module_eir_stage` construction, `EirModule::disambiguate`, `mem` primitive lowering, EIR data structures, and Design Rule Checks (DRC), and conclude with HW IR lowering.
+
+---
+
+## Inputs and Outputs
+
+Elaboration takes TIR, Const MIR, and Map IR from semantic analysis and produces EIR (Elaborated IR) and HW IR (Hardware IR):
+
+```mermaid
+flowchart LR
+    TIR["TIR"]
+    CM["Const MIR"]
+    MI["Map IR"]
+    Elab["Elaboration Pipeline"]
+    EIR["EIR"]
+    HW["HW IR"]
+
+    TIR --> Elab
+    CM --> Elab
+    MI --> Elab
+    Elab --> EIR
+    Elab --> HW
+```
+
+## The 9-Step Elaboration Pipeline
+
+```mermaid
+flowchart TB
+    CM1["1. Const MIR Eval\nExpand fn calls"]
+    MI1["2. Map IR Eval\nExpand map calls"]
+    EB["3. EIR Construction\nTargeted module_eir_stage"]
+    EV["4. EIR Validation\nUniqueness & Disambiguation"]
+    EF["5. Fact Collection\nCreate / Drive / Read"]
+    EC["6. EIR Composition\nMerge structure & facts"]
+    DF["7. Driver Facts\nDetailed drive records"]
+    DR["8. DRC\nMulti-drive / Missing / CDC / RAM"]
+    HL["9. HW IR Lowering"]
+
+    CM1 --> MI1
+    MI1 --> EB
+    EB --> EV
+    EV --> EF
+    EF --> EC
+    EC --> DF
+    DF --> DR
+    DR --> HL
+```
+
+1. **Const MIR evaluation**: evaluates `fn` calls for generic widths, array sizes, and constant conditions.
+2. **Map IR evaluation**: inlines pure combinational `map` calls.
+3. **EIR construction (`module_eir_stage` & `mem` lowering)**: in `syl_elab/src/pipeline/module_stage.rs`, `module_eir_stage` builds EIR per canonical module path (driven by Salsa's `owner_module_eir`). It converts `signal`/`reg` declarations to EIR objects, `:=`/`next` to EIR drives, `place`/`inplace` to instances (rejecting `inplace` on `@cdc_sync`), and lowers `mem` primitives (`EirItem::MemoryDecl`, `MemoryWrite`, `MemorySyncRead`).
+4. **EIR validation & disambiguation**: checks structural invariants and runs `EirModule::disambiguate` in `output_from_modules` to qualify colliding module names as `canonical_path.join("__")` or with an FNV-1a 32-bit hash suffix, rewriting `EirItem::Instance::module`.
+5. **Fact collection**: records creation, drive, and read relationships for every EIR object.
+6. **EIR composition**: merges raw EIR and collected facts into `EirDesign`.
+7. **Driver fact collection**: records per-drive module, kind (combinational vs. sequential), guard condition, and source span.
+8. **Design Rule Checks (DRC)**: detects multiple drivers, missing drivers, overlapping `select unique` drivers, unsynchronized CDC crossings (`CdcChecker`), and non-mutually-exclusive memory write ports (`MemoryPortDrcChecker`).
+9. **HW IR lowering**: lowers EIR into backend-independent HW IR.
+
+## EIR Data Structures
+
+- **`EirModule`**: corresponds to an elaborated module, holding its name, ports, objects, drives, and `cdc_crossings` summary.
+- **`EirObject`**: represents a signal or storage element with module, name, bit width, kind (`Signal` or `Storage`), and origin.
+- **`EirDrive`**: represents an assignment with target, value expression, drive kind, guard, and origin.
+
+EIR is strictly isolated from the backend—the backend only consumes HW IR.

@@ -1,0 +1,81 @@
+---
+title: Driver Overlap
+description: How the Syl compiler detects multiple-driver and overlapping-driver conflicts.
+---
+
+# Driver Overlap
+
+The Syl compiler detects when the same signal is driven by multiple sources. Multiple drivers are a common source of hardware bugs.
+
+---
+
+## Checking Rules
+
+Each signal may have only one continuous driver.
+
+```syl
+signal s: Bit
+s := a
+# s := b    // Error: s is already driven
+```
+
+## Handling Conditional Assignments
+
+When you need conditional assignment, use `select`:
+
+```syl
+signal s: Bit := select {
+    a => 1,
+    b => 0,
+    default => s,
+}
+```
+
+All branches of a `select` expression share a single driver.
+
+## Module Instantiation
+
+When instantiating another module, if the submodule drives a signal, the compiler treats that submodule as a driver:
+
+```syl
+extern cell Driver(y: out Bit)
+
+cell Top(ext_sig: out Bit) {
+    let d = place Driver(y: ext_sig)
+    // ext_sig := 1    // Error: already driven by Driver
+}
+```
+
+## Overlapping Driver Detection
+
+In `select unique` mode, the compiler checks whether conditions can overlap:
+
+```syl
+signal s: Bit := select unique {
+    a => 1,
+    b => 1,
+    default => 0,
+}
+```
+
+If `a` and `b` can both be true at the same time under `unique` mode, the compiler reports an overlapping-driver error.
+
+## Common Mistakes
+
+### Multiple Assignments to the Same Signal
+
+```syl
+signal s: Bit
+s := cond1
+s := cond2    // Error
+```
+
+### Conflicting Branches in select
+
+```syl
+signal s: Bit := select unique {
+    a => 1,
+    a => 0,    // Error: duplicate condition
+    default => 0,
+}
+```
