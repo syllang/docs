@@ -70,3 +70,59 @@ cell AxiSlave(
 - **Single-interface** (`Stream<T>`): Ideal for point-to-point unidirectional channels.
 - **Multi-interface**: Complex buses (like AXI4) group separate `AxiWriteAddr`, `AxiWriteData`, and `AxiWriteResp` channels so each channel can be independently buffered or pipelined.
 - **`std.bundle`**: Provides helper utilities for packing, unpacking, and width-safe bundle transformations.
+
+## Multi-Interface Bus Example (AXI4-Lite Write)
+
+Complex bus protocols group multiple independent channels so each channel can be buffered or pipelined separately:
+
+```syl
+bundle AxiLiteAddr {
+    addr: UInt<32>,
+    prot: UInt<3>,
+}
+
+bundle AxiLiteWData {
+    data: UInt<32>,
+    strb: UInt<4>,
+}
+
+interface AxiLiteAw {
+    payload: AxiLiteAddr
+    valid: Bit
+    ready: Bit
+
+    view master { out payload, out valid, in ready }
+    view slave  { in payload, in valid, out ready }
+}
+
+interface AxiLiteW {
+    payload: AxiLiteWData
+    valid: Bit
+    ready: Bit
+
+    view master { out payload, out valid, in ready }
+    view slave  { in payload, in valid, out ready }
+}
+
+interface AxiLiteB {
+    resp: UInt<2>
+    valid: Bit
+    ready: Bit
+
+    view master { in resp, in valid, out ready }
+    view slave  { out resp, out valid, in ready }
+}
+```
+
+## Using `std.bundle` Utilities
+
+`std.bundle` provides helpers for packing and unpacking `bundle` types to/from flat `UInt<W>` vectors when interfacing with `extern cell`s or memory primitives.
+
+## Interface Design Checklist
+
+| Rule | Rationale |
+| :--- | :--- |
+| **Symmetric views** | Every `out` in `master` must be `in` in `slave` (and vice versa). |
+| **Explicit direction** | Never leave a signal undirected inside a `view`. |
+| **Bundle payloads** | Group data fields into a `bundle` so `Stream<T>` and `SyncFifo<T>` can wrap them generically. |
+| **Independent channels** | Separate request and response channels to avoid combinational deadlocks. |

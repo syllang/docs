@@ -54,3 +54,66 @@ for i in 0..LANES {
 
 1. **Validate early**: Guard every generic `cell` with `check_fn` or `compile_error` so invalid parameters fail with a clear message instead of downstream width mismatches.
 2. **Watch `for` loop area**: `for i in 0..1024` elaborates 1024 physical hardware copies.
+
+## Parameterized `bundle` and `map`
+
+Generics work on `bundle` and `map` as well as `cell`:
+
+```syl
+bundle Packet<W: Nat> {
+    data: UInt<W>,
+    parity: Bit,
+}
+
+map zero_packet<W: Nat>() -> Packet<W> = Packet<W> {
+    data: 0,
+    parity: 0,
+}
+```
+
+## Compile-Time `const` and `fn`
+
+Use `const` and `fn` to compute derived widths (such as `clog2`) at elaboration time:
+
+```syl
+fn clog2(n: Nat) -> Nat {
+    var v: Nat = n - 1
+    var r: Nat = 0
+    while v > 0 {
+        v = v >> 1
+        r = r + 1
+    }
+    return r
+}
+
+const ADDR_W: Nat = clog2(64) -- evaluates to 6
+```
+
+## Conditional Hardware Generation (`if` / `else`)
+
+Because `if` requires a compile-time `Bool`, untaken branches generate zero hardware:
+
+```syl
+cell OptionalRegister<W: Nat, BYPASS: Bool, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    din: in UInt<W>,
+    dout: out UInt<W>,
+) {
+    if BYPASS {
+        dout := din
+    } else {
+        reg r: UInt<W> reset(rst, 0)
+        next r := din
+        dout := r
+    }
+}
+```
+
+## Parameter Validation Summary
+
+| Mechanism | When Checked | Use Case |
+| :--- | :--- | :--- |
+| `check_fn` | Before `cell` elaboration | Enforce power-of-two depths, min/max widths |
+| `check_map` | Before `map` lowering | Validate bit-slice bounds |
+| `compile_error("...")` | During `fn` / `if` evaluation | Custom diagnostic messages for invalid configs |

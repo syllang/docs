@@ -36,3 +36,49 @@ cell Register8<D: Domain>(
     q := r
 }
 ```
+
+## Combinational Logic: `process(all)` vs. `signal` + `select`
+
+In VHDL, combinational processes require listing all sensitivity signals (or `process(all)` in VHDL-2008) and assigning defaults to avoid latches. Syl's `select priority` and `match` are expressions that always produce a value:
+
+```syl
+signal mux_out: UInt<8> := select priority {
+    sel == 0 => in0,
+    sel == 1 => in1,
+    default => 0,
+}
+```
+
+## Records & Arrays
+
+VHDL `record` types map to Syl `bundle`, and constrained arrays `array (0 to N-1) of ...` map to `[N] T`:
+
+```syl
+bundle AxiBeat {
+    data: UInt<32>,
+    last: Bit,
+}
+
+cell BeatDelay<N: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    din: in AxiBeat,
+    dout: out AxiBeat,
+) {
+    reg pipe: [N] AxiBeat reset(rst, AxiBeat { data: 0, last: 0 })
+    next pipe[0] := din
+    for i in 1..N {
+        next pipe[i] := pipe[i - 1]
+    }
+    dout := pipe[N - 1]
+}
+```
+
+## Migration Checklist for VHDL Engineers
+
+| VHDL Habit | Syl Replacement |
+| :--- | :--- |
+| Separate `entity` and `architecture` | Single `cell` declaration. |
+| `std_logic` (`'0'`, `'1'`, `'X'`, `'Z'`) | `Bit` (`0`, `1`); `inout` only at external pads. |
+| `variable` vs. `signal` inside `process` | Use `signal` for wires and `reg` + `next` for state. |
+| `generic` map | `<W: Nat, D: Domain>` type/const parameters. |

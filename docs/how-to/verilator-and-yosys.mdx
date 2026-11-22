@@ -79,3 +79,21 @@ yosys -p "read_verilog -sv build/sv/*.sv; hierarchy -top Counter; proc; memory; 
 - `memory`: Lowers `mem` arrays into synthesizable memory cells.
 - `check -assert`: Fails immediately if any combinational loops, latches, or undriven wires exist.
 - `stat`: Prints cell counts (FFs, LUTs/gates, memories) for area tracking.
+
+## Waveform Tracing (VCD) in Verilator
+
+Enable `--trace` to dump a `.vcd` waveform for GTKWave or Surfer:
+
+```bash
+verilator --cc --exe --build --trace -j 0 -Wall --std-c++17 \
+  -f build/sv/filelist.f tb_counter.cpp --top-module Counter
+```
+
+## Common Verilator & Yosys Troubleshooting
+
+| Tool | Error / Warning | Cause & Fix |
+| :--- | :--- | :--- |
+| Verilator | `UNOPTFLAT` / combinational loop | Check `Stream` `ready` path; insert `std.skid.SkidBuffer`. |
+| Verilator | `WIDTH` mismatch | Ensure `sylc emit` was run after `sylc check` with matching port widths. |
+| Yosys | `Latch inferred for signal ...` | Should not occur from valid Syl; check `extern cell` or `always_comb` wrappers. |
+| Yosys | `Wire ... has no driver` | Verify all `out` ports are driven in Syl (`sylc check` catches this). |

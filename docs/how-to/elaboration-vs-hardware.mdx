@@ -23,3 +23,45 @@ Every Syl program executes in two distinct phases:
 ## Common Pitfall
 
 You cannot write `if my_signal == 1 { ... }` because `my_signal` is a runtime hardware signal, not a compile-time `Bool`. Use `select` instead.
+
+## Elaboration-Time Constructs in Detail
+
+### `const` and `fn`
+
+`const` and `fn` run completely during elaboration. They can use loops, local `var`s, and recursion to compute widths, tables, or validation checks:
+
+```syl
+fn max_nat(a: Nat, b: Nat) -> Nat {
+    if a > b {
+        return a
+    }
+    return b
+}
+
+const MAX_W: Nat = max_nat(8, 16) -- 16
+```
+
+### `for` Unrolling
+
+A `for i in 0..N` loop unrolls into `N` independent hardware copies. Unlike a software loop, it does not take `N` clock cycles—it replicates hardware `N` times in space:
+
+```syl
+cell ParallelInc<N: Nat>(
+    din: in [N] UInt<8>,
+    dout: out [N] UInt<8>,
+) {
+    for i in 0..N {
+        dout[i] := din[i] + 1
+    }
+}
+```
+
+## Hardware-Time Constructs in Detail
+
+- **`signal`**: Combinational wire with a single `:=` driver.
+- **`reg`**: Flip-flop bound to `Clock<D>` with optional `reset(...)` and a single `next` assignment.
+- **`mem`**: Synthesizable memory array accessed via `mem_write` and `mem_read_sync`.
+
+## Mental Model
+
+Think of elaboration as **building the schematic** at compile time, and hardware constructs as **the components on the schematic** that run at every clock edge.

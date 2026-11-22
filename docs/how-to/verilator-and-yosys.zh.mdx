@@ -79,3 +79,21 @@ yosys -p "read_verilog -sv build/sv/*.sv; hierarchy -top Counter; proc; memory; 
 - `memory`：将 `mem` 阵列降级为可综合存储单元。
 - `check -assert`：若存在组合环路、锁存器或未驱动线网则立即报错退出。
 - `stat`：输出触发器、逻辑门与存储器单元统计信息，用于面积跟踪。
+
+## 在 Verilator 中开启波形跟踪（VCD）
+
+添加 `--trace` 参数即可生成 `.vcd` 波形文件，供 GTKWave 或 Surfer 查看：
+
+```bash
+verilator --cc --exe --build --trace -j 0 -Wall --std-c++17 \
+  -f build/sv/filelist.f tb_counter.cpp --top-module Counter
+```
+
+## Verilator 与 Yosys 常见报错排查
+
+| 工具 | 报错 / 警告 | 原因与解决方法 |
+| :--- | :--- | :--- |
+| Verilator | `UNOPTFLAT` / 组合环路 | 检查 `Stream` 的 `ready` 组合路径，插入 `std.skid.SkidBuffer` 打断环路。 |
+| Verilator | `WIDTH` 位宽不匹配 | 确认 `sylc check` 通过后再执行 `sylc emit`，检查外部 testbench 端口位宽。 |
+| Yosys | `Latch inferred for signal ...` | 合法 Syl 代码不会产生锁存器；检查 `extern cell` 包装的外部 Verilog。 |
+| Yosys | `Wire ... has no driver` | 确认所有 `out` 端口均已驱动（`sylc check` 会静态拦截）。 |

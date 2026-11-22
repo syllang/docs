@@ -78,3 +78,53 @@ sylc check --manifest ./boards/fpga/syl.toml rtl/top.syl
 ## `syl-lsp` 中的热重载
 
 `syl-lsp` 通过 `workspace/didChangeWatchedFiles` 监听 `syl.toml`。修改并保存 `workspace_roots`、`package_roots` 或 `opaque_summaries` 后，LSP 会自动重载工作区并重新检查已打开的文件，无需重启编辑器。若 `syl.toml` 存在语法错误或未知字段，`syl-lsp` 会直接将错误诊断发布到 `syl.toml` 文件上。
+
+## 完整多包工程示例
+
+```
+my_soc/
+├── syl.toml
+├── rtl/
+│   └── top.syl
+├── common_ip/
+│   └── uart.syl
+└── ip/
+    └── pll_summary.toml
+```
+
+`rtl/top.syl`：
+
+```syl
+use common_ip.uart.UartTx
+
+cell SocTop<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    tx_en: in Bit,
+    tx_data: in UInt<8>,
+    tx_pin: out Bit,
+) {
+    let uart = place UartTx<D>(
+        clk: clk,
+        rst: rst,
+        en: tx_en,
+        data: tx_data,
+        tx: tx_pin,
+    )
+}
+```
+
+使用以下命令验证：
+
+```bash
+sylc check --manifest syl.toml rtl/top.syl
+```
+
+## 常见清单错误与排查
+
+| 错误 / 现象 | 原因 | 解决方法 |
+| :--- | :--- | :--- |
+| `unknown field ...` | `syl.toml` 启用了 `deny_unknown_fields` | 检查 `[project]` 与 `[paths]` 字段拼写。 |
+| `module std.stream not found` | 未配置 `std_roots` 或 `--std-root` | 添加 `std_roots = ["vendor/syl-std"]` 或传入 `--std-root`。 |
+| `opaque summary file not found` | 相对路径基于 `syl.toml` 所在目录解析，而非当前工作目录 | 将路径修改为相对于 `syl.toml` 的路径。 |
+| `package not found` | 外部包目录未加入 `package_roots` | 将包根目录添加到 `package_roots = ["..."]`。 |

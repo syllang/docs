@@ -1,21 +1,81 @@
 ---
 title: Rust 嵌入
-description: 在 Rust 应用与自定义构建工具中嵌入 syl_session::AnalysisHost、Send + Sync 的 AnalysisSnapshot 与 EmitOptions API。
+description: 在 Rust 应用中使用 Syl 编译器。
 ---
 
-Syl 编译器使用 Rust 编写，提供模块化 crate（`syl_session`、`syl_syntax`、`syl_sema`、`syl_elab`、`syl_emit`、`syl_query`），可直接嵌入到自定义构建工具、CI 检查器与编辑器插件中。
+# Rust 嵌入
 
-## 添加依赖
+Syl 编译器使用 Rust 编写，可以作为库嵌入到 Rust 应用中。本文说明如何通过 Rust API 使用编译器的功能。
+
+---
+
+## 使用方式
+
+在 Rust 项目中添加依赖：
 
 ```toml
 [dependencies]
-syl_session = { path = "crates/syl_session" }
-syl_emit = { path = "crates/syl_emit" }
+syl_session = { git = "..." }
 ```
 
-## 会话管理：`AnalysisHost` 与 `AnalysisSnapshot`
+## 基本使用
 
-`syl_session::AnalysisHost` 负责管理项目配置（`syl.toml`）、虚拟文件系统（VFS）状态与增量更新。调用 `host.snapshot()` 会生成一个不可变的 `AnalysisSnapshot`；该快照实现了 `Send + Sync`，可安全地发送到后台线程执行耗时查询与 DRC，而不会阻塞主线程的编辑操作。
+```rust
+use syl_session::{AnalysisHost, DocumentUri, DocumentVersion};
+
+let mut host = AnalysisHost::new();
+let uri = DocumentUri::new("example.syl");
+host.open_document(uri.clone(), source_code.to_string(), DocumentVersion::new(1));
+let snapshot = host.snapshot()?;
+```
+
+## 编译代码
+
+```rust
+use syl_emit::SystemVerilogBackend;
+use syl_sema::SemanticCompiler;
+use syl_elab::HardwareCompiler;
+use syl_syntax::SourceParser;
+
+let file = SourceParser::new(source).parse_file()?;
+let sema = SemanticCompiler::new().session(&[file]);
+let hir = sema.resolve_hir()?;
+let tir = hir.check_tir()?;
+let hwir = HardwareCompiler::new().compile_tir(&tir)?;
+let sv = SystemVerilogBackend::new().emit(&hwir)?;
+```
+
+## 获取诊断信息
+
+```rust
+let snapshot = host.snapshot()?;
+let diagnostics = snapshot.diagnostics();
+for diagnostic in &diagnostics {
+    println!("{}", diagnostic);
+}
+```
+
+## 查询 API
+
+```rust
+use syl_query::AnalysisQueries;
+
+let snapshot = host.snapshot()?;
+let hover = snapshot.hover_at(uri, position)?;
+let definition = snapshot.definition_at(uri, position)?;
+let completions = snapshot.completions_at(uri, position)?;
+```
+
+## 适用场景
+
+- 自定义构建工具
+- 持续集成集成
+- 编辑器插件
+- 测试框架
+
+## `AnalysisHost` 与 `AnalysisSnapshot`（`Send + Sync`）
+
+在多线程工具或编辑器后端中，`AnalysisHost::snapshot()` 返回的 `AnalysisSnapshot` 实现了 `Send + Sync`，可安全跨线程传递：
 
 ```rust
 use syl_session::{AnalysisHost, ProjectConfig};
@@ -23,42 +83,24 @@ use std::path::Path;
 
 let mut host = AnalysisHost::new(ProjectConfig::from_manifest(Path::new("syl.toml"))?);
 host.open_document("src/top.syl", source_code.to_string(), 1);
-
 let snapshot = host.snapshot();
-// `snapshot` 实现了 Send + Sync，可安全跨线程传递
-let diagnostics = snapshot.diagnostics();
-for diag in &diagnostics {
-    println!("{diag}");
-}
+
+std::thread::spawn(move || {
+    let diags = snapshot.diagnostics();
+    for d in &diags {
+        eprintln!("{d}");
+    }
+});
 ```
 
-## 编译与发射 SystemVerilog（`EmitOptions`）
-
-使用 `EmitOptions` 配置单文件/多文件发射以及是否附带源码位置注释：
+## `EmitOptions` 配置发射
 
 ```rust
 use syl_emit::{EmitOptions, SystemVerilogBackend};
 
-let options = EmitOptions {
+let opts = EmitOptions {
     source_comments: true,
     ..EmitOptions::default()
 };
-let sv_output = SystemVerilogBackend::with_options(options).emit(&hwir)?;
+let sv = SystemVerilogBackend::with_options(opts).emit(&hwir)?;
 ```
-
-## 语义查询 API
-
-`AnalysisSnapshot` 同时提供与 LSP 同源的语义查询接口：
-
-```rust
-let hover = snapshot.hover_at("src/top.syl", position)?;
-let definition = snapshot.definition_at("src/top.syl", position)?;
-let completions = snapshot.completions_at("src/top.syl", position)?;
-```
-
-## 适用场景
-
-- 自定义硬件构建系统与 Bazel/Cargo 集成
-- 自动化 CI 静态检查与 DRC 门禁
-- 编辑器插件与在线 Playground
-- 基于属性的硬件测试框架

@@ -1,21 +1,36 @@
 ---
 title: Rust Embedding
-description: Embed syl_session::AnalysisHost, Send + Sync AnalysisSnapshot, and EmitOptions in Rust applications and custom build tools.
+description: Embed syl_session::AnalysisHost, Send + Sync AnalysisSnapshot, and EmitOptions in Rust applications.
 ---
 
-The Syl compiler is written in Rust and exposes a modular set of crates (`syl_session`, `syl_syntax`, `syl_sema`, `syl_elab`, `syl_emit`, `syl_query`) for embedding into custom build tools, CI runners, and editor plugins.
+# Rust Embedding
+
+The Syl compiler is written in Rust and can be embedded as a library into custom build tools, CI runners, and editor plugins. This guide shows how to use the Rust API.
+
+---
 
 ## Adding Dependencies
 
+Add the crates to your `Cargo.toml`:
+
 ```toml
 [dependencies]
-syl_session = { path = "crates/syl_session" }
-syl_emit = { path = "crates/syl_emit" }
+syl_session = { git = "..." }
+syl_emit = { git = "..." }
 ```
 
-## Session & `AnalysisHost` / `AnalysisSnapshot`
+## Basic Usage (`AnalysisHost` & `AnalysisSnapshot`)
 
-`syl_session::AnalysisHost` manages project configuration (`syl.toml`), virtual filesystem state, and incremental updates. Calling `host.snapshot()` produces an immutable `AnalysisSnapshot` that implements `Send + Sync`, allowing you to run queries and DRC on background threads without blocking edits.
+```rust
+use syl_session::{AnalysisHost, DocumentUri, DocumentVersion};
+
+let mut host = AnalysisHost::new();
+let uri = DocumentUri::new("example.syl");
+host.open_document(uri.clone(), source_code.to_string(), DocumentVersion::new(1));
+let snapshot = host.snapshot()?;
+```
+
+`AnalysisSnapshot` implements `Send + Sync`, so you can move it to a background thread for non-blocking diagnostics:
 
 ```rust
 use syl_session::{AnalysisHost, ProjectConfig};
@@ -23,42 +38,61 @@ use std::path::Path;
 
 let mut host = AnalysisHost::new(ProjectConfig::from_manifest(Path::new("syl.toml"))?);
 host.open_document("src/top.syl", source_code.to_string(), 1);
-
 let snapshot = host.snapshot();
-// `snapshot` is Send + Sync and can be moved to a worker thread
-let diagnostics = snapshot.diagnostics();
-for diag in &diagnostics {
-    println!("{diag}");
-}
+
+std::thread::spawn(move || {
+    let diags = snapshot.diagnostics();
+    for d in &diags {
+        eprintln!("{d}");
+    }
+});
 ```
 
-## Compiling and Emitting SystemVerilog (`EmitOptions`)
-
-Use `EmitOptions` to configure single-file or multi-file emission with optional source comments:
+## Compiling & Emitting SystemVerilog (`EmitOptions`)
 
 ```rust
 use syl_emit::{EmitOptions, SystemVerilogBackend};
+use syl_sema::SemanticCompiler;
+use syl_elab::HardwareCompiler;
+use syl_syntax::SourceParser;
 
-let options = EmitOptions {
+let file = SourceParser::new(source).parse_file()?;
+let sema = SemanticCompiler::new().session(&[file]);
+let hir = sema.resolve_hir()?;
+let tir = hir.check_tir()?;
+let hwir = HardwareCompiler::new().compile_tir(&tir)?;
+
+let opts = EmitOptions {
     source_comments: true,
     ..EmitOptions::default()
 };
-let sv_output = SystemVerilogBackend::with_options(options).emit(&hwir)?;
+let sv = SystemVerilogBackend::with_options(opts).emit(&hwir)?;
+```
+
+## Retrieving Diagnostics
+
+```rust
+let snapshot = host.snapshot()?;
+let diagnostics = snapshot.diagnostics();
+for diagnostic in &diagnostics {
+    println!("{}", diagnostic);
+}
 ```
 
 ## Query API
 
-`AnalysisSnapshot` also exposes LSP-grade semantic queries:
-
 ```rust
-let hover = snapshot.hover_at("src/top.syl", position)?;
-let definition = snapshot.definition_at("src/top.syl", position)?;
-let completions = snapshot.completions_at("src/top.syl", position)?;
+use syl_query::AnalysisQueries;
+
+let snapshot = host.snapshot()?;
+let hover = snapshot.hover_at(uri, position)?;
+let definition = snapshot.definition_at(uri, position)?;
+let completions = snapshot.completions_at(uri, position)?;
 ```
 
 ## Use Cases
 
-- Custom hardware build systems and Bazel/Cargo integrations
-- Automated CI linting and DRC gates
-- IDE plugins and web playgrounds
-- Property-based testing harnesses
+- Custom hardware build tools
+- Continuous integration (CI) DRC gates
+- Editor plugins
+- Property-based testing frameworks

@@ -43,3 +43,49 @@ for i in 0..4 {
     )
 }
 ```
+
+## Connecting `interface` Views Across `cell` Boundaries
+
+When you `place` a child `cell`, `sylc` checks that every `source` view connects to a `sink` view (and every `out` port connects to an `in` port):
+
+```syl
+use std.stream.Stream
+
+cell Producer<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    out_s: out Stream<UInt<8>>.source,
+) {
+    reg cnt: UInt<8> reset(rst, 0)
+    next cnt := select {
+        out_s.ready => cnt + 1,
+        default => cnt,
+    }
+    out_s.payload := cnt
+    out_s.valid := 1
+}
+
+cell Consumer<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_s: in Stream<UInt<8>>.sink,
+    last_val: out UInt<8>,
+) {
+    reg r: UInt<8> reset(rst, 0)
+    next r := select {
+        in_s.valid => in_s.payload,
+        default => r,
+    }
+    in_s.ready := 1
+    last_val := r
+}
+```
+
+## Structural Design Principles
+
+| Principle | How Syl Enforces It |
+| :--- | :--- |
+| **Explicit hierarchy** | Every submodule is instantiated with `place`. |
+| **No hidden global state** | Clocks, resets, and signals must be passed through typed ports. |
+| **Direction safety** | `view`s on `interface`s prevent accidental output-to-output shorts. |
+| **Deterministic naming** | Parameterized `cell`s emit unique, reproducible SystemVerilog module names. |

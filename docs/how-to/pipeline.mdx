@@ -68,3 +68,82 @@ let dropped = place drop_link<UInt<8>>(
 1. **Balance stage depth**: Keep combinational logic between `stage_link` boundaries roughly equal to maximize $F_{\max}$.
 2. **Stall vs. Flush**: Use `halt_link` when downstream is not ready; use `drop_link` for branch mispredictions or exceptions.
 3. **Stream boundaries**: Wrap pipeline entry and exit with `stage_from_stream` / `stage_to_stream` for clean backpressure integration.
+
+## Complete Example: 3-Stage Pipelined ALU
+
+This example demonstrates a 3-stage pipelined ALU using `stage_from_stream`, `stage_link`, `halt_link`, and `stage_to_stream`:
+
+```syl
+use std.stream.Stream
+use std.stage.stage_from_stream
+use std.stage.stage_to_stream
+use std.stage.stage_link
+use std.stage.halt_link
+
+bundle AluReq {
+    op: UInt<2>,
+    a: UInt<16>,
+    b: UInt<16>,
+}
+
+cell PipelinedAlu<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    stall: in Bit,
+    req: in Stream<AluReq>.sink,
+    resp: out Stream<UInt<16>>.source,
+) {
+    -- Stage 0: Convert incoming Stream to internal Stage
+    let s0 = place stage_from_stream<AluReq>(stream: req)
+
+    -- Stage 1: Register boundary with optional stall
+    let s1_halt = place halt_link<AluReq>(up: s0, halt: stall)
+    let s1 = place stage_link<AluReq, D>(clk: clk, rst: rst, up: s1_halt)
+
+    -- Stage 2: Combinational ALU operation
+    signal alu_out: UInt<16> := select priority {
+        s1.data.op == 0 => s1.data.a + s1.data.b,
+        s1.data.op == 1 => s1.data.a - s1.data.b,
+        s1.data.op == 2 => s1.data.a & s1.data.b,
+        default => s1.data.a | s1.data.b,
+    }
+
+    -- Stage 3: Output register & convert back to Stream
+    reg out_reg: UInt<16> reset(rst, 0)
+    next out_reg := select {
+        s1.valid and !stall => alu_out,
+        default => out_reg,
+    }
+
+    let s2 = place stage_link<UInt<16>, D>(clk: clk, rst: rst, up: s1)
+    let out_s = place stage_to_stream<UInt<16>>(stage: s2)
+    resp := out_s
+}
+```
+
+## Pipeline Control Patterns
+
+### Backpressure Propagation
+
+When `resp.ready` is `0`, `stage_to_stream` deasserts its upstream ready signal, propagating backpressure through `stage_link` to `req.ready`.
+
+### Flushing on Branch Misprediction
+
+Insert `drop_link` before the commit stage so speculative transactions can be squashed in a single cycle without stalling the front-end:
+
+```syl
+let s_flushed = place drop_link<AluReq>(
+    up: s1,
+    drop: branch_mispredict,
+)
+```
+
+### Summary of `std.stage` Primitives
+
+| Primitive | Purpose | Registers? |
+| :--- | :--- | :--- |
+| `stage_from_stream` | Adapts `Stream<T>.sink` to `Stage<T>` | No |
+| `stage_to_stream` | Adapts `Stage<T>` to `Stream<T>.source` | No |
+| `stage_link` | Pipeline register boundary | Yes |
+| `halt_link` | Freezes upstream on `halt == 1` | No |
+| `drop_link` | Invalidates transaction on `drop == 1` | No |

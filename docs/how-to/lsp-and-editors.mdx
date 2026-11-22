@@ -1,44 +1,78 @@
 ---
 title: LSP and Editors
-description: Configure syl-lsp for VS Code, Neovim, and Helix, with automatic syl.toml discovery, hot-reload, incremental sync, and async DRC.
+description: Configure syl-lsp for VS Code, Neovim, and Helix, with syl.toml auto-discovery, hot-reload, incremental sync, and async DRC.
 ---
 
-`syl-lsp` is the official Language Server Protocol (LSP) implementation for Syl. It communicates over `stdin`/`stdout` and provides real-time type checking, navigation, and asynchronous Design Rule Checks (DRC).
+# LSP and Editors
+
+The Syl Language Server (`syl-lsp`) provides code completion, hover information, go-to-definition, and real-time diagnostics for editors. This guide covers setup, editor configuration, and architecture.
+
+---
 
 ## Starting the Language Server
+
+The LSP server is implemented in the `syl_lsp` crate. Start it from your PATH:
 
 ```bash
 syl-lsp
 ```
 
-## Architecture Highlights
+The server communicates with editors over `stdin`/`stdout` using JSON-RPC.
 
-- **Automatic `syl.toml` Discovery & Hot-Reload**: On initialization, `syl-lsp` discovers the nearest `syl.toml` above the workspace root. It watches `syl.toml` via `workspace/didChangeWatchedFiles` and reloads `workspace_roots`, `package_roots`, and `opaque_summaries` automatically on save.
-- **Incremental Document Synchronization**: Edits in the editor are synced incrementally to `syl_session::AnalysisHost` without re-parsing unchanged files.
-- **Asynchronous Background DRC**: Fast syntax and type diagnostics are published immediately, while heavier elaboration DRC runs on a background worker channel so typing remains responsive.
+## Supported Capabilities
 
-## Supported Editor Capabilities
+### Hover
 
-1. **Hover**: Displays inferred types, clock domains, and parameter values on expressions and signals.
-2. **Go to Definition**: Jumps to signal, `cell`, `bundle`, `enum`, and cross-file module declarations.
-3. **Find References**: Locates all usages of a symbol across the workspace.
-4. **Completions**: Suggests ports, local signals, `std.*` modules, and keywords at the cursor.
-5. **Diagnostics**: Publishes syntax, semantic, and DRC errors/warnings with exact spans (including `syl.toml` parse errors).
-6. **Document Symbols**: Outlines `cell`, `bundle`, `enum`, `fn`, and `map` definitions in the current file.
+Hover over any expression or signal to inspect its inferred type, bit width, and clock domain:
+
+```syl
+signal data: UInt<8>
+// Hovering over `data` shows: UInt<8>
+```
+
+### Go to Definition & Find References
+
+Jump to declarations of signals, `cell`s, `bundle`s, and `enum`s across files, or find all references across the workspace.
+
+### Completions
+
+Provides context-aware completions at the cursor: module ports, local signals, `std.*` modules, and keywords.
+
+### Diagnostics
+
+Marks syntax, semantic, and elaboration DRC errors in real time with error codes and spans. Diagnostics update automatically as you type.
+
+### Document Symbols
+
+Outlines `cell`, `bundle`, `enum`, `fn`, and `map` definitions in the current file.
+
+## `syl.toml` Auto-Discovery & Hot-Reload
+
+On initialization, `syl-lsp` walks up from the workspace root to discover the nearest `syl.toml`. It watches `syl.toml` via `workspace/didChangeWatchedFiles`:
+
+- Saving changes to `workspace_roots`, `package_roots`, or `opaque_summaries` triggers an automatic workspace reload without restarting the editor.
+- If `syl.toml` contains a syntax error or unknown field (`deny_unknown_fields`), `syl-lsp` publishes the parse error directly on `syl.toml`.
+
+## Incremental Sync & Async Background DRC
+
+`syl-lsp` uses a two-tier diagnostic pipeline:
+
+1. **Incremental Document Sync**: Edits are synced incrementally to `syl_session::AnalysisHost` via `didChange`, avoiding re-parsing unchanged files.
+2. **Asynchronous Background DRC**: Fast syntax and type diagnostics are published immediately, while heavier elaboration DRC runs on a background worker channel so typing stays responsive.
 
 ## Editor Configuration
 
 ### VS Code
 
-Configure a custom LSP client pointing to `syl-lsp`:
+Install a custom LSP client extension and configure `syl-lsp`:
 
 ```json
 {
-  "lsp": {
-    "syl": {
-      "command": ["syl-lsp"]
+    "lsp": {
+        "syl": {
+            "command": ["syl-lsp"]
+        }
     }
-  }
 }
 ```
 
@@ -46,9 +80,9 @@ Configure a custom LSP client pointing to `syl-lsp`:
 
 ```lua
 vim.lsp.start({
-  name = "syl",
-  cmd = { "syl-lsp" },
-  root_dir = vim.fs.root(0, { "syl.toml", ".git" }),
+    name = "syl",
+    cmd = { "syl-lsp" },
+    root_dir = vim.fs.root(0, { "syl.toml", ".git" }),
 })
 ```
 

@@ -1,44 +1,60 @@
 ---
 title: LSP 与编辑器
-description: 为 VS Code、Neovim 与 Helix 配置 syl-lsp，支持 syl.toml 自动发现、热重载、增量同步与后台异步 DRC。
+description: Syl 语言服务器的使用和编辑器配置。
 ---
 
-`syl-lsp` 是 Syl 官方的语言服务器（LSP）实现，通过标准输入输出（`stdin`/`stdout`）与编辑器通信，提供实时类型检查、代码导航与后台异步设计规则检查（DRC）。
+# LSP 与编辑器
+
+Syl 语言服务器（LSP）为编辑器提供代码补全、悬停提示和诊断信息。本文说明如何配置和使用。
+
+---
 
 ## 启动语言服务器
 
-```bash
+LSP 服务器在 `syl_lsp` crate 中实现。编译后启动：
+
+```
 syl-lsp
 ```
 
-## 核心架构特性
+服务器通过标准输入输出和编辑器通信。
 
-- **`syl.toml` 自动发现与热重载**：初始化时，`syl-lsp` 会自动向上发现工作区根目录最近的 `syl.toml`，并通过 `workspace/didChangeWatchedFiles` 监听其变更；保存 `syl.toml` 后会自动重载 `workspace_roots`、`package_roots` 与 `opaque_summaries`。
-- **增量文档同步**：编辑器中的修改会增量同步至 `syl_session::AnalysisHost`，无需重新解析未改动的文件。
-- **后台异步 DRC 通道**：轻量的语法与类型诊断会即时发布，而耗时的展开期 DRC 在后台异步通道中执行，确保输入流畅不卡顿。
+## 支持的功能
 
-## 支持的 6 项编辑器能力
+### 悬停提示
 
-1. **悬停提示（Hover）**：显示表达式、信号的推导类型、时钟域与参数值。
-2. **跳转定义（Go to Definition）**：支持跳转到信号、`cell`、`bundle`、`enum` 及跨文件模块声明。
-3. **查找引用（Find References）**：在工作区内定位符号的所有使用位置。
-4. **自动补全（Completions）**：在光标处提供端口、局部信号、`std.*` 模块与关键字补全。
-5. **实时诊断（Diagnostics）**：精确标记语法、语义与 DRC 错误/警告（包括 `syl.toml` 解析错误）。
-6. **文档符号大纲（Document Symbols）**：列出当前文件中的 `cell`、`bundle`、`enum`、`fn` 与 `map` 定义。
+将鼠标悬停在表达式上，显示类型信息。
+
+```syl
+signal data: UInt<8>
+// 悬停在 data 上显示：UInt<8>
+```
+
+### 跳转定义
+
+点击名字跳转到它的声明位置。支持跨文件跳转。
+
+### 自动补全
+
+在光标位置提供可用的符号名：模块端口、信号名、局部变量、关键字。
+
+### 诊断信息
+
+在文件中标记错误位置。错误信息包含错误代码和描述。诊断在文件修改时自动更新。
 
 ## 编辑器配置
 
 ### VS Code
 
-在支持自定义 LSP 的扩展中配置 `syl-lsp`：
+安装支持自定义 LSP 的扩展。配置语言服务器路径：
 
 ```json
 {
-  "lsp": {
-    "syl": {
-      "command": ["syl-lsp"]
+    "lsp": {
+        "syl": {
+            "command": ["syl-lsp"]
+        }
     }
-  }
 }
 ```
 
@@ -46,15 +62,15 @@ syl-lsp
 
 ```lua
 vim.lsp.start({
-  name = "syl",
-  cmd = { "syl-lsp" },
-  root_dir = vim.fs.root(0, { "syl.toml", ".git" }),
+    name = "syl",
+    cmd = { "syl-lsp" },
+    root_dir = vim.fn.getcwd(),
 })
 ```
 
 ### Helix
 
-在 `~/.config/helix/languages.toml` 中添加：
+在 `languages.toml` 中添加：
 
 ```toml
 [language-server.syl]
@@ -69,5 +85,30 @@ file-types = ["syl"]
 
 ## 当前限制
 
-- 暂不支持重命名重构（Rename）与代码操作（Code Actions）。
-- 暂不支持 `cell` 实例化时的签名帮助（Signature Help）。
+- 大型文件的补全响应可能较慢
+- 不支持重命名操作
+- 不支持代码动作
+- 不支持签名帮助
+
+## `syl.toml` 自动发现与热重载
+
+初始化时，`syl-lsp` 会从工作区根目录向上递归查找最近的 `syl.toml`。通过 `workspace/didChangeWatchedFiles` 监听 `syl.toml` 变更：
+
+- 修改 `workspace_roots`、`package_roots` 或 `opaque_summaries` 并保存后，LSP 会自动重载工作区并重新发布诊断，无需重启编辑器。
+- 若 `syl.toml` 存在语法错误或未知字段（`deny_unknown_fields`），`syl-lsp` 会直接将错误诊断发布到 `syl.toml` 文件上。
+
+## 增量同步与后台异步 DRC 通道
+
+`syl-lsp` 采用双通道诊断架构：
+
+1. **增量文档同步**：编辑内容通过 `didChange` 增量同步至 `syl_session::AnalysisHost`，未改动文件无需重新解析。
+2. **后台异步 DRC**：轻量级语法与类型错误即时反馈；耗时的展开期 DRC 在后台线程异步运行，确保大型工程下输入依然流畅。
+
+## 6 项核心编辑器能力
+
+1. **悬停提示（Hover）**：显示类型、`Domain` 与参数值。
+2. **跳转定义（Go to Definition）**：支持跨文件跳转。
+3. **查找引用（Find References）**：工作区级符号引用定位。
+4. **自动补全（Completions）**：端口、信号、`std.*` 模块与关键字。
+5. **实时诊断（Diagnostics）**：语法、语义、DRC 与 `syl.toml` 错误。
+6. **文档符号大纲（Document Symbols）**：列出 `cell`、`bundle`、`enum`、`fn` 与 `map`。

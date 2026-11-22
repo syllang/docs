@@ -117,3 +117,36 @@ The `@cdc_sync` attribute tells `sylc`'s CDC DRC pass that this `cell` is an int
 - Always match `Reset<D, Mode, Polarity>` with `reg ... reset(rst, val, ...)`.
 - Prefer `std.cdc` over hand-rolled synchronizers whenever possible.
 - Restrict `@cdc_sync` to dedicated, audited synchronizer cells.
+
+## Error Comparison & Troubleshooting
+
+| Diagnostic / Mistake | Why It Fails | Correct Pattern |
+| :--- | :--- | :--- |
+| `reg q reset(rst_n, 0)` on `Reset<D, Async, ActiveLow>` | Polarity/mode mismatch between port and `reg` | `reg q reset(rst_n, 0, async, active_low)` |
+| Reading `D_A` signal inside `D_B` `reg` | Unsynchronized clock-domain crossing | Route through `std.cdc.Sync2FF` or `@cdc_sync` cell |
+| Passing `UInt<8>` directly through `Sync2FF` | Multi-bit bus skew across 2-FF synchronizer | Use `std.cdc` handshake or Gray-code FIFO |
+
+## Complete Multi-Domain Example
+
+```syl
+use std.cdc.Sync2FF
+
+cell DualDomainBridge<D_FAST: Domain, D_SLOW: Domain>(
+    clk_fast: in Clock<D_FAST>,
+    rst_fast: in Reset<D_FAST, Async, ActiveLow>,
+    clk_slow: in Clock<D_SLOW>,
+    rst_slow: in Reset<D_SLOW, Sync, ActiveHigh>,
+    trigger_fast: in Bit,
+    ack_slow: out Bit,
+) {
+    reg req_latched: Bit reset(rst_fast, 0, async, active_low)
+    next req_latched := trigger_fast
+
+    let sync = place Sync2FF<D_FAST, D_SLOW>(
+        clk_dst: clk_slow,
+        rst_dst: rst_slow,
+        din: req_latched,
+        dout: ack_slow,
+    )
+}
+```

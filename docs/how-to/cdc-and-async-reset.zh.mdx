@@ -117,3 +117,36 @@ cell CustomBitSync<D_SRC: Domain, D_DST: Domain>(
 - 始终确保 `Reset<D, Mode, Polarity>` 与 `reg ... reset(rst, val, ...)` 的模式和极性完全一致。
 - 优先使用 `std.cdc`，避免重复手写基础同步器。
 - 将 `@cdc_sync` 严格限制在专用的、经过审计的同步器模块上。
+
+## 常见错误对照与排查
+
+| 诊断错误 / 常见误用 | 失败原因 | 正确写法 |
+| :--- | :--- | :--- |
+| `Reset<D, Async, ActiveLow>` 配合 `reg q reset(rst_n, 0)` | 端口与 `reg` 的复位模式/极性不匹配 | `reg q reset(rst_n, 0, async, active_low)` |
+| 在 `D_B` 域寄存器中直接读取 `D_A` 域信号 | 未经同步的跨时钟域访问 | 通过 `std.cdc.Sync2FF` 或 `@cdc_sync` 模块隔离 |
+| 将 `UInt<8>` 多比特总线直接送入两级触发器同步器 | 多比特偏斜（skew）导致采样亚稳态错误 | 使用 `std.cdc` 握手同步或格雷码异步 FIFO |
+
+## 完整双时钟域桥接示例
+
+```syl
+use std.cdc.Sync2FF
+
+cell DualDomainBridge<D_FAST: Domain, D_SLOW: Domain>(
+    clk_fast: in Clock<D_FAST>,
+    rst_fast: in Reset<D_FAST, Async, ActiveLow>,
+    clk_slow: in Clock<D_SLOW>,
+    rst_slow: in Reset<D_SLOW, Sync, ActiveHigh>,
+    trigger_fast: in Bit,
+    ack_slow: out Bit,
+) {
+    reg req_latched: Bit reset(rst_fast, 0, async, active_low)
+    next req_latched := trigger_fast
+
+    let sync = place Sync2FF<D_FAST, D_SLOW>(
+        clk_dst: clk_slow,
+        rst_dst: rst_slow,
+        din: req_latched,
+        dout: ack_slow,
+    )
+}
+```

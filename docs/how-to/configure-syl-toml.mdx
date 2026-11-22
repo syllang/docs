@@ -78,3 +78,53 @@ sylc check --manifest ./boards/fpga/syl.toml rtl/top.syl
 ## Live Reload in `syl-lsp`
 
 `syl-lsp` watches `syl.toml` via `workspace/didChangeWatchedFiles`. Saving changes to `workspace_roots`, `package_roots`, or `opaque_summaries` triggers a workspace reload and re-runs diagnostics across open files without restarting the editor. If `syl.toml` contains a syntax error or unknown field, `syl-lsp` publishes the parse error directly on `syl.toml`.
+
+## Complete Multi-Package Example
+
+```
+my_soc/
+├── syl.toml
+├── rtl/
+│   └── top.syl
+├── common_ip/
+│   └── uart.syl
+└── ip/
+    └── pll_summary.toml
+```
+
+`rtl/top.syl`:
+
+```syl
+use common_ip.uart.UartTx
+
+cell SocTop<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    tx_en: in Bit,
+    tx_data: in UInt<8>,
+    tx_pin: out Bit,
+) {
+    let uart = place UartTx<D>(
+        clk: clk,
+        rst: rst,
+        en: tx_en,
+        data: tx_data,
+        tx: tx_pin,
+    )
+}
+```
+
+Verify with:
+
+```bash
+sylc check --manifest syl.toml rtl/top.syl
+```
+
+## Common Manifest Errors & Troubleshooting
+
+| Error / Symptom | Cause | Fix |
+| :--- | :--- | :--- |
+| `unknown field ...` | `syl.toml` uses `deny_unknown_fields` | Check spelling of `[project]` and `[paths]` keys. |
+| `module std.stream not found` | `std_roots` not set in `syl.toml` or `--std-root` | Add `std_roots = ["vendor/syl-std"]` or pass `--std-root`. |
+| `opaque summary file not found` | Relative path resolved from `syl.toml` dir, not CWD | Adjust path relative to `syl.toml` location. |
+| `package not found` | External library directory missing from `package_roots` | Add parent directory to `package_roots = ["..."]`. |

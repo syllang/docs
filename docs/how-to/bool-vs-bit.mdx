@@ -35,3 +35,52 @@ out_sig := select {
     default => reg_sig,
 }
 ```
+
+## Common Errors & How to Fix Them
+
+### Error 1: Using `Bit` in an `if` Condition
+
+```syl
+-- WRONG: `en` is `Bit`, not `Bool`
+if en {
+    y := a
+} else {
+    y := b
+}
+```
+
+**Fix**: Use `select` for hardware conditions:
+
+```syl
+y := select {
+    en => a,
+    default => b,
+}
+```
+
+### Error 2: Using `Bool` as a Port or `signal` Type
+
+```syl
+-- WRONG: `Bool` cannot be a hardware port
+cell Bad(flag: in Bool, y: out Bit) { ... }
+```
+
+**Fix**: Use `Bit` for hardware ports/signals, and `Bool` only for `const` or generic parameters:
+
+```syl
+cell Good<ENABLE_PARITY: Bool>(
+    flag: in Bit,
+    y: out Bit,
+) {
+    if ENABLE_PARITY {
+        y := flag
+    } else {
+        y := 0
+    }
+}
+```
+
+## Summary
+
+- **`Bool`** = compile-time truth value (`true` / `false`), controls elaboration (`if`).
+- **`Bit`** = physical 1-bit wire (`0` / `1`), controls hardware muxes (`select`).

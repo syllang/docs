@@ -33,3 +33,70 @@ use std.pulse.RisingEdge
 ```
 
 Every `std.*` module is continuously checked with `sylc check`, simulated in Verilator, and synthesized with Yosys.
+
+## Module-by-Module Usage Patterns
+
+### `std.logic` & `std.bundle`
+
+Use `std.logic` for combinational bit manipulation (priority encoders, one-hot decoders, popcount) and `std.bundle` for width-safe struct packing.
+
+### `std.stream`, `std.skid`, `std.arbiter`, and `std.fifo`
+
+Compose `Stream<T>` channels with `SkidBuffer` (timing closure), `RoundRobinArbiter2` (multi-master arbitration), and `SyncFifo` (rate decoupling):
+
+```syl
+use std.stream.Stream
+use std.skid.SkidBuffer
+use std.fifo.SyncFifo
+
+cell BufferedStream<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_s: in Stream<UInt<8>>.sink,
+    out_s: out Stream<UInt<8>>.source,
+) {
+    let skid = place SkidBuffer<UInt<8>, D>(clk: clk, rst: rst, input: in_s)
+    let fifo = place SyncFifo<UInt<8>, 16, D>(
+        clk: clk,
+        rst: rst,
+        input: skid.output,
+        output: out_s,
+    )
+}
+```
+
+### `std.stage` & `std.pipeline`
+
+Build multi-stage pipelines with `stage_from_stream`, `stage_link`, `halt_link`, `drop_link`, and `stage_to_stream`.
+
+### `std.mem`
+
+Instantiate single-port or dual-port synchronous memories backed by `mem`, `mem_write`, and `mem_read_sync` for clean FPGA BRAM inference.
+
+### `std.cdc` & `std.pulse`
+
+- `std.cdc.Sync2FF`: Two-flip-flop synchronizer for single-bit cross-domain signals.
+- `std.pulse.RisingEdge`: Detects `0 -> 1` transitions and emits a single-cycle pulse.
+
+```syl
+use std.pulse.RisingEdge
+
+cell EdgeDetect<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    sig_in: in Bit,
+    pulse_out: out Bit,
+) {
+    let det = place RisingEdge<D>(
+        clk: clk,
+        rst: rst,
+        din: sig_in,
+        dout: pulse_out,
+    )
+}
+```
+
+### `std.assert` & `std.vendor`
+
+- `std.assert`: Elaboration-time and simulation-time invariant checks.
+- `std.vendor`: Typed `extern cell` wrappers for vendor-specific FPGA/ASIC primitives (PLLs, IO buffers, DSPs).

@@ -115,3 +115,85 @@ let buffered = place SyncFifo<UInt<8>, 16, D>(clk: clk, rst: rst, input: skidded
 
 1. **Combinational loop on `ready`**: Never drive `source.valid` combinationally from `source.ready`.
 2. **Dropping `valid` under stall**: Once `valid` is `1` and `ready` is `0`, `valid` and `payload` must remain unchanged on the next cycle.
+
+## Stream Composition Patterns
+
+### 1. Skid Buffer (`std.skid.SkidBuffer`)
+
+A skid buffer registers both forward (`valid`, `payload`) and backward (`ready`) paths, breaking long combinational `ready` chains while maintaining 100% throughput (1 transfer per cycle):
+
+```syl
+use std.stream.Stream
+use std.skid.SkidBuffer
+
+cell PipelineBoundary<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_s: in Stream<UInt<32>>.sink,
+    out_s: out Stream<UInt<32>>.source,
+) {
+    let skid = place SkidBuffer<UInt<32>, D>(
+        clk: clk,
+        rst: rst,
+        input: in_s,
+        output: out_s,
+    )
+}
+```
+
+### 2. Synchronous FIFO (`std.fifo.SyncFifo`)
+
+Use `SyncFifo` to absorb bursty traffic between producers and consumers:
+
+```syl
+use std.stream.Stream
+use std.fifo.SyncFifo
+
+cell BurstBuffer<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in_s: in Stream<UInt<16>>.sink,
+    out_s: out Stream<UInt<16>>.source,
+) {
+    let fifo = place SyncFifo<UInt<16>, 16, D>(
+        clk: clk,
+        rst: rst,
+        input: in_s,
+        output: out_s,
+    )
+}
+```
+
+### 3. Stream Arbiter (`std.arbiter`)
+
+When multiple producers share a single downstream sink, use `std.arbiter` to arbitrate cleanly without dropping valid/ready invariants:
+
+```syl
+use std.stream.Stream
+use std.arbiter.RoundRobinArbiter2
+
+cell TwoToOneMux<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D, Sync, ActiveHigh>,
+    in0: in Stream<UInt<8>>.sink,
+    in1: in Stream<UInt<8>>.sink,
+    out_s: out Stream<UInt<8>>.source,
+) {
+    let arb = place RoundRobinArbiter2<UInt<8>, D>(
+        clk: clk,
+        rst: rst,
+        in0: in0,
+        in1: in1,
+        output: out_s,
+    )
+}
+```
+
+## Protocol Invariants Checklist
+
+| Invariant | Description |
+| :--- | :--- |
+| **Stability under stall** | If `valid == 1` and `ready == 0`, `valid` and `payload` must remain unchanged on the next cycle. |
+| **No combinational `valid` from `ready`** | `source.valid` must never depend combinationally on `source.ready`. |
+| **Single-cycle handshake** | A transfer occurs if and only if `valid and ready == 1` at the rising clock edge. |
+| **Reset state** | `valid` must reset to `0` so spurious data is not transferred during reset. |
