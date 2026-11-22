@@ -5,7 +5,7 @@ description: How the Syl frontend turns source text into structured representati
 
 # Syntax and AST
 
-Welcome to the Syntax and AST chapter! This page explains how the Syl compiler processes source code. We introduce the overall design of the frontend (`syl_syntax`), walk through lexing and parsing (including `Reset` polarity and `@cdc_sync` hardware syntax), explain why two trees—the typed AST and the lossless syntax tree—coexist, and discuss error recovery and stable node indexing.
+The `syl_syntax` frontend handles lexing and parsing (including `Reset` polarity and `@cdc_sync` hardware syntax), maintaining both a typed AST and a lossless syntax tree to support error recovery and stable node indexing.
 
 ---
 

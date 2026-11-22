@@ -5,7 +5,7 @@ description: 深入展开阶段——module_eir_stage 定向构建、EirModule::
 
 # 展开与 EIR
 
-欢迎来到展开与 EIR 篇章！这篇文章深入编译器最复杂的阶段——展开。我们先回顾展开的输入和输出，然后展示它内部那条包含 9 个步骤的流水线，重点解释 `module_eir_stage` 按规范路径定向构建、`EirModule::disambiguate` 命名消歧、`mem` 原语降级、EIR 数据结构与设计规则检查，最后说明 HW IR 下降。
+展开（Elaboration）是编译器最复杂的阶段，通过 9 步内部流水线完成 `module_eir_stage` 按规范路径定向构建、`EirModule::disambiguate` 命名消歧、`mem` 原语降级、EIR 数据结构构建、设计规则检查（DRC）以及向 HW IR 的下降。
 
 ---
 
@@ -14,7 +14,7 @@ description: 深入展开阶段——module_eir_stage 定向构建、EirModule::
 展开阶段的输入来自语义分析：TIR、常量 MIR 和 Map IR。输出是两个中间表示：EIR 和 HW IR。
 
 ```mermaid
-flowchart LR
+flowchart TB
     TIR["TIR（类型化中间表示）"]
     CM["常量 MIR"]
     MI["Map IR"]

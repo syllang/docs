@@ -5,12 +5,12 @@ description: Hands-on, progressive tutorials taking you from your first combinat
 
 # Syl Tutorials
 
-Welcome to the Syl hands-on tutorial series. Rather than listing syntax rules in isolation, these five lessons guide you through building, checking, simulating, and synthesizing real digital hardware—explaining **why** Syl is designed the way it is, what hardware semantics each construct lowers to, and which bugs the compiler catches before you ever launch a simulator.
+These five progressive lessons build combinational logic, a sequential counter, a multi-file project, an interface pipeline, and a clock-domain-crossing FIFO—covering design rationale, hardware semantics, and compile-time checks at each step.
 
 ## Learning Path
 
 ```mermaid
-flowchart LR
+flowchart TB
   L1["1. First Cell<br/>Combinational & SV Emit"] --> L2["2. Sequential Counter<br/>Clock<D>, Reset<D> & Verilator"]
   L2 --> L3["3. Multi-File Project<br/>syl.toml, use & std.*"]
   L3 --> L4["4. Interfaces & Pipelines<br/>bundle, view & Backpressure"]

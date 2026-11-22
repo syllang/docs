@@ -3,39 +3,39 @@ title: 操作指南
 description: 面向实际工程任务的 Syl 操作手册：涵盖 syl.toml 配置、SystemVerilog 发射、硬件设计模式、Verilator/Yosys 验证以及从其他 HDL 迁移。
 ---
 
-本象限提供面向具体工程目标的实操指南。所有 `.syl` 代码示例与配置片段均已通过 `sylc`（`7608b0d`）实测验证。
+本栏目提供面向具体工程目标的实操指南。所有 `.syl` 代码示例与配置片段均已通过 `sylc` 实测验证。
 
 ## 工程与工具链
 
-- [配置 syl.toml](/docs/how-to/configure-syl-toml)：配置 `[project]`、`[paths]`、多包工作区与自动向上发现。
-- [使用 sylc](/docs/how-to/sylc)：运行 `sylc check` 与 `sylc emit`、JSON 诊断输出与 `SourceMap` 渲染。
-- [SystemVerilog 发射](/docs/how-to/systemverilog-emission)：多文件发射（`--out-dir`）、`--filelist`、`--source-comments` 与确定性跨模块命名消歧。
-- [外部模块与 IP 集成](/docs/how-to/extern-and-ip)：编写 JSON/TOML Opaque Summary（`schema_version = 1`）、`domain_behavior` 与 `cdc_crossings`。
-- [LSP 与编辑器](/docs/how-to/lsp-and-editors)：配置 `syl-lsp`、`syl.toml` 热重载、增量同步与后台异步 DRC 通道。
-- [Rust 嵌入](/docs/how-to/rust-embedding)：在 Rust 工具中嵌入 `syl_session::AnalysisHost` 与 `AnalysisSnapshot`（`Send + Sync`）。
-- [AI 编程助手提示词](/docs/how-to/ai-prompt)：用于生成合法 Syl 硬件代码的生产级系统提示词。
+- [配置 syl.toml](/zh/docs/how-to/configure-syl-toml)：配置 `[project]`、`[paths]`、多包工作区与自动向上发现。
+- [使用 sylc](/zh/docs/how-to/sylc)：运行 `sylc check` 与 `sylc emit`、JSON 诊断输出与 `SourceMap` 渲染。
+- [SystemVerilog 发射](/zh/docs/how-to/systemverilog-emission)：多文件发射（`--out-dir`）、`--filelist`、`--source-comments` 与确定性跨模块命名消歧。
+- [外部模块与 IP 集成](/zh/docs/how-to/extern-and-ip)：编写 JSON/TOML Opaque Summary（`schema_version = 1`）、`domain_behavior` 与 `cdc_crossings`。
+- [LSP 与编辑器](/zh/docs/how-to/lsp-and-editors)：配置 `syl-lsp`、`syl.toml` 热重载、增量同步与后台异步 DRC 通道。
+- [Rust 嵌入](/zh/docs/how-to/rust-embedding)：在 Rust 工具中嵌入 `syl_session::AnalysisHost` 与 `AnalysisSnapshot`（`Send + Sync`）。
+- [AI 编程助手提示词](/zh/docs/how-to/ai-prompt)：用于生成合法 Syl 硬件代码的生产级系统提示词。
 
 ## 硬件设计模式
 
-- [流与握手](/docs/how-to/stream)：Valid/Ready 反压、`std.skid`、`std.arbiter` 与 `std.fifo` 联用。
-- [流水线](/docs/how-to/pipeline)：多级流水线、`std.stage`、`std.pipeline`、停顿传播与冲刷。
-- [接口与 Bundle](/docs/how-to/interfaces)：带方向的 `Bundle` 定义、`flip` 与 `std.bundle` 工具。
-- [参数化设计](/docs/how-to/parameterization)：编译期泛型、`const` 参数、`check_fn`/`check_map` 约束与结构生成。
-- [标准库](/docs/how-to/standard-library)：全部 13 个 `std.*` 模块的使用模式。
-- [示例与仿真](/docs/how-to/examples)：端到端示例与仿真入口。
+- [流与握手](/zh/docs/how-to/stream)：Valid/Ready 反压、`std.skid`、`std.arbiter` 与 `std.fifo` 联用。
+- [流水线](/zh/docs/how-to/pipeline)：多级流水线、`std.stage`、`std.pipeline`、停顿传播与冲刷。
+- [接口与 Bundle](/zh/docs/how-to/interfaces)：带方向的 `Bundle` 定义、`flip` 与 `std.bundle` 工具。
+- [参数化设计](/zh/docs/how-to/parameterization)：编译期泛型、`const` 参数、`check_fn`/`check_map` 约束与结构生成。
+- [标准库](/zh/docs/how-to/standard-library)：全部 13 个 `std.*` 模块的使用模式。
+- [示例与仿真](/zh/docs/how-to/examples)：端到端示例与仿真入口。
 
 ## 进阶硬件与验证
 
-- [CDC 与异步复位](/docs/how-to/cdc-and-async-reset)：`@cdc_sync` 边界同步器、`std.cdc` 与 `Reset<D, Sync|Async, ActiveHigh|ActiveLow>`。
-- [可综合 RAM 与 FIFO](/docs/how-to/synthesizable-ram-fifo)：`mem`、`mem_write`、`mem_read_sync`、`std.mem` 与 `std.fifo` 建模。
-- [Verilator 与 Yosys 验证](/docs/how-to/verilator-and-yosys)：`scripts/check_std_sim.sh`、C++17 Verilator testbench 与 Yosys 综合检查。
+- [CDC 与异步复位](/zh/docs/how-to/cdc-and-async-reset)：`@cdc_sync` 边界同步器、`std.cdc` 与 `Reset<D, Sync|Async, ActiveHigh|ActiveLow>`。
+- [可综合 RAM 与 FIFO](/zh/docs/how-to/synthesizable-ram-fifo)：`mem`、`mem_write`、`mem_read_sync`、`std.mem` 与 `std.fifo` 建模。
+- [Verilator 与 Yosys 验证](/zh/docs/how-to/verilator-and-yosys)：`scripts/check_std_sim.sh`、C++17 Verilator testbench 与 Yosys 综合检查。
 
 ## 迁移到 Syl
 
-- [从 Verilog / SystemVerilog 迁移](/docs/how-to/from-verilog)
-- [从 VHDL 迁移](/docs/how-to/from-vhdl)
-- [从 Chisel 迁移](/docs/how-to/from-chisel)
-- [从 SpinalHDL 迁移](/docs/how-to/from-spinalhdl)
-- [bool 与 bit](/docs/how-to/bool-vs-bit)
-- [求值期与硬件期](/docs/how-to/elaboration-vs-hardware)
-- [结构化设计](/docs/how-to/structural-design)
+- [从 Verilog / SystemVerilog 迁移](/zh/docs/how-to/from-verilog)
+- [从 VHDL 迁移](/zh/docs/how-to/from-vhdl)
+- [从 Chisel 迁移](/zh/docs/how-to/from-chisel)
+- [从 SpinalHDL 迁移](/zh/docs/how-to/from-spinalhdl)
+- [bool 与 bit](/zh/docs/how-to/bool-vs-bit)
+- [求值期与硬件期](/zh/docs/how-to/elaboration-vs-hardware)
+- [结构化设计](/zh/docs/how-to/structural-design)

@@ -18,7 +18,7 @@ description: 使用 syl.toml 组织多文件 Syl 工程，按路径导入本地�
 
 ## 前置条件
 
-- 已完成[第 2 课](/docs/tutorials/sequential-counter-sim)。
+- 已完成[第 2 课](/zh/docs/tutorials/sequential-counter-sim)。
 - 准备一个新的工程目录（例如 `mkdir -p ~/syl-tut3/src && cd ~/syl-tut3`）。
 
 ---
@@ -101,7 +101,7 @@ cell PulseSkidTop<D: Domain>(
 ### 关键细节
 
 - **`use src.frontend.ButtonPulse`**：通过工程相对路径导入 `src/frontend.syl` 中的 `ButtonPulse`。
-- **`let skid_out = place WordSkidBuffer<8, D>(...)`**：由于 `WordSkidBuffer` 返回的是双向接口视图（`Stream<UInt<8>>.source`），这里使用 `let` 绑定，并显式连接前向通道（`valid`、`payload`）与反向背压通道（`ready`）。（我们将在[第 4 课](/docs/tutorials/interfaces-and-pipelines)深入讲解 `bundle`、`interface` 与 `view`。）
+- **`let skid_out = place WordSkidBuffer<8, D>(...)`**：由于 `WordSkidBuffer` 返回的是双向接口视图（`Stream<UInt<8>>.source`），这里使用 `let` 绑定，并显式连接前向通道（`valid`、`payload`）与反向背压通道（`ready`）。（我们将在[第 4 课](/zh/docs/tutorials/interfaces-and-pipelines)深入讲解 `bundle`、`interface` 与 `view`。）
 
 ---
 
@@ -152,4 +152,4 @@ PulseSkidTop.sv
 
 ## 下一步
 
-你已经体验了标准库中的 `Stream<T>.sink` 与 `Stream<T>.source`。在[第 4 课：接口与流水线](/docs/tutorials/interfaces-and-pipelines)中，你将亲手定义 `bundle`、`interface` 和 `view`，并结合 `std.stage`、`std.pipeline` 与 `std.arbiter` 构建带反压的多级流水线。
+你已经体验了标准库中的 `Stream<T>.sink` 与 `Stream<T>.source`。在[第 4 课：接口与流水线](/zh/docs/tutorials/interfaces-and-pipelines)中，你将亲手定义 `bundle`、`interface` 和 `view`，并结合 `std.stage`、`std.pipeline` 与 `std.arbiter` 构建带反压的多级流水线。

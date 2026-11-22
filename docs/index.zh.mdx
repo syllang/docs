@@ -7,56 +7,54 @@ description: 静态可分析硬件描述语言，配备 Salsa 增量编译引擎
 
 Syl 是一门静态可分析的硬件描述语言（HDL），旨在生成 SystemVerilog 之前就在编译期捕获硬件缺陷——包括缺失驱动、多驱动冲突、位宽不匹配、跨时钟域（CDC）违规以及复位域/极性不一致。
 
-本文档按照 **Diátaxis** 框架组织为四个象限，无论你是第一次编写 `cell`、迁移现有 RTL 代码库、查阅语法与 CLI 规范，还是深入研究 Salsa 增量编译器，都能快速定位所需内容。
-
 ---
 
-## Diátaxis 四象限导图
+## 文档导览
 
-| 象限 | 定位 | 入口 |
+| 栏目 | 定位 | 入口 |
 | :--- | :--- | :--- |
-| **[Tutorials（教程）](/docs/tutorials)** | 学习导向，手把手带你完成完整项目 | [第一个 Cell](/docs/tutorials/first-cell) |
-| **[How-To Guides（操作指南）](/docs/how-to)** | 任务导向，解决实际工程与迁移问题 | [操作指南总览](/docs/how-to) |
-| **[Reference（参考手册）](/docs/reference)** | 信息导向，语法、类型、CLI、诊断与 `std.*` 规范 | [参考手册总览](/docs/reference) |
-| **[Explanation（原理解析）](/docs/explanation)** | 理解导向，静态检查原理、架构设计与编译器内部 | [什么是 Syl？](/docs/explanation/what-is-syl) |
+| **[Tutorials（教程）](/zh/docs/tutorials)** | 学习导向，手把手带你完成完整项目 | [第一个 Cell](/zh/docs/tutorials/first-cell) |
+| **[How-To Guides（操作指南）](/zh/docs/how-to)** | 任务导向，解决实际工程与迁移问题 | [操作指南总览](/zh/docs/how-to) |
+| **[Reference（参考手册）](/zh/docs/reference)** | 信息导向，语法、类型、CLI、诊断与 `std.*` 规范 | [参考手册总览](/zh/docs/reference) |
+| **[Explanation（原理解析）](/zh/docs/explanation)** | 理解导向，静态检查原理、架构设计与编译器内部 | [什么是 Syl？](/zh/docs/explanation/what-is-syl) |
 
 ---
 
 ## 推荐阅读路线
 
 ### 1. 初识 Syl（动手实践）
-1. [第一个 Cell](/docs/tutorials/first-cell) — 安装 `sylc`，编写组合逻辑模块并生成 SystemVerilog。
-2. [时序计数器与仿真](/docs/tutorials/sequential-counter-sim) — 引入 `Clock<D>`、`Reset<D>`、`reg`，并使用 Verilator 仿真。
-3. [多文件工程](/docs/tutorials/multi-file-project) — 使用 `syl.toml` 与 `import` 组织包结构。
-4. [接口与流水线](/docs/tutorials/interfaces-and-pipelines) — 构建强类型的 `interface`/`view` 总线与 valid/ready 流水线。
-5. [CDC 与异步 FIFO](/docs/tutorials/cdc-and-fifo) — 使用 `cdc` 标注与 `std.fifo` 安全跨越时钟域。
+1. [第一个 Cell](/zh/docs/tutorials/first-cell) — 安装 `sylc`，编写组合逻辑模块并生成 SystemVerilog。
+2. [时序计数器与仿真](/zh/docs/tutorials/sequential-counter-sim) — 引入 `Clock<D>`、`Reset<D>`、`reg`，并使用 Verilator 仿真。
+3. [多文件工程](/zh/docs/tutorials/multi-file-project) — 使用 `syl.toml` 与 `import` 组织包结构。
+4. [接口与流水线](/zh/docs/tutorials/interfaces-and-pipelines) — 构建强类型的 `interface`/`view` 总线与 valid/ready 流水线。
+5. [CDC 与异步 FIFO](/zh/docs/tutorials/cdc-and-fifo) — 使用 `cdc` 标注与 `std.fifo` 安全跨越时钟域。
 
 ### 2. 从 Verilog、SystemVerilog、VHDL、Chisel 或 SpinalHDL 迁移
-- **Verilog / SystemVerilog 工程师**：[从 Verilog 迁移](/docs/how-to/from-verilog) → [结构化设计](/docs/how-to/structural-design) → [SystemVerilog 生成](/docs/how-to/systemverilog-emission)
-- **VHDL 工程师**：[从 VHDL 迁移](/docs/how-to/from-vhdl) → [Bool 与 Bit](/docs/how-to/bool-vs-bit)
-- **Chisel / SpinalHDL 工程师**：[从 Chisel 迁移](/docs/how-to/from-chisel) 或 [从 SpinalHDL 迁移](/docs/how-to/from-spinalhdl) → [展开期与硬件期](/docs/how-to/elaboration-vs-hardware)
+- **Verilog / SystemVerilog 工程师**：[从 Verilog 迁移](/zh/docs/how-to/from-verilog) → [结构化设计](/zh/docs/how-to/structural-design) → [SystemVerilog 生成](/zh/docs/how-to/systemverilog-emission)
+- **VHDL 工程师**：[从 VHDL 迁移](/zh/docs/how-to/from-vhdl) → [Bool 与 Bit](/zh/docs/how-to/bool-vs-bit)
+- **Chisel / SpinalHDL 工程师**：[从 Chisel 迁移](/zh/docs/how-to/from-chisel) 或 [从 SpinalHDL 迁移](/zh/docs/how-to/from-spinalhdl) → [展开期与硬件期](/zh/docs/how-to/elaboration-vs-hardware)
 
 ### 3. 生产级工具链与验证
-- **工程配置**：[配置 `syl.toml`](/docs/how-to/configure-syl-toml) 与 [Manifest 与 Opaque Schema](/docs/reference/manifest-and-opaque-schema)
-- **CLI 与 IDE**：[使用 `sylc`](/docs/how-to/sylc)、[LSP 与编辑器（`syl_lsp`）](/docs/how-to/lsp-and-editors)、[LSP 参考](/docs/reference/lsp)
-- **仿真与综合**：[Verilator 与 Yosys](/docs/how-to/verilator-and-yosys)、[可综合 RAM 与 FIFO](/docs/how-to/synthesizable-ram-fifo)、[Extern 与 IP 集成](/docs/how-to/extern-and-ip)
-- **CDC 与复位安全**：[CDC 与异步复位](/docs/how-to/cdc-and-async-reset) 与 [CDC 与复位域](/docs/explanation/cdc-and-reset-domains)
+- **工程配置**：[配置 `syl.toml`](/zh/docs/how-to/configure-syl-toml) 与 [Manifest 与 Opaque Schema](/zh/docs/reference/manifest-and-opaque-schema)
+- **CLI 与 IDE**：[使用 `sylc`](/zh/docs/how-to/sylc)、[LSP 与编辑器（`syl_lsp`）](/zh/docs/how-to/lsp-and-editors)、[LSP 参考](/zh/docs/reference/lsp)
+- **仿真与综合**：[Verilator 与 Yosys](/zh/docs/how-to/verilator-and-yosys)、[可综合 RAM 与 FIFO](/zh/docs/how-to/synthesizable-ram-fifo)、[Extern 与 IP 集成](/zh/docs/how-to/extern-and-ip)
+- **CDC 与复位安全**：[CDC 与异步复位](/zh/docs/how-to/cdc-and-async-reset) 与 [CDC 与复位域](/zh/docs/explanation/cdc-and-reset-domains)
 
 ### 4. 编译器内部架构与贡献者
-- [什么是 Syl？](/docs/explanation/what-is-syl) 与 [为什么需要静态可分析性？](/docs/explanation/why-static-analyzability)
-- [编译器流水线](/docs/explanation/pipeline) 与 [Salsa 增量架构](/docs/explanation/salsa-incremental-architecture)
-- [语法与 AST](/docs/explanation/syntax-ast) → [HIR 与 TIR](/docs/explanation/hir-and-tir) → [展开与 EIR](/docs/explanation/elab-and-eir) → [Const MIR 与 Map IR](/docs/explanation/const-mir-and-map-ir) → [HW 与 SV IR](/docs/explanation/hw-and-sv-ir)
-- [仓库结构导览](/docs/explanation/repository-map) 与 [测试与贡献指南](/docs/explanation/testing-and-contributing)
+- [什么是 Syl？](/zh/docs/explanation/what-is-syl) 与 [为什么需要静态可分析性？](/zh/docs/explanation/why-static-analyzability)
+- [编译器流水线](/zh/docs/explanation/pipeline) 与 [Salsa 增量架构](/zh/docs/explanation/salsa-incremental-architecture)
+- [语法与 AST](/zh/docs/explanation/syntax-ast) → [HIR 与 TIR](/zh/docs/explanation/hir-and-tir) → [展开与 EIR](/zh/docs/explanation/elab-and-eir) → [Const MIR 与 Map IR](/zh/docs/explanation/const-mir-and-map-ir) → [HW 与 SV IR](/zh/docs/explanation/hw-and-sv-ir)
+- [仓库结构导览](/zh/docs/explanation/repository-map) 与 [测试与贡献指南](/zh/docs/explanation/testing-and-contributing)
 
 ---
 
 ## 生产级 Syl 全貌
 
 ### Salsa 增量编译引擎
-Syl 编译器（`sylc`）与语言服务器（`syl_lsp`）共享一套基于 **Salsa 的增量查询数据库**。编辑单个 `.syl` 文件时，仅重新计算受影响的语法、HIR/TIR、展开与静态检查查询，在编辑器中提供亚秒级诊断反馈，并在 CI 中实现极速增量构建。详见 [Salsa 增量架构](/docs/explanation/salsa-incremental-architecture)。
+Syl 编译器（`sylc`）与语言服务器（`syl_lsp`）共享一套基于 **Salsa 的增量查询数据库**。编辑单个 `.syl` 文件时，仅重新计算受影响的语法、HIR/TIR、展开与静态检查查询，在编辑器中提供亚秒级诊断反馈，并在 CI 中实现极速增量构建。详见 [Salsa 增量架构](/zh/docs/explanation/salsa-incremental-architecture)。
 
 ### `syl.toml` 工作区与包清单
-多文件工程通过 `syl.toml` 配置，用于定义包名、源码根目录、SystemVerilog 生成目标选项以及 `extern` IP 绑定。详见 [配置 `syl.toml`](/docs/how-to/configure-syl-toml) 与 [Manifest 与 Opaque Schema](/docs/reference/manifest-and-opaque-schema)。
+多文件工程通过 `syl.toml` 配置，用于定义包名、源码根目录、SystemVerilog 生成目标选项以及 `extern` IP 绑定。详见 [配置 `syl.toml`](/zh/docs/how-to/configure-syl-toml) 与 [Manifest 与 Opaque Schema](/zh/docs/reference/manifest-and-opaque-schema)。
 
 ### 编译期静态硬件保证
 每次执行 `sylc check` 都会验证：
@@ -64,10 +62,10 @@ Syl 编译器（`sylc`）与语言服务器（`syl_lsp`）共享一套基于 **S
 - **位宽与类型安全**：精确位宽匹配（`E_MIDDLE_TYPE_MISMATCH`）以及 `Bool` 与 `Bit` 的严格区分。
 - **跨时钟域与复位域检查（CDC/RDC）**：显式的 `Clock<D>` 与 `Reset<D>` 域追踪（`E_MIDDLE_CDC_VIOLATION`）、复位极性一致性检查，以及可综合 RAM/FIFO 推断。
 
-详见 [诊断索引](/docs/explanation/diagnostic-index) 与 [诊断参考手册](/docs/reference/diagnostics)。
+详见 [诊断索引](/zh/docs/explanation/diagnostic-index) 与 [诊断参考手册](/zh/docs/reference/diagnostics)。
 
 ### 13 个 `std.*` 标准库模块
-Syl 内置 13 个标准库模块，涵盖算术运算、位操作、跨时钟域同步器、FIFO、存储器、仲裁器与总线协议。详见 [标准库参考](/docs/reference/standard-library) 与 [标准库使用模式](/docs/how-to/standard-library)。
+Syl 内置 13 个标准库模块，涵盖算术运算、位操作、跨时钟域同步器、FIFO、存储器、仲裁器与总线协议。详见 [标准库参考](/zh/docs/reference/standard-library) 与 [标准库使用模式](/zh/docs/how-to/standard-library)。
 
 ### `syl_lsp` 与编辑器支持
-`syl_lsp` 基于与 `sylc` 相同的 Salsa 数据库，提供实时诊断、悬停类型/位宽提示、跳转到定义与工作区符号搜索。详见 [LSP 与编辑器](/docs/how-to/lsp-and-editors)。
+`syl_lsp` 基于与 `sylc` 相同的 Salsa 数据库，提供实时诊断、悬停类型/位宽提示、跳转到定义与工作区符号搜索。详见 [LSP 与编辑器](/zh/docs/how-to/lsp-and-editors)。

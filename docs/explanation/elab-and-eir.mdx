@@ -5,7 +5,7 @@ description: Deep dive into the elaboration stage — targeted module_eir_stage,
 
 # Elaboration and EIR
 
-Welcome to the Elaboration and EIR chapter! This page dives into the most complex stage of the compiler: elaboration. We review its inputs and outputs, walk through its 9-step internal pipeline, highlight targeted `module_eir_stage` construction, `EirModule::disambiguate`, `mem` primitive lowering, EIR data structures, and Design Rule Checks (DRC), and conclude with HW IR lowering.
+Elaboration is the compiler's most complex stage, executing a 9-step internal pipeline that covers targeted `module_eir_stage` construction, `EirModule::disambiguate`, `mem` primitive lowering, EIR data structures, Design Rule Checks (DRC), and HW IR lowering.
 
 ---
 
@@ -14,7 +14,7 @@ Welcome to the Elaboration and EIR chapter! This page dives into the most comple
 Elaboration takes three inputs from semantic analysis—TIR, Const MIR, and Map IR—and produces two outputs: EIR (Elaborated IR) and HW IR (Hardware IR).
 
 ```mermaid
-flowchart LR
+flowchart TB
     TIR["TIR (Typed IR)"]
     CM["Const MIR"]
     MI["Map IR"]

@@ -30,7 +30,7 @@ Syl's CDC checker (`CdcChecker` in `crates/syl_elab/src/driver/drc/cdc.rs`) runs
    ```
 
 ```mermaid
-flowchart LR
+flowchart TB
     RegA["reg src (Clock<DomainA>)"] --> Comb["Combinational Logic\n(inherits DomainA)"]
     Comb -->|"Direct unsynchronized sample ❌"| RegB["reg dst (Clock<DomainB>)\nE_MIDDLE_CDC_VIOLATION"]
     Comb -->|"Through @cdc_sync ✅"| Sync["Sync2FF\n@cdc_sync(din, dout, clk_in)"]

@@ -88,6 +88,32 @@ function validateLink(href, page, catalog) {
     };
   }
 
+  const isZhPage = page.url === '/zh/docs' || page.url.startsWith('/zh/docs/');
+  const canonicalTarget =
+    normalized === '/en/docs'
+      ? '/docs'
+      : normalized.startsWith('/en/docs/')
+        ? normalized.replace(/^\/en\/docs/, '/docs')
+        : normalized;
+
+  if (isZhPage && (canonicalTarget === '/docs' || canonicalTarget.startsWith('/docs/'))) {
+    const zhEquivalent = `/zh${canonicalTarget}`;
+    if (catalog.pages.has(zhEquivalent)) {
+      return {
+        ok: false,
+        message: `cross-locale link from zh page to ${normalized}; use ${zhEquivalent} instead`,
+      };
+    }
+  } else if (!isZhPage && (canonicalTarget === '/zh/docs' || canonicalTarget.startsWith('/zh/docs/'))) {
+    const enEquivalent = canonicalTarget.replace(/^\/zh/, '');
+    if (catalog.pages.has(enEquivalent)) {
+      return {
+        ok: false,
+        message: `cross-locale link from en page to ${normalized}; use ${enEquivalent} instead`,
+      };
+    }
+  }
+
   if (!hash) {
     return { ok: true };
   }
@@ -240,7 +266,7 @@ function getPageInfo(file) {
   const relative = path.posix.relative('docs', file).replace(/\\/g, '/');
   const isZh = relative.endsWith('.zh.mdx');
   const withoutExt = relative.replace(/\.mdx$/, '').replace(/\.zh$/, '');
-  const base = withoutExt.replace(/\/index$/, '');
+  const base = withoutExt === 'index' ? '' : withoutExt.replace(/\/index$/, '');
   const localePrefix = isZh ? '/zh/docs' : '/docs';
   const url = base ? `${localePrefix}/${base}` : localePrefix;
   const anchors = collectAnchors(readFileSync(file, 'utf8'));

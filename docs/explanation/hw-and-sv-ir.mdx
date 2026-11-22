@@ -5,7 +5,7 @@ description: Understand the backend-independent Hardware IR (HW IR), multi-file 
 
 # HW IR and SV Backend
 
-Welcome to the HW IR and SV Backend chapter! This page covers two topics: first, HW IR—the backend-independent interface between elaboration and code generation; second, how `syl_emit` lowers HW IR into SystemVerilog (including multi-file `EmittedSvBundle` / `filelist.f`, source-location comments, sync/async reset polarity, and synthesizable RAM).
+HW IR is the backend-independent interface between elaboration and code generation; the `syl_emit` backend lowers HW IR into SystemVerilog (including multi-file `EmittedSvBundle` / `filelist.f`, source-location comments, sync/async reset polarity, and synthesizable RAM).
 
 ---
 
@@ -99,7 +99,7 @@ In CI, emitted SystemVerilog is verified through Verilator lint + C++ co-simulat
 **HW IR does not depend on the backend, and the backend does not depend on the frontend.**
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Front["Frontend & Sema"]
         Sema["syl_sema"]
     end
