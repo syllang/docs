@@ -1,0 +1,168 @@
+---
+title: "第 5 课：跨时钟域与 FIFO"
+description: 触发并理解 E_MIDDLE_CDC_VIOLATION，使用 @cdc_sync、std.cdc.Sync2FF 与 std.fifo.SyncFifo 安全跨时钟域，并完成 Yosys 综合验证。
+---
+
+# 第 5 课：跨时钟域与 FIFO
+
+在真实的 SoC 与 FPGA 中，各子系统很少共享同一个时钟。将一个信号从时钟域 `A` 直接跨越到时钟域 `B` 而未做同步，会导致**亚稳态（Metastability）**——这种物理级故障在功能 RTL 仿真中极难暴露。在最后一课中，你将主动触发 Syl 的编译期 CDC 检查（`E_MIDDLE_CDC_VIOLATION`），使用 `std.cdc.Sync2FF`（`@cdc_sync`）修复跨时钟域路径，结合 `std.fifo.SyncFifo` 缓存数据，并用 **Yosys** 验证可综合性。
+
+## 学习目标
+
+完成本课后，你将能够：
+
+- 触发并读懂当 `A` 域寄存器直接驱动 `B` 域寄存器时报告的 `E_MIDDLE_CDC_VIOLATION`。
+- 理解 `@cdc_sync(async_in, sync_out, dst_clk)` 如何声明经过验证的同步器边界。
+- 实例化 `std.cdc.Sync2FF` 与 `std.fifo.SyncFifo` 构建双时钟桥接模块 `CdcFifoBridge`。
+- 运行 Yosys 综合（`read_verilog -sv ...; synth -top CdcFifoBridge`）确认生成的 SystemVerilog 完全可综合。
+
+## 前置条件
+
+- 已完成[第 4 课](/docs/tutorials/interfaces-and-pipelines)。
+- 已安装 `yosys` 并加入 `PATH`（`yosys -V` 可用）。
+
+---
+
+## 第 1 步：触发 `E_MIDDLE_CDC_VIOLATION`
+
+创建 `bad_cdc.syl`，声明两个独立时钟域 `A` 和 `B`，并将 `A` 域的寄存器直接连到 `B` 域的寄存器：
+
+```syl
+cell BadCdc<A: Domain, B: Domain>(
+    clk_a: in Clock<A>,
+    rst_a: in Reset<A>,
+    clk_b: in Clock<B>,
+    rst_b: in Reset<B>,
+    din: in Bit,
+) -> dout: Bit {
+    reg stage_a: Bit reset(rst_a, 0)
+    next stage_a := din
+
+    reg stage_b: Bit reset(rst_b, 0)
+    next stage_b := stage_a
+
+    dout := stage_b
+}
+```
+
+运行 `sylc check bad_cdc.syl`：
+
+```text
+error[E_MIDDLE_CDC_VIOLATION]: CDC violation: stage_a launched in clk_a sampled by stage_b in clk_b
+   --> bad_cdc.syl:11:5
+    |
+ 11 |     reg stage_b: Bit reset(rst_b, 0)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: stage_a launched by clk_a
+  --> bad_cdc.syl:8:5
+   |
+ 8 |     reg stage_a: Bit reset(rst_a, 0)
+   |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   |
+error: aborting due to 1 previous errors
+```
+
+在传统 Verilog 中，这类隐患往往零警告通过编译。而在 Syl 中，由于 `stage_a` 绑定到 `rst_a`（域 `A`），`stage_b` 绑定到 `rst_b`（域 `B`），`sylc` 在编译期即证明存在未同步的跨时钟域路径并直接拒绝。
+
+---
+
+## 第 2 步：理解 `std.cdc` 中的 `@cdc_sync`
+
+在 `std.cdc` 中，`Sync2FF` 带有 `@cdc_sync(async_in, sync_out, dst_clk)` 属性注解：
+
+```syl
+@cdc_sync(async_in, sync_out, dst_clk)
+cell Sync2FF<D_DST: Domain>(
+    dst_clk: in Clock<D_DST>, dst_rst: in Reset<D_DST>, async_in: in Bit,
+) -> sync_out: Bit {
+    reg stage1: Bit reset(dst_rst, 0)
+    reg stage2: Bit reset(dst_rst, 0)
+    next stage1 := async_in
+    next stage2 := stage1
+    sync_out := stage2
+}
+```
+
+`@cdc_sync` 告诉 `sylc` 的 CDC 检查器：*“此 `cell` 显式接收异步输入 `async_in`，并将其安全同步到 `dst_clk` 所在的时钟域输出 `sync_out`。”*
+
+---
+
+## 第 3 步：构建 `CdcFifoBridge`
+
+创建 `cdc_fifo.syl`，将 `std.cdc.Sync2FF`（控制信号同步）与 `std.fifo.SyncFifo`（8 深度、8 位宽数据缓存）组合在一起：
+
+```syl
+use std.cdc.Sync2FF
+use std.fifo.SyncFifo
+
+cell CdcFifoBridge<A: Domain, B: Domain>(
+    clk_a: in Clock<A>,
+    rst_a: in Reset<A>,
+    clk_b: in Clock<B>,
+    rst_b: in Reset<B>,
+    req_a: in Bit,
+    push: in Bit,
+    pop: in Bit,
+    wdata: in UInt<8>,
+    rdata: out UInt<8>,
+    full: out Bit,
+    empty: out Bit,
+    count: out UInt<4>,
+    req_b: out Bit,
+) {
+    reg src_flag: Bit reset(rst_a, 0)
+    next src_flag := req_a
+
+    signal synced_req: Bit := place Sync2FF<B>(
+        dst_clk: clk_b,
+        dst_rst: rst_b,
+        async_in: src_flag,
+    )
+    req_b := synced_req
+
+    place SyncFifo<8, 8, 3, 4, B>(
+        clk: clk_b,
+        rst: rst_b,
+        push: push,
+        pop: pop,
+        wdata: wdata,
+        rdata: rdata,
+        full: full,
+        empty: empty,
+        count: count,
+    )
+}
+```
+
+运行 `sylc check` 并发射 SystemVerilog：
+
+```bash
+sylc check cdc_fifo.syl
+sylc emit cdc_fifo.syl > CdcFifoBridge.sv
+```
+
+两条命令均以退出码 `0` 成功完成。
+
+---
+
+## 第 4 步：使用 Yosys 进行综合验证
+
+最后，使用 Yosys 验证 `CdcFifoBridge.sv` 能够顺利综合为标准逻辑单元与触发器：
+
+```bash
+yosys -q -p "read_verilog -sv CdcFifoBridge.sv; synth -top CdcFifoBridge"
+```
+
+退出码 `0` 表明生成的 SystemVerilog 100% 可综合——其中 `Sync2FF` 被综合为两级触发器同步链，`SyncFifo` 被综合为存储阵列与读写指针寄存器。
+
+---
+
+## 常见踩坑与排障
+
+- **把 `rst_a` 传给 `Sync2FF<B>`**：`Sync2FF<B>` 要求 `dst_rst: in Reset<B>`，传入 `rst_a` 会因复位域不匹配触发 `E_MIDDLE_RESET_DOMAIN_MISMATCH`。
+- **用 `Sync2FF` 同步多位宽总线**：`Sync2FF` 仅适用于单比特电平信号；多位宽数据请配合握手脉冲（`std.cdc.PulseSync`）或 FIFO 传递。
+
+## 恭喜通关！
+
+你已经完成了 Syl 实战教程的全部五课——从第一个组合逻辑 `cell`，一路走到了通过 Yosys 综合验证的多时钟域硬件系统。

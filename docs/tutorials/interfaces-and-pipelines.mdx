@@ -1,0 +1,170 @@
+---
+title: "Lesson 4: Interfaces & Pipelines"
+description: Build backpressured pipelines using bundle, interface, view, std.stream, std.skid, and std.arbiter with static direction and single-driver checks.
+---
+
+# Lesson 4: Interfaces & Pipelines
+
+In [Lesson 3](/docs/tutorials/multi-file-project), you used `Stream<UInt<8>>.sink` and `Stream<UInt<8>>.source` from `std.stream`. In this lesson, you will look under the hood at how Syl models bidirectional protocols with `bundle`, `interface`, and `view`, chain elastic pipeline stages with full backpressure, integrate `std.arbiter.FixedPriorityArbiter4`, and see how `sylc` catches direction violations at compile time.
+
+## Learning Objectives
+
+By the end of this lesson, you will be able to:
+
+- Define composite data payloads with `bundle` and bidirectional protocols with `interface` and `view` (`source` / `sink`).
+- Chain `std.stream.Stream` stages with `std.skid.WordSkidBuffer` to build a backpressured 2-stage pipeline.
+- Integrate `std.arbiter.FixedPriorityArbiter4` for combinational request arbitration.
+- Diagnose `E_MIDDLE_NOT_DRIVABLE` when driving a signal against its `view` direction.
+
+## Prerequisites
+
+- Completed [Lesson 3](/docs/tutorials/multi-file-project).
+
+---
+
+## Step 1: Defining `bundle` and `interface` with `view`
+
+In SystemVerilog, `modport`s are optional and often ignored by synthesis tools or bypassed accidentally. In Syl, `interface` and `view` are **first-class, statically checked** constructs.
+
+Create `pipeline_demo.syl` and start with a `bundle` and a `SimpleBus<T>` interface:
+
+```syl
+bundle Packet {
+    data: UInt<8>,
+    tag: UInt<2>,
+}
+
+interface SimpleBus<T> {
+    valid: Bit,
+    data: T,
+    ready: Bit,
+
+    view source {
+        out valid,
+        out data,
+        in ready,
+    }
+
+    view sink {
+        in valid,
+        in data,
+        out ready,
+    }
+}
+```
+
+### Hardware Semantics
+
+- **`bundle Packet`**: Groups `data` and `tag` into a single unidirectional value type. Every field flows in the same direction.
+- **`interface SimpleBus<T>`**: Declares a collection of signals (`valid`, `data`, `ready`) that flow in **opposite** directions depending on which endpoint you are looking from.
+- **`view source` / `view sink`**: Pins the direction of each field. A `source` drives `valid` and `data` (`out`) and reads `ready` (`in`); a `sink` reads `valid` and `data` (`in`) and drives `ready` (`out`).
+
+---
+
+## Step 2: Building a 2-Stage Backpressured Pipeline
+
+Now add `TwoStagePipe` to `pipeline_demo.syl`, importing `std.stream.Stream`, `std.skid.WordSkidBuffer`, and `std.arbiter.FixedPriorityArbiter4`:
+
+```syl
+use std.stream.Stream
+use std.skid.WordSkidBuffer
+use std.arbiter.FixedPriorityArbiter4
+
+bundle Packet {
+    data: UInt<8>,
+    tag: UInt<2>,
+}
+
+interface SimpleBus<T> {
+    valid: Bit,
+    data: T,
+    ready: Bit,
+
+    view source {
+        out valid,
+        out data,
+        in ready,
+    }
+
+    view sink {
+        in valid,
+        in data,
+        out ready,
+    }
+}
+
+cell TwoStagePipe<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    up: in Stream<UInt<8>>.sink,
+    req: in UInt<4>,
+    grant: out UInt<4>,
+) -> down: Stream<UInt<8>>.source {
+    signal g: UInt<4> := place FixedPriorityArbiter4(req: req)
+    grant := g
+
+    let s1 = place WordSkidBuffer<8, D>(clk: clk, rst: rst, up: up)
+    let s2 = place WordSkidBuffer<8, D>(clk: clk, rst: rst, up: s1)
+
+    down.valid := s2.valid
+    down.payload := s2.payload
+    s2.ready := down.ready
+}
+```
+
+### Why This Works
+
+1. **Zero-cycle backpressure**: Each `WordSkidBuffer` registers both the forward `valid`/`payload` path and the backward `ready` path. Chaining `s1` into `s2` creates a 2-stage elastic pipeline that can absorb stalls from `down.ready == 0` without dropping data.
+2. **Arbitration**: `FixedPriorityArbiter4` is a pure combinational `cell` that grants the lowest-indexed active bit in `req`.
+3. **Explicit handshake wiring**: `down.valid := s2.valid`, `down.payload := s2.payload`, and `s2.ready := down.ready` connect the downstream `Stream` cleanly.
+
+Run `sylc check`:
+
+```bash
+sylc check pipeline_demo.syl
+```
+
+Exit code `0`—every `view` direction and single-driver rule is satisfied.
+
+---
+
+## Step 3: Compile-Time Direction Checking (`E_MIDDLE_NOT_DRIVABLE`)
+
+What happens if you accidentally try to drive `up.valid` inside a cell that receives `up: in Stream<UInt<8>>.sink`?
+
+Create `bad_dir.syl`:
+
+```syl
+use std.stream.Stream
+
+cell BadDirection(
+    up: in Stream<UInt<8>>.sink,
+) {
+    up.valid := 1
+}
+```
+
+Run `sylc check bad_dir.syl`:
+
+```text
+error[E_MIDDLE_NOT_DRIVABLE]: up.valid is not drivable in this scope
+  --> bad_dir.syl:6:5
+   |
+ 6 |     up.valid := 1
+   |     ^^^^^^^^
+   |
+error: aborting due to 1 previous errors
+```
+
+Because `up` has view `Stream<UInt<8>>.sink`, `up.valid` is an `in` field—`sylc` immediately rejects the illegal write with `E_MIDDLE_NOT_DRIVABLE`.
+
+---
+
+## Common Pitfalls
+
+- **Driving an `in` field on a `sink` view**: Always remember `sink` drives `ready` (`out ready`) and reads `valid`/`payload` (`in valid`, `in payload`).
+- **Forgetting to wire `s2.ready := down.ready`**: Leaving `s2.ready` undriven will be caught by `sylc check` as a missing driver on the backward channel.
+
+## Next Step
+
+All circuits so far have lived in a single clock domain `D`. In [Lesson 5: CDC & FIFO](/docs/tutorials/cdc-and-fifo), you will connect two independent clock domains (`clk_a` and `clk_b`), trigger `E_MIDDLE_CDC_VIOLATION`, and build a verified dual-clock bridge using `@cdc_sync`, `std.cdc`, `std.fifo`, Verilator, and Yosys.

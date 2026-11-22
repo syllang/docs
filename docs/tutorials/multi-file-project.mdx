@@ -1,0 +1,155 @@
+---
+title: "Lesson 3: Multi-File Project"
+description: Organize a multi-file Syl project with syl.toml, module paths, use imports, std.pulse/std.skid reuse, and multi-file SystemVerilog emission.
+---
+
+# Lesson 3: Multi-File Project
+
+Real hardware designs rarely live in a single `.syl` file. As your codebase grows, you need a project manifest, clean module boundaries, and a way to reuse standard library components without copy-pasting code. In this lesson, you will structure a multi-file Syl project using `syl.toml`, import both local modules and `std.*` library cells (`std.pulse` and `std.skid`), and emit a multi-file SystemVerilog build tree with `--out-dir`, `--filelist`, and `--source-comments`.
+
+## Learning Objectives
+
+By the end of this lesson, you will be able to:
+
+- Configure a Syl project root with `syl.toml`.
+- Organize source files under `src/` and import cells across files using `use`.
+- Reuse `std.pulse.RisingEdgeDetector`, `std.stream.Stream`, and `std.skid.WordSkidBuffer`.
+- Emit one SystemVerilog file per module using `--out-dir`, generate a synthesis/simulation filelist with `--filelist`, and preserve origin traceability with `--source-comments`.
+
+## Prerequisites
+
+- Completed [Lesson 2](/docs/tutorials/sequential-counter-sim).
+- A fresh project directory (for example, `mkdir -p ~/syl-tut3/src && cd ~/syl-tut3`).
+
+---
+
+## Step 1: Create the Project Manifest (`syl.toml`)
+
+In the root of your project (`~/syl-tut3/syl.toml`), create a `syl.toml` file:
+
+```toml
+[project]
+name = "pulse_skid"
+```
+
+When you pass a directory to `sylc check .` or `sylc emit .`, `sylc` looks for `syl.toml` to establish the project root. File paths relative to that root map directly to module paths—so `src/frontend.syl` becomes the module `src.frontend`.
+
+---
+
+## Step 2: Create a Local Module (`src/frontend.syl`)
+
+Create `src/frontend.syl` containing a `ButtonPulse` cell that wraps `std.pulse.RisingEdgeDetector` to turn a level-based button input into a single-cycle pulse:
+
+```syl
+use std.pulse.RisingEdgeDetector
+
+cell ButtonPulse<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    raw_btn: in Bit,
+) -> trig: Bit {
+    place RisingEdgeDetector<D>(
+        clk: clk,
+        rst: rst,
+        level: raw_btn,
+        rising: trig,
+    )
+}
+```
+
+### Why This Works
+
+- **`use std.pulse.RisingEdgeDetector`**: Imports `RisingEdgeDetector` from the Syl standard library (`std.pulse`).
+- **`place RisingEdgeDetector<D>(...)`**: Instantiates the sub-cell and connects its `rising` output port directly to `ButtonPulse`'s `trig` output. Because `D` is passed through, both cells are statically bound to the same clock domain.
+
+---
+
+## Step 3: Compose the Top-Level Cell (`src/main.syl`)
+
+Now create `src/main.syl` to combine `ButtonPulse` with `std.skid.WordSkidBuffer`—a 2-entry elastic buffer that breaks combinational `ready` paths on a `Stream<UInt<8>>` interface:
+
+```syl
+use std.stream.Stream
+use std.skid.WordSkidBuffer
+use src.frontend.ButtonPulse
+
+cell PulseSkidTop<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    raw_btn: in Bit,
+    up: in Stream<UInt<8>>.sink,
+    btn_pulse: out Bit,
+) -> down: Stream<UInt<8>>.source {
+    signal trig: Bit := place ButtonPulse<D>(
+        clk: clk,
+        rst: rst,
+        raw_btn: raw_btn,
+    )
+    btn_pulse := trig
+
+    let skid_out = place WordSkidBuffer<8, D>(
+        clk: clk,
+        rst: rst,
+        up: up,
+    )
+    down.valid := skid_out.valid
+    down.payload := skid_out.payload
+    skid_out.ready := down.ready
+}
+```
+
+### Key Details
+
+- **`use src.frontend.ButtonPulse`**: Imports `ButtonPulse` from `src/frontend.syl` using its project-relative module path.
+- **`let skid_out = place WordSkidBuffer<8, D>(...)`**: Because `WordSkidBuffer` returns a bidirectional interface view (`Stream<UInt<8>>.source`), we bind it with `let` and wire the forward (`valid`, `payload`) and backward (`ready`) channels explicitly. (We will explore `bundle`, `interface`, and `view` in depth in [Lesson 4](/docs/tutorials/interfaces-and-pipelines).)
+
+---
+
+## Step 4: Check the Whole Project
+
+Run `sylc check` on the project directory:
+
+```bash
+sylc check .
+```
+
+If your `std` library lives in a custom location, pass `--std-root /path/to/std`. A clean exit code `0` confirms that all imports, domain parameters, and interface directions across both files and `std.*` are valid.
+
+---
+
+## Step 5: Multi-File SystemVerilog Emission
+
+For synthesis tools (Yosys, Vivado) and simulators (Verilator), emitting one `.sv` file per module alongside a `.f` filelist is standard practice. Run:
+
+```bash
+sylc emit --out-dir sv_out --filelist sv_out/files.f --source-comments .
+```
+
+Inspect `sv_out/files.f`:
+
+```text
+RisingEdgeDetector.sv
+ButtonPulse.sv
+FallingEdgeDetector.sv
+EdgeDetector.sv
+PulseStretcher.sv
+stream_connect.sv
+stream_skid_buffer.sv
+SkidBuffer.sv
+WordSkidBuffer.sv
+PulseSkidTop.sv
+```
+
+`sylc` automatically orders `files.f` in topological dependency order (leaves first, `PulseSkidTop.sv` last), and `--source-comments` embeds `// <file>:<line>` annotations inside the generated SystemVerilog so you can trace any wire or `always_ff` back to its `.syl` origin.
+
+---
+
+## Common Pitfalls
+
+- **Using `[package]` instead of `[project]` in `syl.toml`**: `sylc` expects `[project]` (and optional `[paths]`). Using `[package]` triggers `E_MANIFEST_PARSE`.
+- **Omitting `src.` in `use` paths**: Without custom `[paths]` remapping, `src/frontend.syl` is addressed as `src.frontend`. Using `use frontend.ButtonPulse` triggers `E_IMPORT_RESOLVE`.
+- **Binding a bidirectional `Stream` view with `signal`**: Use `let skid_out = place ...` for interface views so you can drive `skid_out.ready` and read `skid_out.valid`/`skid_out.payload`.
+
+## Next Step
+
+You have now used `Stream<T>.sink` and `Stream<T>.source` from `std.stream`. In [Lesson 4: Interfaces & Pipelines](/docs/tutorials/interfaces-and-pipelines), you will define your own `bundle`, `interface`, and `view` types, and build a 2-stage backpressured pipeline with `std.stage`, `std.pipeline`, and `std.arbiter`.
