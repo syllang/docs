@@ -7,7 +7,7 @@ description: Deep dive into Syl's declaration-level incremental query engine bui
 
 The Syl compiler powers both batch CLI compilation (`sylc`) and interactive IDE tooling (`syl_lsp` and `syl_query`). To keep large hardware projects responsive to sub-10ms edits, `syl_session` implements a declaration-level incremental computation engine on top of **Salsa 0.28.2**.
 
-The incremental engine combines the `AnalysisHost` / `AnalysisSnapshot` session model, single-parse deduplication, O(1) generation comparison, `Retained` pointer deduplication, and LSP fast/background lane isolation, achieving sub-millisecond incremental checks across 50- and 100-file benchmarks.
+The incremental engine combines the `AnalysisHost` / `AnalysisSnapshot` session model, single-parse deduplication, O(1) generation comparison, `Retained` pointer deduplication, and LSP fast/background lane isolation, achieving millisecond-level incremental IDE queries across 50- and 100-file projects.
 
 ---
 

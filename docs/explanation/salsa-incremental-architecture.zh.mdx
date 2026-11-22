@@ -7,7 +7,7 @@ description: 深入解析 Syl 基于 Salsa 0.28.2 的声明级增量查询架构
 
 Syl 编译器不仅服务于命令行批处理（`sylc`），还直接驱动交互式语言服务器（`syl_lsp`）与只读查询引擎（`syl_query`）。为了让大型硬件工程在编辑时保持毫秒级响应，Syl 在 `syl_session` 中构建了一套基于 **Salsa 0.28.2** 的声明级增量计算引擎。
 
-本文从 `AnalysisHost` 与 `AnalysisSnapshot` 的会话模型出发，深入剖析单次解析去重、O(1) 代际比对、`Retained` 指针去重、LSP 快慢双通道隔离，以及 50/100 文件规模下的真实压测表现。
+增量引擎结合 `AnalysisHost` / `AnalysisSnapshot` 会话模型、单次解析去重、O(1) 代际比对、`Retained` 指针去重与 LSP 快慢双通道隔离，在 50/100 文件工程下保持毫秒级交互响应。
 
 ---
 
