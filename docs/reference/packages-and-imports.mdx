@@ -5,13 +5,13 @@ description: File organization in Syl—package, use, syl.toml root discovery, a
 
 # Packages and Imports
 
-Syl organizes code into packages. Each source file belongs to a package, and packages import declarations from one another using `use`. This page covers package rules, import syntax, `syl.toml` root discovery, and file layout.
+Syl organizes code into packages. Each source file belongs to a package, and packages import declarations from one another using `use`. This page explains package rules, import syntax, `syl.toml` root discovery, and file organization.
 
 ---
 
 ## Package Concept
 
-Each `.syl` file belongs to a package whose path is derived from its file path relative to the package root:
+Every `.syl` file belongs to a package. The package name is inferred from its file path relative to the package root:
 
 ```
 project/
@@ -22,6 +22,8 @@ project/
     └── utils.syl      # package: project.lib.utils
 ```
 
+Package names are used in `use` statements to reference declarations in other files.
+
 ## use Imports
 
 `use` imports declarations from other packages.
@@ -31,6 +33,8 @@ project/
 ```syl
 use project.src.counter.Counter
 ```
+
+This imports the `Counter` declaration from `project.src.counter`, making `Counter` available directly by name.
 
 ### Importing Multiple Declarations
 
@@ -45,6 +49,8 @@ use project.src.counter.Config
 use project.src.counter.*
 ```
 
+This imports all public declarations from `project.src.counter`.
+
 ### Importing from the Standard Library
 
 ```syl
@@ -57,17 +63,21 @@ Standard library packages begin with `std.`.
 
 ## Package Organization
 
-### By Feature
+### Organizing by Feature
 
 ```
 project/
 ├── alu.syl            # ALU types and cells
-├── counter.syl        # Counters
-├── stream.syl         # Stream interfaces
+├── counter.syl        # Counter cells
+├── stream.syl         # Stream interface definitions
 └── top.syl            # Top-level cell
 ```
 
+Each file contains declarations for a single functional area, and other files import them with `use`.
+
 ### Separating Types and Implementations
+
+Place shared type definitions in one file and the modules that implement them in another:
 
 ```syl
 # types.syl
@@ -83,9 +93,11 @@ cell FSM(ctrl: out Control) { ... }
 
 ### Avoiding Cyclic Imports
 
-Package A cannot import package B if package B imports package A. The compiler detects and reports cyclic imports.
+If package A imports package B, package B cannot import package A. The Syl compiler detects and reports cyclic imports.
 
 ## Cross-File References
+
+### Example
 
 ```syl
 # counter.syl
@@ -111,6 +123,8 @@ Compile both files together:
 sylc counter.syl top.syl
 ```
 
+The compiler resolves `use counter.Counter` and locates `Counter` in `counter.syl`.
+
 ### Subdirectory Imports
 
 ```syl
@@ -127,48 +141,129 @@ Import paths are relative to the package root.
 
 ## Standard Library Packages
 
+Syl's standard library provides the following packages:
+
 ```syl
-use std.stream.Stream
-use std.stage.Stage
-use std.stage.stage_from_stream
-use std.stage.stage_to_stream
-use std.stage.stage_link
-use std.stage.halt_link
-use std.stage.drop_link
-use std.pipeline.*
-use std.bundle.*
-use std.logic.*
-use std.assert.*
+use std.stream.Stream              // Streaming handshake interface
+use std.stage.Stage                // Pipeline stage interface
+use std.stage.stage_from_stream    // Adapt Stream to Stage
+use std.stage.stage_to_stream      // Adapt Stage to Stream
+use std.stage.stage_link           // Connect two pipeline stages
+use std.stage.halt_link            // Pipeline link with halt
+use std.stage.drop_link            // Pipeline link with drop
+use std.pipeline.*                 // Multi-stage pipeline helpers
+use std.bundle.*                   // Bundle utilities
+use std.logic.*                    // Combinational logic helpers
+use std.assert.*                   // Assertion helpers
 ```
 
-See [Standard Library](./standard-library) for the full reference.
+The standard library source lives under `examples/std/` and serves as a reference for idiomatic Syl code.
 
-## Best Practices
+## Standard Library Package Walkthrough
 
-- Keep files between 100 and 500 lines for readability.
-- Place public types (`bundle`, `interface`, `enum`) at the top of the file.
-- Syl does not require a specific file order on the command line.
+```syl
+use std.stream.Stream
+```
+
+`std.stream.Stream` defines a valid-ready handshake interface—the most common interface type in Syl:
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+Usage example:
+
+```syl
+use std.stream.Stream
+
+cell PipelineStage<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    upstream: in Stream<T>.sink,
+    downstream: out Stream<T>.source,
+)
+```
+
+## Package Design Guidelines
+
+### Keep File Sizes Moderate
+
+A file size of 100 to 500 lines of Syl code works well. Overly large files are hard to navigate, while tiny files increase import overhead.
+
+### Place Public Interfaces at the Top
+
+Put public types (`bundle`, `interface`, `enum`) at the top of the file and cell implementations below so readers can quickly see what the file exports.
+
+### Compile in Dependency Order
+
+Syl does not require a specific file order on the command line, though listing dependencies first can be convenient.
+
+## Compilation Order
+
+During parsing, the compiler collects top-level declarations from all input files, then runs name resolution to bind `use` imports to their target declarations.
+
+If the compiler cannot locate the file for a `use` path, it reports an error. Common causes include omitting the file from the command line, a misspelled path, or a mismatched filename.
 
 ## Common Errors
 
 ### Wrong Import Path
 
-Import paths must match the full package path relative to the package root.
+```syl
+# use counter.Counter    // Wrong if the file is under src/
+```
+
+Import paths must use the full package path relative to the package root.
 
 ### Name Collisions
 
-Imported declarations cannot share a name with local declarations in the same file.
+```syl
+# file1.syl
+cell Counter { ... }
+
+# file2.syl
+use file1.Counter
+# cell Counter { ... }    // Error: Counter name collision
+```
+
+Imported declarations cannot share a name with local declarations in the same file. Rename the local declaration to resolve the conflict.
 
 ### Cyclic Imports
 
-Extract shared types into a third package to break import cycles.
+```
+Package A imports Package B
+Package B imports Package A
+# Error: cyclic import
+```
+
+The compiler detects cyclic imports and reports an error. Extract shared types into a third package to break the cycle.
 
 ### Using Without Importing
 
-Cross-file references require `use`.
+```syl
+// Error: Stream used without importing
+cell Top(stream: in Stream<UInt<8>>.sink) { ... }
+```
+
+Cross-file references require `use`. References within the same file do not require importing.
 
 ### `syl.toml` Root Discovery, Unused `use` Checks, and `E_DUPLICATE_MODULE_FILE`
 
-- **`syl.toml` root discovery:** When `--package-root` is not explicitly passed, `sylc` searches upward from the input paths for the nearest `syl.toml` to determine the package root.
-- **Unused `use` validation:** The compiler checks whether imported declarations are actually referenced and reports unused `use` statements.
+- **`syl.toml` root discovery:** When `--package-root` is not explicitly passed, `sylc` searches upward from the input path for the nearest `syl.toml` to determine the project root and resolve package paths.
+- **Unused `use` validation:** The compiler checks whether imported declarations are actually referenced in the current file and emits diagnostics for unused `use` statements.
 - **Duplicate module files (`E_DUPLICATE_MODULE_FILE`):** When multiple source files map to the same module path or a module file is loaded twice, the compiler reports `E_DUPLICATE_MODULE_FILE`.

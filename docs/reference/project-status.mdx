@@ -1,12 +1,110 @@
 ---
 title: Project Status
-description: Current implementation status of Syl across Wave 0–3 milestones.
+description: What Syl can do today, what is experimental, and what is not yet supported.
 ---
 
 # Project Status
 
-Syl is under active development. The compiler (`sylc`), language server (`syl-lsp`), and standard library (`std.*`) have completed **Wave 0 through Wave 3** milestones:
+This page describes the current capabilities and boundaries of the Syl compiler. If you are evaluating Syl, this helps you judge whether its current maturity matches your needs.
 
-- **Wave 0–1 (Frontend, Query & Manifest):** Salsa-based incremental query engine (`syl_query`), `syl.toml` manifest discovery, `check_fn` full body checking, `check_map` return consistency, recursive struct/bundle cycle detection, and `E_MIDDLE_CONST_CYCLE`.
-- **Wave 2 (Standard Library & Tooling):** 13 `std.*` modules (36 public `cell`s including `std.vendor`), `--out-dir` / `--filelist` / `--source-comments`, `--diagnostics-format json`, and `syl-lsp` incremental sync + semantic tokens + background DRC.
-- **Wave 3 (Hardware Semantics & DRC):** Clock Domain Crossing (CDC) enforcement with `@cdc_sync`, `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` polarity, synthesizable `mem` / `mem_write` / `mem_read_sync`, and JSON/TOML Opaque Summary `schema_version = 1`.
+---
+
+## Verified Capabilities
+
+The following capabilities are verified by architectural contract tests on every CI run:
+
+**End-to-end compilation pipeline.** From frontend to backend to Verilator smoke tests. The compiler handles module definitions, interface declarations, combinational logic, and sequential logic, emitting SystemVerilog that Verilator can parse.
+
+**Parameterized module instantiation and elaboration.** Modules can carry type and value parameters bound at instantiation. The compiler elaborates parameterized modules into concrete hardware instances.
+
+**Name resolution and type checking.** The compiler resolves cross-file `use` imports, checks expression type consistency, and enforces port direction rules.
+
+**Constant evaluation.** Compile-time `fn` functions execute with conditionals and loops, and their results drive generic parameters and array sizes.
+
+**Driver analysis.** The compiler detects multiple-driver conflicts and missing drivers.
+
+**Opaque summaries.** External modules can declare signatures via `extern cell`. Pre-compiled third-party components can describe internal behavior via injected summaries.
+
+**Layered diagnostics.** Diagnostics are grouped by phase (syntax, semantic, elaboration), and editors can consume structured diagnostics over LSP.
+
+**Incremental caching.** The compiler caches per-package semantic analysis results so incremental edits only recompile affected packages.
+
+## Verified with Limitations
+
+**Array types `[N] T`.** Supports indexing and compile-time `for` unrolling. Array sizes must be compile-time constants.
+
+**Enumerations.** Supports `enum` declarations and `match` expressions. Enum variants do not carry associated data.
+
+**Combinational maps.** `map` defines pure combinational functions supporting `select`, `match`, and arithmetic.
+
+**Register resets.** `reg` supports synchronous and asynchronous resets with configurable polarity via `reset(rst, value)`.
+
+## Currently Supported
+
+**Combinational logic.** Declare pure combinational functions with `map`, and conditional selection with `select` and `match`.
+
+**Sequential logic.** Declare registers with `reg` and next-state transitions with `next`.
+
+**Module instantiation and wiring.** Instantiate modules with `place` and connect ports using named arguments.
+
+**Generic parameters.** Modules and functions support type parameters (such as `UInt<W>`) and value parameters (such as `W: Nat`).
+
+**Interfaces and views.** Group ports with `interface` and define directional perspectives with `view`.
+
+**Streaming interfaces.** The standard library provides `Stream` for valid-ready handshakes.
+
+**Pipeline stages.** The standard library provides `Stage` constructs for multi-stage pipelines.
+
+**SystemVerilog emission.** The compiler emits synthesizable SystemVerilog verified by Verilator smoke tests in CI.
+
+## Experimental
+
+**Enumerations.** `enum` declarations define named state sets for state machines and instruction decoding.
+
+**Array types.** `[N] T` declares an `N`-element array with indexing and `for` unrolling.
+
+**Compile-time evaluation.** `fn` executes at compile time to compute constants with conditionals and loops.
+
+## Not Yet Supported
+
+**Black-box IP workflows.** `extern cell` declares external module signatures, though full vendor IP import workflows are still evolving.
+
+**Formal verification interfaces.** Syl does not emit SystemVerilog `assert` or `cover` properties directly.
+
+**High-level synthesis (HLS).** Syl is an RTL hardware description language, not a C-to-RTL synthesis tool.
+
+**Built-in simulation.** `sylc` does not run simulation itself; use standard simulators on the emitted SystemVerilog.
+
+## Standard Library Status
+
+The standard library currently includes 13 `std.*` modules:
+
+| Package | Contents |
+|---------|----------|
+| `std.stream` | `Stream` interface and valid-ready handshake helpers |
+| `std.stage` | Pipeline stages: `stage_from_stream`, `stage_to_stream`, `stage_link`, `halt_link`, `drop_link` |
+| `std.pipeline` | Multi-stage pipeline composition |
+| `std.bundle` | Bundle utilities |
+| `std.logic` | General combinational logic helpers |
+| `std.assert` | Assertion observation helpers |
+| `std.vendor` | External vendor black-box signatures |
+
+These packages are written in Syl and compiled alongside user code.
+
+## Toolchain Status
+
+**`sylc` (CLI compiler).** Accepts `.syl` source files and `syl.toml` manifests, emitting SystemVerilog (`--out`, `--out-dir`, `--filelist`).
+
+**`syl-lsp` (LSP server).** Supports incremental sync, semantic tokens, hover, go-to-definition, completion, and background DRC.
+
+**Fuzzing.** The parser is fuzz-tested to handle arbitrary inputs without crashing.
+
+## Roadmap
+
+The project prioritizes three areas:
+
+1. Stabilizing the core language: completing the type system and improving diagnostics
+2. Expanding the standard library: adding common bus interfaces and components
+3. Toolchain integration: enhancing LSP and editor experience
+
+See [Roadmap](./roadmap) for details.

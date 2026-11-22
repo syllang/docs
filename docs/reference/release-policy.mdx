@@ -1,8 +1,46 @@
 ---
 title: Release Policy
-description: Release cadence and stability commitments for Syl.
+description: Syl's release process, cadence, and quality gates.
 ---
 
 # Release Policy
 
-Syl follows a milestone-driven release cadence. Each release includes verified `sylc` and `syl-lsp` binaries, updated standard library modules (`std.*`), and synchronized reference documentation.
+This page describes the release process, cadence, and distribution channels for the Syl compiler.
+
+---
+
+## Release Cadence
+
+Syl follows a milestone-driven release cadence based on feature completeness and quality gate status.
+
+**Major/Minor releases.** Include new features or breaking changes, verified by the full test suite: architectural contract tests, conformance tests, and Verilator smoke tests.
+
+**Patch releases.** Include bug fixes without breaking changes or new features, allowing faster turnaround.
+
+## Release Process
+
+1. **Feature freeze.** Lock the release scope.
+2. **Testing phase.** Run the full test suite, including architectural contract and conformance tests.
+3. **Fix phase.** Resolve any issues uncovered during testing.
+4. **Release candidate.** Tag a release candidate for integration verification.
+5. **Release.** Tag the version, update the Changelog, and publish GitHub Releases.
+
+## Distribution Channels
+
+**GitHub Releases.** Primary channel containing pre-built binaries and source archives.
+
+**crates.io.** Foundational crates (such as `syl_span`) may be published to crates.io; core compiler crates remain internal until stabilized.
+
+## Quality Gates
+
+Every release must pass:
+
+1. All unit and integration tests
+2. Architectural contract tests
+3. Documentation link and build checks
+4. Verilator smoke tests (when Verilator is available)
+5. Clippy lint checks
+
+## Version History
+
+See [Changelog](./changelog) for per-release new features, breaking changes, bug fixes, and known issues.

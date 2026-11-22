@@ -5,7 +5,7 @@ description: Syl's built-in types, functions, memory primitives, and special con
 
 # Built-in Types and Primitives
 
-Syl provides built-in types, functions, and hardware primitives directly from the compiler without requiring imports.
+Syl provides a set of built-in types, functions, and hardware primitives directly from the compiler without requiring imports.
 
 ---
 
@@ -13,39 +13,61 @@ Syl provides built-in types, functions, and hardware primitives directly from th
 
 ### `Bit`
 
-Single-bit hardware signal (`0` or `1`). Operators: `and`, `or`, `xor`, `not`, `eq`.
+Single-bit hardware signal. Values: `0` or `1`.
 
 ```syl
 signal valid: Bit := 1
 ```
 
+Operators: `and`, `or`, `xor`, `not`, `eq`.
+
 ### `Nat`
 
-Compile-time non-negative integer. Operators: `+`, `-`, `*`, `/`, `%`, `<<`, `==`, `!=`, `<`, `>`, `<=`, `>=`.
+Compile-time non-negative integer.
 
 ```syl
 const W: Nat = 8
 ```
 
+Operators: `+`, `-`, `*`, `/`, `%`, `<<`, `==`, `!=`, `<`, `>`, `<=`, `>=`.
+
 ### `Bool`
 
-Compile-time boolean (`true` or `false`). Operators: `and`, `or`, `not`.
+Compile-time boolean. Values: `true`, `false`.
 
 ```syl
 const debug: Bool = true
 ```
 
+Operators: `and`, `or`, `not`.
+
 ### `UInt<W>`
 
-`W`-bit unsigned integer, where `W` is a compile-time `Nat`.
+`W`-bit unsigned integer. `W` must be a compile-time `Nat`.
 
 ```syl
 signal data: UInt<8>
 ```
 
-### `Clock<D>` and `Domain`
+### `Clock` and `Domain`
 
-`Clock<D>` is a clock signal bound to clock domain `D: Domain`.
+`Clock<D>` is a clock signal, where `D` is a `Domain` type parameter.
+
+```syl
+signal clk: Clock<A>
+```
+
+### `Reset`
+
+`Reset<D>` is a reset signal. `D` must match the corresponding `Clock<D>`.
+
+```syl
+signal rst: Reset<A>
+```
+
+### `Domain`
+
+Clock domain identifier used to associate clocks, resets, and registers.
 
 ```syl
 cell Top<D: Domain>(
@@ -54,15 +76,11 @@ cell Top<D: Domain>(
 )
 ```
 
-### `Reset<D, Sync|Async, ActiveHigh|ActiveLow>`
-
-Reset signal bound to domain `D`, with optional sync mode and polarity parameters (defaulting to `Sync, ActiveHigh`).
-
 ## Built-in Functions
 
 ### `zero<T>()`
 
-Returns the zero value of type `T`:
+Returns the zero value of type `T`.
 
 ```syl
 reg data: UInt<8> reset(rst, zero<UInt<8>>())
@@ -70,7 +88,7 @@ reg data: UInt<8> reset(rst, zero<UInt<8>>())
 
 ### `compile_error(message)`
 
-Aborts compilation with a compile-time error message:
+Reports an error at compile time and aborts compilation.
 
 ```syl
 if W == 0 {
@@ -84,23 +102,59 @@ if W == 0 {
 
 Conditional selection supporting `priority` and `unique` modes.
 
+```syl
+signal s: UInt<8> := select priority {
+    a => 1,
+    b => 2,
+    default => 0,
+}
+```
+
 ### `match`
 
-Exhaustive enum pattern matching.
+Enum pattern matching. Must cover all variants.
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+    State.Done => State.Idle,
+}
+```
 
 ### `place`
 
-Module or cell instantiation.
+Module or `cell` instantiation.
 
-### `for` / `if`
+```syl
+let inst = place Counter<8>(enable: en, count: cnt)
+```
 
-Compile-time loop unrolling and conditional elaboration.
+### `for`
+
+Compile-time loop unrolling.
+
+```syl
+for i in 0..4 {
+    signal s: UInt<8>
+}
+```
+
+### `if`
+
+Compile-time conditional branching.
+
+```syl
+if W > 8 {
+    signal wide: UInt<16>
+}
+```
 
 ## Synthesizable Memory Primitives
 
 ### `mem`
 
-Declares a synthesizable memory (BRAM or register file). The element type must be an array type (`E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`):
+Declares a synthesizable memory (block RAM or register file). Its element type must be an array type (`E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`):
 
 ```syl
 mem ram: [256] UInt<32>
@@ -108,8 +162,8 @@ mem ram: [256] UInt<32>
 
 ### `mem_write(m, addr, data, en)`
 
-Writes `data` to `m[addr]` on the clock edge when `en` is asserted. Statement-only (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`); duplicate write ports trigger `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`.
+Writes `data` to `m[addr]` on the clock edge when `en` is asserted. Can only be used as a statement (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`), and duplicate write ports on the same memory trigger `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`.
 
 ### `mem_read_sync(m, addr, en)`
 
-Synchronously reads `m[addr]` on the clock edge. Statement-only (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`); target must be a `mem` (`E_MIDDLE_MEMORY_TARGET_NOT_MEM`).
+Synchronously reads `m[addr]` on the clock edge. Can only be used as a statement (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`), and its target must be a `mem` (`E_MIDDLE_MEMORY_TARGET_NOT_MEM`).

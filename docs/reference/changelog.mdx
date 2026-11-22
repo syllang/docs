@@ -1,20 +1,39 @@
 ---
 title: Changelog
-description: Release history and Wave 0–3 capabilities in Syl.
+description: Version history and Wave 0–3 capabilities of the Syl compiler.
 ---
 
 # Changelog
 
-## Wave 3
-- Added Clock Domain Crossing (CDC) enforcement and `@cdc_sync(in, out, dst_clk)`.
-- Added `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` polarity and `reg ... reset(..., async, active_low)`.
-- Added synthesizable `mem`, `mem_write`, and `mem_read_sync` primitives and `std.mem`.
-- Added JSON/TOML Opaque Summary `schema_version = 1`.
+This page records version changes for the Syl compiler, including Wave 0–3 capabilities.
 
-## Wave 2
-- Expanded `std.*` to 13 modules (36 `cell`s including `std.vendor`).
-- Added `--out-dir`, `--filelist`, `--source-comments`, and `--diagnostics-format json`.
-- Added `syl-lsp` incremental sync, semantic tokens, and background DRC.
+---
 
-## Wave 0–1
-- Salsa incremental query engine (`syl_query`), `syl.toml` manifest discovery, `check_fn`, `check_map`, and cycle detection.
+## 0.1.0 (Latest — Wave 0–3)
+
+### Wave 3: Hardware Semantics & DRC
+
+- Added Clock Domain Crossing (CDC) domain enforcement and `@cdc_sync(in, out, dst_clk)` synchronizer boundary attribute (`E_MIDDLE_CDC_VIOLATION`, `E_MIDDLE_INPLACE_ON_CDC_SYNC`).
+- Added `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` polarity and `reg ... reset(..., async, active_low)` modifiers (`E_MIDDLE_RESET_DOMAIN_MISMATCH`, `E_MIDDLE_RESET_CONFIG_CONFLICT`).
+- Added synthesizable memory primitives `mem`, `mem_write`, and `mem_read_sync` (`E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`, `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`, `E_MIDDLE_DIRECT_DRIVE_TO_MEM`).
+- Added JSON/TOML Opaque Summary `schema_version = 1` support (`E_OPAQUE_SUMMARY_PARSE`, `E_OPAQUE_SUMMARY_INVALID`).
+
+### Wave 2: Standard Library & Tooling
+
+- Expanded `std.*` standard library to 13 modules (`std.stream`, `std.stage`, `std.pipeline`, `std.skid`, `std.fifo`, `std.mem`, `std.cdc`, `std.arbiter`, `std.pulse`, `std.logic`, `std.bundle`, `std.assert`, `std.vendor`) with 36 public `cell`s.
+- Added `sylc check` and `sylc emit` subcommands with `--out-dir`, `--filelist`, `--source-comments`, and `--diagnostics-format human|json`.
+- Upgraded `syl-lsp` with `TextDocumentSyncKind::INCREMENTAL`, `textDocument/semanticTokens/full`, and a background DRC channel.
+
+### Wave 0–1: Core Compiler & Salsa Queries
+
+- Implemented Salsa-based incremental query engine (`syl_query`).
+- Added `syl.toml` project manifest root discovery (`E_MANIFEST_PARSE`, `E_MANIFEST_INVALID`, `E_DUPLICATE_MODULE_FILE`).
+- Added full `fn` body type checking (`check_fn`), `map` return consistency (`check_map`), recursive struct/bundle cycle detection (`E_MIDDLE_RECURSIVE_STRUCT`, `E_MIDDLE_RECURSIVE_BUNDLE`), and constant cycle detection (`E_MIDDLE_CONST_CYCLE`).
+- Core language: `cell`, `extern cell`, `interface`, `view`, `bundle`, `enum`, `reg`, `next`, `place`, `select`, `match`, `use`.
+- Architectural contract tests, conformance tests, and Verilator smoke tests.
+
+### Known Limitations
+
+- Signed integer type (`SInt<W>`) is not yet supported.
+- Hardware floating-point is not yet supported.
+- LSP rename, code actions, and signature help are not yet supported.

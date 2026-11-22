@@ -5,17 +5,182 @@ description: Frequently asked questions about Syl, Salsa, CDC, RAM, and LSP.
 
 # Frequently Asked Questions
 
-### What is Syl?
-Syl is a statically typed hardware description language (HDL) that compiles to synthesizable SystemVerilog, catching width, direction, single-driver, and CDC errors at compile time.
+## Getting Started
 
-### How does Syl handle incremental compilation?
-Syl uses a Salsa-based query engine (`syl_query`) for incremental parsing, name resolution, type checking, and elaboration.
+### How do I install the Syl compiler?
 
-### How does CDC checking work?
-`reg` and `mem` are bound to a `Domain`. Direct cross-domain connections trigger `E_MIDDLE_CDC_VIOLATION` unless routed through a `@cdc_sync` synchronizer cell.
+Clone the repository and run `cargo build --release` at the workspace root. The compiled binary is at `target/release/sylc`. You need the Rust toolchain (`rustc`, `cargo`).
 
-### Does Syl support synthesizable RAM?
-Yes. Use `mem`, `mem_write`, and `mem_read_sync` primitives, or the wrappers in `std.mem` (`SinglePortRam`, `SimpleDualPortRam`, `DistributedRam`).
+### What is the file extension for Syl source files?
 
-### What does `syl-lsp` support?
-`syl-lsp` supports incremental document sync, semantic tokens (`textDocument/semanticTokens/full`), hover, go-to-definition, completion, and background DRC diagnostics.
+`.syl`.
+
+### Does Syl require a runtime environment?
+
+No. The compiler is a statically linked executable, and the emitted SystemVerilog works with any standard simulator or synthesis tool.
+
+### How do I compile a Syl file?
+
+Run `sylc input.syl` to emit SystemVerilog to stdout, or `sylc input.syl --out output.sv` to write to a file.
+
+### Can I compile multiple source files together?
+
+Yes: `sylc file1.syl file2.syl`. Multiple files form a single compilation unit and can reference each other via `use`.
+
+## Language Questions
+
+### What is the difference between `:=` and `next`?
+
+`:=` is continuous assignment: whenever the right-hand side changes, the left-hand side updates immediately (like Verilog `assign`).
+
+`next` assigns the next-state value of a register on the clock edge (like non-blocking assignment in `always @(posedge clk)`).
+
+### What is the difference between `signal` and `reg`?
+
+`signal` declares a combinational signal that holds no state and is continuously driven.
+
+`reg` declares a register that samples its input on the clock edge and holds it until the next edge, optionally with `reset(rst, value)`.
+
+### What is the difference between `let` and `signal`?
+
+`let` binds a name alias without creating hardware (`let x = expr` has zero hardware overhead).
+
+`signal` creates an actual hardware wire (`signal x: Bit := expr`).
+
+### What is the difference between `map` and `fn`?
+
+`map` defines a pure combinational hardware function (no registers or state).
+
+`fn` defines a compile-time function that runs during compilation to compute constants and emits no hardware.
+
+### What is the difference between `cell` and `module`?
+
+`cell` is the primary hardware unit in Syl. Depending on attributes and elaboration, cells can be emitted as hierarchical SystemVerilog modules or inlined.
+
+### How are enum variants referenced?
+
+Use qualified `EnumName.VARIANT_NAME` syntax, such as `match color { Color.Red => ... }`. Bare variant names (like `Red`) are not supported.
+
+### Can enums specify explicit encoding values?
+
+Yes. Enum variants can carry explicit discriminant values:
+
+```syl
+enum State {
+    Idle = 1,
+    Busy = 3,
+    Done = 7,
+}
+```
+
+Unassigned variants increment from the previous value by 1.
+
+### Can enums specify a hardware bit width?
+
+Yes, by adding `: UInt<N>` after the enum name:
+
+```syl
+enum State: UInt<3> {
+    Idle = 1,
+    Busy = 3,
+    Done = 7,
+}
+```
+
+When omitted, the compiler infers the minimum bit width needed for the largest discriminant.
+
+### Do enums support one-hot or flags encoding?
+
+Yes, via the `@layout` attribute:
+
+```syl
+@layout(flags)
+enum Access: Bits<4> {
+    Read,
+    Write,
+    Exec,
+    Admin,
+}
+```
+
+`@layout(flags)` assigns one-hot values and allows bitwise `|`, `&`, `^` combinations. `@layout(onehot)` assigns the same encoding but keeps states mutually exclusive.
+
+## Synthesis
+
+### Is Syl synthesizable?
+
+Yes. `sylc` emits SystemVerilog checked with Verilator, which can be synthesized by standard tools (Yosys, Design Compiler, Vivado).
+
+### What does the generated SystemVerilog look like?
+
+The emitted SystemVerilog is direct and readable: each module maps to an SV `module`, `:=` maps to `assign`, and `next` maps to sequential `always_ff` blocks.
+
+### Does the generated SV include comments?
+
+Yes, `--source-comments` includes Syl source locations in the emitted SystemVerilog.
+
+### How fast is compilation?
+
+For small to medium designs, compilation takes under a second, and Salsa-based incremental caching avoids recompiling unchanged packages.
+
+## Language Comparisons
+
+### How does Syl compare to Chisel?
+
+**Architecture.** Chisel is a Scala-embedded DSL whose elaboration runs on the JVM; Syl is a standalone HDL whose elaboration runs inside a native compiler.
+
+**Practical impact:**
+- **Toolchain:** Chisel requires sbt, JVM, and Scala; `sylc` is a single native binary.
+- **Diagnostics:** Chisel errors pass through Scala and FIRRTL; Syl errors speak hardware terms directly.
+- **Elaboration:** Syl's compile-time `fn` and `const` are pure and deterministic.
+- **Learning curve:** Syl does not require learning Scala first.
+
+### How does Syl compare to SpinalHDL?
+
+**Architecture.** SpinalHDL is also Scala-embedded, whereas Syl is a standalone language. Syl's `interface`/`view` enforces directional contracts at compile time in the language itself rather than via runtime `asMaster()` calls.
+
+### How does Syl compare to Verilog / SystemVerilog?
+
+SystemVerilog is Syl's compilation target. Syl adds stronger static typing, width checking, single-driver enforcement, and CDC checking before emitting SystemVerilog.
+
+## Usage
+
+### Do I need to know Rust to use Syl?
+
+No. The compiler is written in Rust, but Syl is an independent hardware description language.
+
+### Can I use Syl on Windows, macOS, and Linux?
+
+Yes. `sylc` is written in Rust and builds on Windows, macOS, and Linux.
+
+### Does Syl support module-level verification or UVM?
+
+Syl emits synthesizable RTL SystemVerilog, which you can verify using any existing SystemVerilog or UVM testbench.
+
+### Can I use existing Verilog IP in Syl?
+
+Yes, declare its port signature with `extern cell` and optionally attach an Opaque Summary for DRC.
+
+## Troubleshooting
+
+### What if the compiler reports a type mismatch?
+
+Check that both sides of the assignment have matching types and bit widths (`Bit` and `UInt<1>` are distinct).
+
+### What if the compiler reports a multiple-driver conflict?
+
+Each `signal` or `out` port may only be driven once. Combine conditional drivers into a single `select` or `match`.
+
+### What if the compiler reports an unresolved name?
+
+Check spelling and `use` imports. Cross-file references require `use`.
+
+## Contributing
+
+### How can I contribute?
+
+See the repository's contributing guide. We welcome hardware designs, standard library components, and diagnostic improvements.
+
+### How do I report a bug or request a feature?
+
+Open a GitHub issue with a minimal `.syl` reproduction, expected vs. actual behavior, and `sylc --version`.

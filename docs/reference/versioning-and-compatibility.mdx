@@ -1,11 +1,73 @@
 ---
 title: Versioning and Compatibility
-description: Semantic versioning and compatibility guarantees for Syl.
+description: Syl's versioning scheme and compatibility guarantees.
 ---
 
 # Versioning and Compatibility
 
-Syl follows Semantic Versioning (`MAJOR.MINOR.PATCH`).
+This page explains Syl's versioning rules and compatibility guarantees to help you assess upgrade risks.
 
-- **Language & Standard Library:** Breaking syntax or `std.*` signature changes are documented in the [Changelog](./changelog).
-- **Opaque Summary Schema:** Versioned via `schema_version` (currently `schema_version = 1`).
+---
+
+## Versioning Scheme
+
+Syl uses Semantic Versioning: `MAJOR.MINOR.PATCH`.
+
+**MAJOR.** Incompatible API or language changes that may require updating Syl source code.
+
+**MINOR.** Backward-compatible feature additions.
+
+**PATCH.** Backward-compatible bug fixes.
+
+Syl is currently in `0.x.x`. During `0.x`, minor version bumps may introduce breaking changes.
+
+## Language Compatibility
+
+### Compiler Output
+
+The SystemVerilog emitted by `sylc` should behave consistently across versions. Behavioral regressions are treated as compiler bugs.
+
+### Language Syntax
+
+During `0.x`, syntax may evolve:
+
+- New syntax features (which may reserve new keywords)
+- Stricter error checking rules
+- Deprecation warnings for older forms
+
+Significant syntax changes are documented in the [Changelog](./changelog).
+
+### Standard Library
+
+`std.*` interfaces may evolve during `0.x`, including new components, parameter updates, and deprecation of older cells.
+
+## Upgrade Strategy
+
+### Patch / Minor Upgrades
+
+Review the Changelog and run your test suite to confirm expected behavior.
+
+### Major Upgrades
+
+1. Read the Changelog for breaking changes.
+2. Run the compiler to check for deprecation warnings.
+3. Update code per the migration notes.
+4. Re-run tests to verify behavior.
+
+### Pre-release Versions
+
+Pre-release builds (`alpha`, `beta`, `rc`) are for testing only and are not recommended for production.
+
+## Compatibility Guarantees
+
+### Compile-Time Determinism
+
+The same compiler version on the same input always produces the same result.
+
+### Semantic Equivalence
+
+Emitted SystemVerilog is semantically equivalent to the input Syl description.
+
+### Diagnostic Consistency
+
+Invalid Syl code reliably produces diagnostics; exact wording may evolve across releases.

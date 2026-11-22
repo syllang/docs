@@ -11,9 +11,9 @@ This page specifies the `syl.toml` project manifest format and the versioned Opa
 
 ## `syl.toml` Project Manifest
 
-`sylc` discovers the nearest `syl.toml` upward from the input path when `--package-root` is not explicitly provided.
+When `--package-root` is not explicitly provided, `sylc` searches upward from the input path for the nearest `syl.toml` to determine the project root and resolve package paths.
 
-### Fields
+### Complete Example
 
 ```toml
 [project]
@@ -25,21 +25,59 @@ edition = "2026"
 workspace_roots = ["."]
 std_roots = ["vendor/std"]
 package_roots = ["src", "lib"]
-opaque_summaries = ["summaries/vendor_ip.json"]
+opaque_summaries = ["summaries/vendor_ip.json", "summaries/cdc_ip.toml"]
 ```
 
-- `[project]`: `name` (must not be blank), `version`, `edition`.
-- `[paths]`: `workspace_roots` (defaults to `["."]`), `std_roots`, `package_roots`, `opaque_summaries` (paths to `.json` or `.toml` opaque summary files).
+### `[project]` Fields
 
-Invalid manifests report `E_MANIFEST_PARSE` or `E_MANIFEST_INVALID`.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `String` | Optional | Project name; if present, must not be blank (`E_MANIFEST_INVALID`) |
+| `version` | `String` | Optional | Semantic version string (e.g., `"0.1.0"`) |
+| `edition` | `String` | Optional | Language edition identifier |
+
+### `[paths]` Fields
+
+All paths in `[paths]` are resolved relative to the directory containing `syl.toml`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `workspace_roots` | `Vec<String>` | `["."]` | Workspace root directories |
+| `std_roots` | `Vec<String>` | `[]` | Custom standard library root directories |
+| `package_roots` | `Vec<String>` | `[]` | Additional package root directories |
+| `opaque_summaries` | `Vec<String>` | `[]` | Paths to `.json` or `.toml` Opaque Summary files |
+
+Configured path entries must not be blank (`E_MANIFEST_INVALID`).
 
 ---
 
 ## Opaque Summary Schema (`schema_version = 1`)
 
-Opaque summaries describe the internal driver, consumption, and clock-domain behavior of `extern cell`s so DRC can verify designs without seeing their SystemVerilog implementation.
+Opaque summaries describe the internal driver, consumption, and clock-domain behavior of `extern cell`s so elaboration DRC can verify designs without seeing their SystemVerilog implementation.
 
-### Top-Level Document
+### Top-Level Document Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `schema_version` | `u32` | Yes | Must be `1`; any other value triggers `E_OPAQUE_SUMMARY_INVALID` |
+| `summaries` | `Vec<Summary>` | No | List of opaque item summaries (defaults to `[]`) |
+
+### `Summary` Entry Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `kind` | `String` | Yes | Opaque item kind (e.g., `"extern_cell"`) |
+| `callable` | `String` | Yes | Non-blank name of the `extern cell` |
+| `endpoints` | `Vec<Endpoint>` | No | Endpoint descriptors |
+| `driven_fields` | `Vec<String>` | No | Port/field paths driven by the black box |
+| `consumed_fields` | `Vec<String>` | No | Port/field paths consumed by the black box |
+| `domain_behavior` | `DomainBehavior` | No | Clock domain relationship (`same_domain`, `cdc_crossings`, etc.) |
+| `latency_class` | `LatencyClass` | No | Latency classification (`combinational`, `registered`, etc.) |
+| `protocol_preservation` | `Preservation` | No | Protocol preservation metadata |
+| `trust_boundary` | `TrustBoundary` | No | Trust boundary classification |
+| `backend_constraints` | `Vec<Constraint>` | No | Additional backend constraints |
+
+### JSON Example (`vendor_ip.json`)
 
 ```json
 {
@@ -61,13 +99,35 @@ Opaque summaries describe the internal driver, consumption, and clock-domain beh
 }
 ```
 
-### Key Fields
+### TOML Example (`cdc_ip.toml`)
 
-- `schema_version`: Must be `1`.
-- `kind`: Opaque item kind (e.g., `extern_cell`).
-- `callable`: Non-blank name of the `extern cell`.
-- `driven_fields` / `consumed_fields`: Port/field paths driven or consumed by the black box.
-- `domain_behavior`: Clock domain relationship (e.g., `same_domain`, `cdc_crossings` / synchronizer behavior).
-- `latency_class`, `protocol_preservation`, `trust_boundary`, `backend_constraints`: Metadata for elaboration and backend checks.
+```toml
+schema_version = 1
 
-Invalid summaries report `E_OPAQUE_SUMMARY_PARSE` or `E_OPAQUE_SUMMARY_INVALID`.
+[[summaries]]
+kind = "extern_cell"
+callable = "VendorCdcBridge"
+driven_fields = ["dst_data", "dst_valid"]
+consumed_fields = ["src_data", "src_valid"]
+domain_behavior = "cdc_crossings"
+latency_class = "registered"
+```
+
+---
+
+## CLI Verification
+
+You can validate a project manifest and its referenced opaque summaries using `sylc check --manifest`:
+
+```bash
+sylc check --manifest path/to/syl.toml path/to/top.syl
+```
+
+## Common Schema Diagnostics
+
+| Error Code | Trigger Condition |
+|------------|-------------------|
+| `E_MANIFEST_PARSE` | Malformed TOML syntax or unknown field in `syl.toml` |
+| `E_MANIFEST_INVALID` | Blank `project.name` or blank path entry in `syl.toml` |
+| `E_OPAQUE_SUMMARY_PARSE` | Malformed JSON/TOML syntax or unknown field in summary file |
+| `E_OPAQUE_SUMMARY_INVALID` | Unsupported `schema_version != 1`, non-`.json`/`.toml` extension, or blank `callable` |

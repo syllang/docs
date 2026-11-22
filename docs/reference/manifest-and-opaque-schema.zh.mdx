@@ -11,9 +11,9 @@ description: syl.toml 工程清单字段与 JSON/TOML Opaque Summary（schema_ve
 
 ## `syl.toml` 工程清单
 
-当未显式传入 `--package-root` 时，`sylc` 会从输入路径向上查找最近的 `syl.toml` 作为工程根目录。
+当未显式传入 `--package-root` 时，`sylc` 会从输入路径向上查找最近的 `syl.toml` 作为工程根目录，并据此解析包路径。
 
-### 字段定义
+### 完整示例
 
 ```toml
 [project]
@@ -25,13 +25,29 @@ edition = "2026"
 workspace_roots = ["."]
 std_roots = ["vendor/std"]
 package_roots = ["src", "lib"]
-opaque_summaries = ["summaries/vendor_ip.json"]
+opaque_summaries = ["summaries/vendor_ip.json", "summaries/cdc_ip.toml"]
 ```
 
-- `[project]`：`name`（不能为空白）、`version`、`edition`。
-- `[paths]`：`workspace_roots`（默认为 `["."]`）、`std_roots`、`package_roots`、`opaque_summaries`（指向 `.json` 或 `.toml` 摘要文件）。
+### `[project]` 字段定义
 
-清单解析或校验失败时报告 `E_MANIFEST_PARSE` 或 `E_MANIFEST_INVALID`。
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | `String` | 可选 | 工程名称；若存在则不能为空白（`E_MANIFEST_INVALID`） |
+| `version` | `String` | 可选 | 语义化版本号（如 `"0.1.0"`） |
+| `edition` | `String` | 可选 | 语言版本标识 |
+
+### `[paths]` 字段定义
+
+`[paths]` 中的所有路径均相对于 `syl.toml` 所在目录解析：
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `workspace_roots` | `Vec<String>` | `["."]` | 工作区根目录列表 |
+| `std_roots` | `Vec<String>` | `[]` | 自定义标准库根目录列表 |
+| `package_roots` | `Vec<String>` | `[]` | 额外包根目录列表 |
+| `opaque_summaries` | `Vec<String>` | `[]` | `.json` 或 `.toml` Opaque Summary 文件路径列表 |
+
+配置的路径条目不能为空白（`E_MANIFEST_INVALID`）。
 
 ---
 
@@ -39,7 +55,29 @@ opaque_summaries = ["summaries/vendor_ip.json"]
 
 Opaque Summary 用于描述 `extern cell` 的内部驱动、消费与时钟域行为，使编译器在没有 SystemVerilog 实现源码的情况下也能执行完整的 DRC 与 CDC 检查。
 
-### 顶层结构
+### 顶层文档字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `schema_version` | `u32` | 是 | 必须为 `1`；其他值将触发 `E_OPAQUE_SUMMARY_INVALID` |
+| `summaries` | `Vec<Summary>` | 否 | 不透明项摘要列表（默认 `[]`） |
+
+### `Summary` 条目字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `kind` | `String` | 是 | 不透明项类型（如 `"extern_cell"`） |
+| `callable` | `String` | 是 | `extern cell` 名称，不能为空白 |
+| `endpoints` | `Vec<Endpoint>` | 否 | 端点描述符列表 |
+| `driven_fields` | `Vec<String>` | 否 | 黑盒内部驱动的端口/字段路径 |
+| `consumed_fields` | `Vec<String>` | 否 | 黑盒内部读取的端口/字段路径 |
+| `domain_behavior` | `DomainBehavior` | 否 | 时钟域行为（如 `same_domain`、`cdc_crossings`） |
+| `latency_class` | `LatencyClass` | 否 | 延迟分类（如 `combinational`、`registered`） |
+| `protocol_preservation` | `Preservation` | 否 | 协议保持属性 |
+| `trust_boundary` | `TrustBoundary` | 否 | 信任边界分类 |
+| `backend_constraints` | `Vec<Constraint>` | 否 | 额外后端约束 |
+
+### JSON 示例（`vendor_ip.json`）
 
 ```json
 {
@@ -61,13 +99,35 @@ Opaque Summary 用于描述 `extern cell` 的内部驱动、消费与时钟域�
 }
 ```
 
-### 核心字段
+### TOML 示例（`cdc_ip.toml`）
 
-- `schema_version`：必须为 `1`。
-- `kind`：不透明项类型（如 `extern_cell`）。
-- `callable`：`extern cell` 名称（不能为空白）。
-- `driven_fields` / `consumed_fields`：黑盒内部驱动或读取的端口/字段路径。
-- `domain_behavior`：时钟域行为（如同域 `same_domain` 或跨时钟域 `cdc_crossings`）。
-- `latency_class`、`protocol_preservation`、`trust_boundary`、`backend_constraints`：展开与后端约束元数据。
+```toml
+schema_version = 1
 
-摘要解析或校验失败时报告 `E_OPAQUE_SUMMARY_PARSE` 或 `E_OPAQUE_SUMMARY_INVALID`。
+[[summaries]]
+kind = "extern_cell"
+callable = "VendorCdcBridge"
+driven_fields = ["dst_data", "dst_valid"]
+consumed_fields = ["src_data", "src_valid"]
+domain_behavior = "cdc_crossings"
+latency_class = "registered"
+```
+
+---
+
+## 命令行校验
+
+可使用 `sylc check --manifest` 实测校验工程清单与引用的 Opaque Summary：
+
+```bash
+sylc check --manifest path/to/syl.toml path/to/top.syl
+```
+
+## 常见 Schema 诊断对照
+
+| 错误码 | 触发条件 |
+|--------|----------|
+| `E_MANIFEST_PARSE` | `syl.toml` TOML 语法错误或存在未知字段 |
+| `E_MANIFEST_INVALID` | `project.name` 为空白或 `[paths]` 中存在空白路径 |
+| `E_OPAQUE_SUMMARY_PARSE` | 摘要文件 JSON/TOML 语法错误或存在未知字段 |
+| `E_OPAQUE_SUMMARY_INVALID` | `schema_version != 1`、非 `.json`/`.toml` 扩展名或 `callable` 为空白 |

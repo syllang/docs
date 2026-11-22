@@ -1,38 +1,39 @@
 ---
 title: 更新日志
-description: Syl 编译器的版本变更记录。
+description: Syl 编译器的版本变更记录与 Wave 0–3 能力。
 ---
 
 # 更新日志
 
-本文记录 Syl 编译器的版本变更。每个版本列出新增功能、变更和 bug 修复。
+本文记录 Syl 编译器的版本变更，包含 Wave 0–3 全部已落地能力。
 
 ---
 
-## 0.1.0（最新）
+## 0.1.0（最新 — Wave 0–3）
 
-### 新增
+### Wave 3：硬件语义与 DRC
 
-- 编译器核心流水线：前端 → 语义分析 → 展开 → 后端
-- `module` 和 `cell` 声明
-- `interface` 和 `view` 接口系统
-- 泛型参数 `Nat`、`Domain` 和类型参数
-- `reg` 寄存器和 `next` 时序赋值
-- `map` 组合映射
-- `fn` 编译期函数
-- 编译期 `if` 和 `for`
-- `select` 和 `match` 表达式
-- `bundle` 和 `enum` 复合类型
-- `place` 模块实例化
-- `use` 导入系统
-- 标准库：Stream、Stage、Pipeline
-- 架构合约测试套件
-- 一致性测试套件
-- Verilator 烟雾测试
+- 新增跨时钟域（CDC）隔离检查与 `@cdc_sync(in, out, dst_clk)` 同步器边界属性（`E_MIDDLE_CDC_VIOLATION`、`E_MIDDLE_INPLACE_ON_CDC_SYNC`）。
+- 新增 `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` 复位同步模式与极性参数，以及 `reg ... reset(..., async, active_low)` 修饰符（`E_MIDDLE_RESET_DOMAIN_MISMATCH`、`E_MIDDLE_RESET_CONFIG_CONFLICT`）。
+- 新增可综合存储器原语 `mem`、`mem_write` 与 `mem_read_sync`（`E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`、`E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`、`E_MIDDLE_DIRECT_DRIVE_TO_MEM`）。
+- 新增 JSON/TOML Opaque Summary `schema_version = 1` 支持（`E_OPAQUE_SUMMARY_PARSE`、`E_OPAQUE_SUMMARY_INVALID`）。
+
+### Wave 2：标准库与工具链
+
+- 将 `std.*` 标准库扩展至 13 个模块（`std.stream`、`std.stage`、`std.pipeline`、`std.skid`、`std.fifo`、`std.mem`、`std.cdc`、`std.arbiter`、`std.pulse`、`std.logic`、`std.bundle`、`std.assert`、`std.vendor`），共 36 个公开 `cell`。
+- 新增 `sylc check` 与 `sylc emit` 子命令，支持 `--out-dir`、`--filelist`、`--source-comments` 与 `--diagnostics-format human|json`。
+- 升级 `syl-lsp`，支持 `TextDocumentSyncKind::INCREMENTAL` 增量同步、`textDocument/semanticTokens/full` 语义高亮与后台 DRC 通道。
+
+### Wave 0–1：核心编译器与 Salsa 查询引擎
+
+- 实现基于 Salsa 的增量查询引擎（`syl_query`）。
+- 新增 `syl.toml` 工程清单根发现（`E_MANIFEST_PARSE`、`E_MANIFEST_INVALID`、`E_DUPLICATE_MODULE_FILE`）。
+- 新增 `fn` 函数体完整检查（`check_fn`）、`map` 返回一致性检查（`check_map`）、`struct`/`bundle` 递归类型检测（`E_MIDDLE_RECURSIVE_STRUCT`、`E_MIDDLE_RECURSIVE_BUNDLE`）与常量循环检测（`E_MIDDLE_CONST_CYCLE`）。
+- 核心语言：前端 → 语义分析 → 展开 → SystemVerilog 后端，支持 `cell`、`extern cell`、`interface`、`view`、`bundle`、`enum`、`reg`、`next`、`place`、`select`、`match`、`use`。
+- 架构合约测试、一致性测试与 Verilator 烟雾测试。
 
 ### 已知限制
 
-- 不支持有符号整数
-- 不支持浮点数
-- 不支持多时钟域的综合检查
-- LSP 支持为基本级别
+- 暂不支持有符号整数（`SInt<W>`）。
+- 暂不支持硬件浮点数。
+- LSP 暂不支持重命名（rename）、代码动作（code actions）与签名帮助（signature help）。
