@@ -1,0 +1,293 @@
+---
+title: Sequential Logic
+description: Register declarations (reg), next-state assignments (next), Reset polarity, and synthesizable memory (mem).
+---
+
+# Sequential Logic
+
+Syl uses `reg` to declare registers, `next` to define next-state transitions, and `mem` / `mem_write` / `mem_read_sync` for synthesizable memories. This page covers register declarations, reset modes and polarity, sequential patterns, and memory primitives.
+
+---
+
+## Register Declarations
+
+### Basic Declaration
+
+```syl
+reg count: UInt<8>
+```
+
+Declares an 8-bit register `count` that samples its input on each clock edge.
+
+### Declaration with Reset
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+```
+
+`reset(rst, 0)` specifies the reset signal `rst` and reset value `0`. The reset value must be a compile-time constant or expression:
+
+```syl
+const INIT: UInt<8> = 42
+reg value: UInt<8> reset(rst, INIT)
+```
+
+### Reset Types
+
+The reset signal `rst` must have type `Reset<D>`, where `D` matches the module's clock domain:
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+) {
+    reg count: UInt<8> reset(rst, 0)
+}
+```
+
+### Reset Sync Mode and Polarity
+
+`Reset` accepts optional sync/async and polarity parameters: `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` (defaulting to `Sync, ActiveHigh`). You can also specify reset modifiers in `reg`:
+
+```syl
+cell AsyncActiveLow<D: Domain>(
+    clk: in Clock<D>,
+    rst_n: in Reset<D, Async, ActiveLow>,
+    d: in UInt<8>,
+    q: out UInt<8>,
+) {
+    reg r: UInt<8> reset(rst_n, 0, async, active_low)
+    next r := d
+    q := r
+}
+```
+
+If the `reg` reset modifiers conflict with the `Reset` port type, the compiler reports `E_MIDDLE_RESET_CONFIG_CONFLICT`.
+
+## Synthesizable Memory (`mem` / `mem_write` / `mem_read_sync`)
+
+Syl provides primitive synthesizable memory support for block RAMs (BRAM) and register files:
+
+- `mem name: [DEPTH] T`: Declares a memory of depth `DEPTH` and element type `T` (must be an array type, otherwise `E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`).
+- `mem_write(m, addr, data, en)`: Writes `data` to `m[addr]` on the clock edge when `en` is asserted. Duplicate write ports on the same memory trigger `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`.
+- `mem_read_sync(m, addr, en)`: Synchronously reads `m[addr]` on the clock edge.
+
+`mem_write` and `mem_read_sync` are statement-only (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`), and `mem` cannot be driven directly with `:=` (`E_MIDDLE_DIRECT_DRIVE_TO_MEM`).
+
+## next Assignment
+
+`next` defines the register's value on the next clock cycle.
+
+### Basic Usage
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+next count := count + 1
+```
+
+### Conditional next
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+next count := select {
+    clear => 0,
+    enable => count + 1,
+    default => count,
+}
+```
+
+### next vs. :=
+
+- `next` assigns to a register on the clock edge (like non-blocking assignment in SystemVerilog `always_ff`).
+- `:=` is continuous combinational assignment (like `assign`).
+
+```syl
+signal s: UInt<8>
+reg r: UInt<8> reset(rst, 0)
+
+s := count + 1              // s updates immediately
+next r := count + 1         // r updates on the next clock edge
+```
+
+## Sequential Patterns
+
+### Shift Register
+
+```syl
+cell ShiftReg<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    data_in: in Bit,
+    data_out: out Bit,
+) {
+    reg r0: Bit reset(rst, 0)
+    reg r1: Bit reset(rst, 0)
+    reg r2: Bit reset(rst, 0)
+
+    next r0 := data_in
+    next r1 := r0
+    next r2 := r1
+    data_out := r2
+}
+```
+
+### Accumulator
+
+```syl
+cell Accumulator<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    din: in UInt<W>,
+    dout: out UInt<W>,
+) {
+    reg acc: UInt<W> reset(rst, 0)
+
+    next acc := acc + din
+    dout := acc
+}
+```
+
+### Finite State Machine
+
+```syl
+enum State { Idle, Busy, Done }
+
+cell FSM<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    start: in Bit,
+    done: out Bit,
+) {
+    reg state: State
+
+    signal next_state: State := match state {
+        State.Idle => select { start => State.Busy, default => State.Idle },
+        State.Busy => State.Done,
+        State.Done => State.Idle,
+    }
+
+    next state := next_state
+    done := state == State.Done
+}
+```
+
+### Enabled Counter
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    clear: in Bit,
+) -> value: UInt<W> {
+    reg count: UInt<W> reset(rst, 0)
+
+    next count := select priority {
+        clear => 0,
+        enable => count + 1,
+        default => count,
+    }
+    value := count
+}
+```
+
+## Register Initialization
+
+- **Explicit reset:** `reset(rst, value)` sets the register to `value` when `rst` is active.
+- **No reset:** `reg count: UInt<8>` leaves the initial value undefined (synthesizes to a flip-flop without reset).
+
+## Multiple Registers
+
+A module can contain any number of registers, each with its own `next` assignment:
+
+```syl
+cell DualCounter<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+) {
+    reg cnt1: UInt<8> reset(rst, 0)
+    reg cnt2: UInt<8> reset(rst, 0)
+
+    next cnt1 := cnt1 + 1
+    next cnt2 := cnt2 + 2
+}
+```
+
+## Mixing Sequential and Combinational Logic
+
+```syl
+cell MixedExample<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    inc: in Bit,
+    dec: in Bit,
+    value: out UInt<8>,
+) {
+    reg count: UInt<8> reset(rst, 0)
+
+    // Combinational: compute next state
+    signal next_count: UInt<8> := select {
+        inc => count + 1,
+        dec => count - 1,
+        default => count,
+    }
+
+    // Sequential: update register
+    next count := next_count
+
+    // Combinational: output
+    value := count
+}
+```
+
+## Registers and Clock Domains
+
+Registers bind to the `Clock<D>` port of their domain:
+
+```syl
+cell DualDomain(
+    clk_a: in Clock<A>,
+    rst_a: in Reset<A>,
+    clk_b: in Clock<B>,
+    rst_b: in Reset<B>,
+    data: in UInt<8>,
+    result: out UInt<8>,
+) {
+    reg reg_a: UInt<8> reset(rst_a, 0)
+    reg reg_b: UInt<8> reset(rst_b, 0)
+
+    next reg_a := data
+    next reg_b := reg_a
+    result := reg_b
+}
+```
+
+Direct cross-domain connections without `@cdc_sync` are rejected by DRC.
+
+## Common Errors
+
+### Missing next
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+// Missing next count := ...
+```
+
+Every register must have a `next` assignment.
+
+### Using := on a reg
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+# count := count + 1    // Use next count := count + 1
+```
+
+### Reset Type Mismatch
+
+```syl
+cell Top(clk: in Bit) {
+    reg count: UInt<8> reset(clk, 0)    // Error: clk is not Reset<D>
+}
+```
+
+The reset signal must have type `Reset<D>`.

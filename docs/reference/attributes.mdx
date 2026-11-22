@@ -1,4 +1,87 @@
 ---
 title: Attributes
-description: Syntax and use of Syl attributes, with a focus on layout metadata and current surface forms.
+description: Declaration attributes in Syl—@layout, @cdc_sync, and validation rules.
 ---
+
+# Attributes
+
+Attributes attach metadata to declarations using `@name` syntax before the declaration.
+
+---
+
+## Syntax
+
+```syl
+@attribute_name
+bundle MyBundle { ... }
+```
+
+Attributes can take arguments:
+
+```syl
+@layout(packed)
+bundle PackedWord { ... }
+```
+
+Multiple attributes can be stacked:
+
+```syl
+@attr1
+@attr2(value)
+cell MyModule { ... }
+```
+
+## Supported Attributes
+
+### `@layout(packed)`
+
+Controls bundle bit layout. `packed` packs fields contiguously without padding bits:
+
+```syl
+@layout(packed)
+bundle Word {
+    high: UInt<4>,
+    low: UInt<4>,
+}
+```
+
+### `@cdc_sync(in, out, dst_clk)`
+
+Declares a Clock Domain Crossing (CDC) synchronizer boundary on a `cell` or `extern cell`:
+
+```syl
+@cdc_sync(in = src_sig, out = dst_sig, dst_clk = dst_clk)
+cell TwoStageSync<D_SRC: Domain, D_DST: Domain>(
+    dst_clk: in Clock<D_DST>,
+    src_sig: in Bit,
+    dst_sig: out Bit,
+) {
+    // Synchronizer implementation
+}
+```
+
+**Validation rules:**
+- `in`, `out`, and `dst_clk` must reference valid ports of the `cell`; missing, duplicate, or unknown ports trigger `E_MIDDLE_INVALID_CDC_ATTR`.
+- A `cell` annotated with `@cdc_sync` cannot be inlined with `inplace` (`E_MIDDLE_INPLACE_ON_CDC_SYNC`).
+
+## Use Cases
+
+### Protocol Interfaces
+
+```syl
+@layout(packed)
+bundle AxiAddress {
+    addr: UInt<32>,
+    len: UInt<8>,
+    size: UInt<3>,
+    burst: UInt<2>,
+}
+```
+
+### Register Maps
+
+Exact bit layout is critical when mapping bundles to hardware control/status registers.
+
+## Future Extensions
+
+Future versions may support additional attributes such as `@deprecated`, `@inline`, and `@no_inline`.

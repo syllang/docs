@@ -1,0 +1,349 @@
+---
+title: Composite Types
+description: Usage of bundle (structs), enum (enumerations), and array types in Syl.
+---
+
+# Composite Types
+
+Syl's composite types group multiple values into a single unit. There are three composite types: `bundle` (struct-like), `enum` (enumeration), and `[N] T` (array).
+
+---
+
+## bundle
+
+`bundle` groups multiple named fields into a data structure, similar to a SystemVerilog `struct` or Chisel `Bundle`.
+
+### Declaration
+
+```syl
+bundle Packet {
+    data: UInt<8>,
+    last: Bit,
+    valid: Bit,
+}
+
+bundle AluCmd<W: Nat> {
+    op: AluOp,
+    a: UInt<W>,
+    b: UInt<W>,
+}
+```
+
+A `bundle` can take generic parameters, and field types may reference those parameters.
+
+### Construction
+
+Create a bundle value using aggregate literal syntax:
+
+```syl
+signal pkt: Packet := Packet {
+    data: 42,
+    last: 1,
+    valid: 1,
+}
+```
+
+All fields must be initialized. The compiler checks that every field type matches.
+
+### Field Access
+
+Access fields with dot notation:
+
+```syl
+signal d: UInt<8> := pkt.data
+signal v: Bit := pkt.valid
+```
+
+### bundle as Port Type
+
+A `bundle` can be used as a module port type:
+
+```syl
+cell ProcessPacket(
+    pkt_in: in Packet,
+    pkt_out: out Packet,
+) {
+    pkt_out.data := pkt_in.data + 1
+    pkt_out.last := pkt_in.last
+    pkt_out.valid := pkt_in.valid
+}
+```
+
+## enum
+
+`enum` defines a set of named variants, commonly used for state machines, instruction decoding, and mode selection.
+
+### Declaration
+
+```syl
+enum State {
+    Idle,
+    Running,
+    Done,
+}
+
+enum AluOp {
+    Add,
+    Sub,
+    Xor,
+    Or,
+}
+```
+
+Enum variants are named constants without associated payload data.
+
+### Usage
+
+```syl
+signal state: State := State.Idle
+
+signal next_state: State := match state {
+    State.Idle => State.Running,
+    State.Running => State.Done,
+    State.Done => State.Idle,
+}
+
+signal result: UInt<8> := match op {
+    AluOp.Add => a + b,
+    AluOp.Sub => a - b,
+    AluOp.Xor => a xor b,
+    AluOp.Or => a or b,
+}
+```
+
+Enum variants must be qualified (e.g. `State.Idle`). Bare variant names are not supported.
+
+### Exhaustiveness Checking
+
+`match` expressions must cover all variants of the enum:
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Running,
+    State.Running => State.Done,
+    // Error: missing State.Done branch
+}
+```
+
+The compiler verifies exhaustiveness and reports an error if any variant is missing.
+
+## Arrays
+
+`[N] T` holds `N` elements of type `T`, where `N` is determined at compile time.
+
+### Declaration
+
+```syl
+signal arr: [4] UInt<8>          // 4 8-bit unsigned integers
+signal matrix: [16] [16] Bit     // 16x16 Bit matrix
+```
+
+### Indexing
+
+Access elements by index:
+
+```syl
+signal first: UInt<8> := arr[0]
+signal second: UInt<8> := arr[1]
+arr[2] := 42
+```
+
+Indices must be compile-time constants or expressions resolvable during elaboration.
+
+### Iteration
+
+Use `for` to unroll iteration at compile time:
+
+```syl
+signal results: [4] UInt<8> := for i in 0..4 {
+    compute(inputs[i])
+}
+```
+
+`for` loops unroll at compile time, generating 4 independent `compute` instances.
+
+### Arrays as Ports
+
+```syl
+cell Crossbar<W: Nat, N: Nat>(
+    inputs: in [N] UInt<W>,
+    sel: in UInt<8>,
+    output: out UInt<W>,
+) {
+    output := inputs[sel]
+}
+```
+
+Array ports are useful in multi-channel designs.
+
+## Nesting Composite Types
+
+Composite types can be nested:
+
+```syl
+enum Color { Red, Green, Blue }
+
+bundle Pixel {
+    color: Color,
+    intensity: UInt<8>,
+}
+
+signal line: [64] Pixel
+signal first_pixel: Pixel := line[0]
+signal first_color: Color := first_pixel.color
+```
+
+## bundle Layout Control
+
+By default, Syl lays out bundle fields in declaration order. You can control layout with attributes:
+
+```syl
+@layout(packed)
+bundle PackedWord<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+```
+
+`@layout(packed)` ensures fields are packed contiguously without padding bits, which is useful for protocol interfaces requiring exact bit layouts.
+
+## Pattern: State Machine
+
+State machines commonly combine `enum` and `bundle`:
+
+```syl
+enum State {
+    Idle,
+    Read,
+    Write,
+    Error,
+}
+
+bundle Control {
+    state: State,
+    addr: UInt<16>,
+    data: UInt<8>,
+}
+
+cell SimpleFSM(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    start: in Bit,
+    done: out Bit,
+) {
+    reg ctrl: Control
+    signal next_state: State := match ctrl.state {
+        State.Idle =>
+            select { start => State.Read, default => State.Idle },
+        State.Read => State.Write,
+        State.Write => State.Done,
+        State.Done => State.Idle,
+    }
+    next ctrl.state := next_state
+    done := ctrl.state == State.Done
+}
+```
+
+## Pattern: Registered bundle
+
+A `bundle` can be stored in a register as a whole:
+
+```syl
+bundle Channel {
+    data: UInt<8>,
+    valid: Bit,
+}
+
+cell ChannelReg(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_ch: in Channel,
+    out_ch: out Channel,
+) {
+    reg saved: Channel reset(rst, Channel { data: 0, valid: 0 })
+
+    next saved := in_ch
+    out_ch := saved
+}
+```
+
+All fields of `saved` update together on the clock edge.
+
+## Pattern: Streaming Packet
+
+```syl
+bundle Packet<W: Nat> {
+    data: UInt<W>,
+    last: Bit,
+}
+
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+
+cell PacketBuffer<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    in_stream: in Stream<Packet<W>>.sink,
+    out_stream: out Stream<Packet<W>>.source,
+) {
+    out_stream.payload.data := in_stream.payload.data + 1
+    out_stream.payload.last := in_stream.payload.last
+    out_stream.valid := in_stream.valid
+    in_stream.ready := out_stream.ready
+}
+```
+
+`Packet<W>` serves as the payload type of `Stream`, demonstrating composite types working with interfaces.
+
+## Common Errors
+
+### Non-Exhaustive Enum Match
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Running,
+    // Missing State.Running and State.Done
+}
+```
+
+The compiler reports an incomplete match. Add all variants or a `default` branch.
+
+### Array Out of Bounds
+
+```syl
+signal arr: [4] UInt<8>
+signal x: UInt<8> := arr[4]    // Error: index out of range 0-3
+```
+
+Array indices must be less than the array length. The compiler checks statically visible out-of-bounds indices.
+
+### bundle Field Type Mismatch
+
+```syl
+bundle Pair { left: UInt<8>, right: UInt<8> }
+signal p: Pair := Pair { left: 42, right: 1 }    // OK
+
+bundle Wide { value: UInt<16> }
+# signal p: Pair := Pair { left: 42, right: Wide { value: 1 } }  // Error: type mismatch
+```
+
+Every field in a bundle literal must match its declared type.
+
+### Recursive Type Definitions (`E_MIDDLE_RECURSIVE_STRUCT` / `E_MIDDLE_RECURSIVE_BUNDLE`)
+
+`struct` and `bundle` declarations cannot directly or indirectly contain themselves, because hardware signals must have finite static bit widths. The semantic analyzer detects declaration cycles and reports `E_MIDDLE_RECURSIVE_STRUCT` or `E_MIDDLE_RECURSIVE_BUNDLE`.

@@ -1,0 +1,12 @@
+---
+title: Project Status
+description: Current implementation status of Syl across Wave 0–3 milestones.
+---
+
+# Project Status
+
+Syl is under active development. The compiler (`sylc`), language server (`syl-lsp`), and standard library (`std.*`) have completed **Wave 0 through Wave 3** milestones:
+
+- **Wave 0–1 (Frontend, Query & Manifest):** Salsa-based incremental query engine (`syl_query`), `syl.toml` manifest discovery, `check_fn` full body checking, `check_map` return consistency, recursive struct/bundle cycle detection, and `E_MIDDLE_CONST_CYCLE`.
+- **Wave 2 (Standard Library & Tooling):** 13 `std.*` modules (36 public `cell`s including `std.vendor`), `--out-dir` / `--filelist` / `--source-comments`, `--diagnostics-format json`, and `syl-lsp` incremental sync + semantic tokens + background DRC.
+- **Wave 3 (Hardware Semantics & DRC):** Clock Domain Crossing (CDC) enforcement with `@cdc_sync`, `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` polarity, synthesizable `mem` / `mem_write` / `mem_read_sync`, and JSON/TOML Opaque Summary `schema_version = 1`.

@@ -1,0 +1,21 @@
+---
+title: FAQ
+description: Frequently asked questions about Syl, Salsa, CDC, RAM, and LSP.
+---
+
+# Frequently Asked Questions
+
+### What is Syl?
+Syl is a statically typed hardware description language (HDL) that compiles to synthesizable SystemVerilog, catching width, direction, single-driver, and CDC errors at compile time.
+
+### How does Syl handle incremental compilation?
+Syl uses a Salsa-based query engine (`syl_query`) for incremental parsing, name resolution, type checking, and elaboration.
+
+### How does CDC checking work?
+`reg` and `mem` are bound to a `Domain`. Direct cross-domain connections trigger `E_MIDDLE_CDC_VIOLATION` unless routed through a `@cdc_sync` synchronizer cell.
+
+### Does Syl support synthesizable RAM?
+Yes. Use `mem`, `mem_write`, and `mem_read_sync` primitives, or the wrappers in `std.mem` (`SinglePortRam`, `SimpleDualPortRam`, `DistributedRam`).
+
+### What does `syl-lsp` support?
+`syl-lsp` supports incremental document sync, semantic tokens (`textDocument/semanticTokens/full`), hover, go-to-definition, completion, and background DRC diagnostics.

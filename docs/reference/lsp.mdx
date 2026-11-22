@@ -1,4 +1,58 @@
 ---
-title: LSP Reference
-description: Reference for the Syl LSP server and its protocol behavior.
+title: LSP (syl-lsp)
+description: Language Server Protocol capabilities, semantic tokens, and background DRC.
 ---
+
+# LSP Reference
+
+Syl implements the Language Server Protocol (LSP) in `syl_lsp`, communicating over stdio.
+
+---
+
+## Starting the Server
+
+```
+syl-lsp
+```
+
+## Supported Capabilities
+
+`syl_lsp` advertises the following `ServerCapabilities`:
+
+- **Incremental document sync (`TextDocumentSyncKind::INCREMENTAL`)**: Efficiently syncs incremental edits.
+- **Semantic tokens (`textDocument/semanticTokens/full`)**: Compiler-backed syntax and semantic highlighting.
+- **Background DRC channel**: Runs elaboration Design Rule Checks (single-driver, CDC, memory DRC) in a background task without blocking interactive editing.
+- **Hover**: Displays type and declaration information.
+- **Go to Definition**: Navigates to declarations across files.
+- **Completion**: Suggests ports, signals, local bindings, and keywords.
+- **Diagnostics**: Publishes syntax, semantic, and DRC diagnostics on edit.
+
+## Editor Integration
+
+### VS Code
+
+Ensure `syl-lsp` is on `PATH` and configure a custom LSP extension to launch `syl-lsp`.
+
+### Neovim
+
+```lua
+vim.lsp.start({
+    name = "syl",
+    cmd = { "syl-lsp" },
+})
+```
+
+### Helix
+
+```toml
+[language-server.syl]
+command = "syl-lsp"
+
+[[language]]
+name = "syl"
+language-servers = ["syl"]
+```
+
+## Current Limitations
+
+- Rename, code actions, and signature help are not yet supported.

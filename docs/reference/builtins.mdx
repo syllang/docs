@@ -1,4 +1,115 @@
 ---
-title: Built-ins
-description: Built-in types, literals, functions, and operators in Syl.
+title: Built-in Types and Primitives
+description: Syl's built-in types, functions, memory primitives, and special constructs.
 ---
+
+# Built-in Types and Primitives
+
+Syl provides built-in types, functions, and hardware primitives directly from the compiler without requiring imports.
+
+---
+
+## Built-in Types
+
+### `Bit`
+
+Single-bit hardware signal (`0` or `1`). Operators: `and`, `or`, `xor`, `not`, `eq`.
+
+```syl
+signal valid: Bit := 1
+```
+
+### `Nat`
+
+Compile-time non-negative integer. Operators: `+`, `-`, `*`, `/`, `%`, `<<`, `==`, `!=`, `<`, `>`, `<=`, `>=`.
+
+```syl
+const W: Nat = 8
+```
+
+### `Bool`
+
+Compile-time boolean (`true` or `false`). Operators: `and`, `or`, `not`.
+
+```syl
+const debug: Bool = true
+```
+
+### `UInt<W>`
+
+`W`-bit unsigned integer, where `W` is a compile-time `Nat`.
+
+```syl
+signal data: UInt<8>
+```
+
+### `Clock<D>` and `Domain`
+
+`Clock<D>` is a clock signal bound to clock domain `D: Domain`.
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+)
+```
+
+### `Reset<D, Sync|Async, ActiveHigh|ActiveLow>`
+
+Reset signal bound to domain `D`, with optional sync mode and polarity parameters (defaulting to `Sync, ActiveHigh`).
+
+## Built-in Functions
+
+### `zero<T>()`
+
+Returns the zero value of type `T`:
+
+```syl
+reg data: UInt<8> reset(rst, zero<UInt<8>>())
+```
+
+### `compile_error(message)`
+
+Aborts compilation with a compile-time error message:
+
+```syl
+if W == 0 {
+    compile_error("width must be greater than 0")
+}
+```
+
+## Built-in Constructs
+
+### `select`
+
+Conditional selection supporting `priority` and `unique` modes.
+
+### `match`
+
+Exhaustive enum pattern matching.
+
+### `place`
+
+Module or cell instantiation.
+
+### `for` / `if`
+
+Compile-time loop unrolling and conditional elaboration.
+
+## Synthesizable Memory Primitives
+
+### `mem`
+
+Declares a synthesizable memory (BRAM or register file). The element type must be an array type (`E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`):
+
+```syl
+mem ram: [256] UInt<32>
+```
+
+### `mem_write(m, addr, data, en)`
+
+Writes `data` to `m[addr]` on the clock edge when `en` is asserted. Statement-only (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`); duplicate write ports trigger `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`.
+
+### `mem_read_sync(m, addr, en)`
+
+Synchronously reads `m[addr]` on the clock edge. Statement-only (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`); target must be a `mem` (`E_MIDDLE_MEMORY_TARGET_NOT_MEM`).

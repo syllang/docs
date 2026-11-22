@@ -1,0 +1,128 @@
+---
+title: 标准库
+description: 全部 13 个 std.* 模块的完整参考——36 个公开 cell、bundle、interface 与 map。
+---
+
+# 标准库
+
+Syl 标准库（`std.*`）包含 13 个模块，共提供 36 个公开 `cell`（含 `std.vendor` 中的 2 个 `extern cell`），以及配套的 `interface`、`bundle` 与 `map` 定义。
+
+---
+
+## 1. `std.stream`
+
+Valid-Ready 流式握手接口与辅助单元。
+
+- **`interface Stream<T>`**：包含 `payload: T`、`valid: Bit`、`ready: Bit`，提供 `source`、`sink` 与 `tap` 视图。
+- **`map stream_fire<T>(stream: Stream<T>.tap) -> Bit`**：返回 `stream.valid and stream.ready`。
+- **`cell stream_connect<T>(...)`**：连接上游 `Stream<T>.sink` 与下游 `Stream<T>.source`。
+- **`cell stream_skid_buffer<T, D: Domain>(...)`**：带寄存器的 Skid Buffer，用于切断组合逻辑反压路径。
+
+## 2. `std.stage`
+
+流水线级接口与连接原语。
+
+- **`interface Stage<T>`**：包含 `payload: T`、`valid: Bit`、`ready: Bit`，提供 `source`、`sink` 与 `tap` 视图。
+- **`map fire<T>(this stage: Stage<T>.tap) -> Bit`**：握手成功谓词。
+- **`map moving<T>(this stage: Stage<T>.tap) -> Bit`**：级间传输谓词。
+- **`cell stage_from_stream<T>(...)`**：将 `Stream<T>` 适配为 `Stage<T>`。
+- **`cell stage_to_stream<T>(...)`**：将 `Stage<T>` 适配为 `Stream<T>`。
+- **`cell direct_link<T>(...)`**：零延迟组合级间直连。
+- **`cell map_stage<A, B>(...)`**：将级间负载从类型 `A` 映射为 `B`。
+- **`cell stage_link<T, D: Domain>(...)`**：带寄存器的流水线级间连接。
+- **`cell halt_link<T>(...)`**：带暂停控制的流水线连接。
+- **`cell drop_link<T>(...)`**：带丢弃控制的流水线连接。
+
+## 3. `std.pipeline`
+
+多级流水线辅助模块。
+
+- **`interface Stage<T>`**：流水线级接口（`source`、`sink`、`tap`）。
+- **`map fire<T>(this stage: Stage<T>.tap) -> Bit`**
+- **`map moving<T>(this stage: Stage<T>.tap) -> Bit`**
+- **`cell stage_from_stream<T>(...)`**
+- **`cell stage_to_stream<T>(...)`**
+- **`cell direct_link<T>(...)`**
+- **`cell map_stage<A, B>(...)`**
+- **`cell stage_link<T, D: Domain>(...)`**
+- **`cell halt_link<T>(...)`**
+- **`cell drop_link<T>(...)`**
+
+## 4. `std.skid`
+
+用于解耦反压的 Skid Buffer。
+
+- **`cell SkidBuffer<T, D: Domain>(...)`**：支持任意负载类型 `T` 的通用 Skid Buffer。
+- **`cell WordSkidBuffer<W: nat = 8, D: Domain>(...)`**：按字宽参数化的 Skid Buffer。
+
+## 5. `std.fifo`
+
+同步 FIFO。
+
+- **`cell SyncFifo<W: nat = 8, DEPTH: nat = 8, ADDR_W: nat = 3, CNT_W: nat = 4, D: Domain>(...)`**：支持推入/弹出、满/空标志与计数的同步 FIFO。
+- **`cell StreamSyncFifo<W: nat = 8, DEPTH: nat = 8, ADDR_W: nat = 3, CNT_W: nat = 4, D: Domain>(...)`**：基于 `Stream<UInt<W>>` 接口封装的同步 FIFO。
+
+## 6. `std.mem`
+
+可综合存储器封装。
+
+- **`cell SinglePortRam<W: nat = 8, DEPTH: nat = 16, ADDR_W: nat = 4, D: Domain>(...)`**：单端口同步 RAM。
+- **`cell SimpleDualPortRam<W: nat = 8, DEPTH: nat = 16, ADDR_W: nat = 4, D: Domain>(...)`**：简单双端口 RAM（1 读端口、1 写端口）。
+- **`cell DistributedRam<W: nat = 8, DEPTH: nat = 16, ADDR_W: nat = 4, D: Domain>(...)`**：分布式/异步读 RAM。
+
+## 7. `std.cdc`
+
+标注了 `@cdc_sync` 的跨时钟域（CDC）同步器。
+
+- **`cell Sync2FF<D_DST: Domain>(...)`**：两级触发器同步器（同步高有效复位）。
+- **`cell Sync2FFAsyncLow<D_DST: Domain>(...)`**：异步低有效复位的两级触发器同步器。
+- **`cell PulseSynchronizer<D_SRC: Domain, D_DST: Domain>(...)`**：跨时钟域单周期脉冲同步器。
+
+## 8. `std.arbiter`
+
+仲裁器逻辑。
+
+- **`map first_request(req: UInt<4>) -> UInt<4>`**：返回最低有效位的独热码授权。
+- **`cell FixedPriorityArbiter4(...)`**：4 输入固定优先级仲裁器。
+- **`cell RoundRobinArbiter4<D: Domain>(...)`**：4 输入轮询仲裁器。
+
+## 9. `std.pulse`
+
+边沿检测与脉冲展宽器。
+
+- **`cell RisingEdgeDetector<D: Domain>(...)`**：上升沿检测（`0 -> 1`）。
+- **`cell FallingEdgeDetector<D: Domain>(...)`**：下降沿检测（`1 -> 0`）。
+- **`cell EdgeDetector<D: Domain>(...)`**：双边沿检测。
+- **`cell PulseStretcher<CYCLES: nat = 4, CNT_W: nat = 3, D: Domain>(...)`**：将单周期脉冲展宽 `CYCLES` 个周期。
+
+## 10. `std.logic`
+
+组合位运算与字运算辅助函数。
+
+- **`map bit_mux(sel: Bit, when_true: Bit, when_false: Bit) -> Bit`**
+- **`map bit_enable(value: Bit, enable: Bit) -> Bit`**
+- **`map word_increment<W: nat>(value: UInt<W>) -> UInt<W>`**
+
+## 11. `std.bundle`
+
+常用 `bundle` 类型与构造函数。
+
+- **`bundle ReadyValidWord<W: nat>`**：包含 `data: UInt<W>`、`valid: Bit`、`ready: Bit`。
+- **`bundle MaybeWord<W: nat>`**：包含 `valid: Bit`、`data: UInt<W>`。
+- **`map valid_word<W: nat>(value: UInt<W>) -> MaybeWord<W>`**
+- **`map invalid_word<W: nat>() -> MaybeWord<W>`**
+
+## 12. `std.assert`
+
+仿真与观测辅助单元。
+
+- **`map assert_pass(condition: Bit) -> Bit`**
+- **`cell observe_stream<T>(...)`**
+- **`cell vendor_assert_stream_fire<T, D: Domain>(...)`**
+
+## 13. `std.vendor`
+
+外部厂商黑盒声明。
+
+- **`extern cell VendorReadyValidSlice<W: nat, D: Domain>(...)`**
+- **`extern cell VendorAssertBit<D: Domain>(...)`**

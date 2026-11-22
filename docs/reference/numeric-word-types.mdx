@@ -1,0 +1,233 @@
+---
+title: Numeric Word Types
+description: Declaration, operations, and width inference rules for UInt<W>.
+---
+
+# Numeric Word Types
+
+Syl's numeric word type `UInt<W>` represents a `W`-bit unsigned integer. The bit width `W` is fixed at compile time and never changes dynamically. This page covers `UInt<W>` declarations, supported operations, width inference rules, and common patterns.
+
+---
+
+## Declarations
+
+### Ports and Signals
+
+```syl
+signal data: UInt<8>            // 8-bit unsigned signal
+signal addr: UInt<16>           // 16-bit unsigned signal
+signal result: UInt<32>         // 32-bit unsigned signal
+```
+
+Widths can be compile-time constants:
+
+```syl
+const W: Nat = 32
+signal value: UInt<W>           // 32-bit unsigned signal
+```
+
+Or generic parameters specified at instantiation:
+
+```syl
+cell FIFO<W: Nat>(
+    data_in: in UInt<W>,
+    data_out: out UInt<W>,
+)
+
+// Instantiate an 8-bit FIFO
+let fifo8 = place FIFO<8>(data_in: din, data_out: dout)
+```
+
+### Literals
+
+Numeric literals infer their type from context:
+
+```syl
+signal a: UInt<8> := 42         // 42 inferred as UInt<8>
+signal b: UInt<16> := 42        // 42 inferred as UInt<16>
+```
+
+If a literal exceeds the target type's range, the compiler reports an error:
+
+```syl
+signal c: UInt<8> := 256        // Error: 256 exceeds UInt<8> range (0-255)
+```
+
+## Operations
+
+### Arithmetic
+
+```syl
+signal a: UInt<8> := x + y      // Addition
+signal b: UInt<8> := x - y      // Subtraction
+signal c: UInt<8> := x * y      // Multiplication
+signal d: UInt<8> := x << 2     // Left shift
+```
+
+Subtraction wraps around on underflow. For example, `0 - 1` on `UInt<4>` produces `15`.
+
+### Bitwise Operations
+
+```syl
+signal a: UInt<8> := x and y    // Bitwise AND
+signal b: UInt<8> := x or y     // Bitwise OR
+signal c: UInt<8> := x xor y    // Bitwise XOR
+signal d: UInt<8> := not x      // Bitwise NOT
+```
+
+Bitwise operations operate bit-by-bit on two operands. If the operands have different widths, the compiler reports an error.
+
+### Comparisons
+
+Comparisons return `Bit`:
+
+```syl
+signal eq: Bit := x == y        // Equal
+signal ne: Bit := x != y        // Not equal
+signal lt: Bit := x < y         // Less than
+signal gt: Bit := x > y         // Greater than
+signal le: Bit := x <= y        // Less than or equal
+signal ge: Bit := x >= y        // Greater than or equal
+```
+
+## Width Inference
+
+Syl tracks the bit width of every expression at compile time.
+
+### Binary Operation Widths
+
+When both operands have the same width, the result has the same width:
+
+```syl
+signal a: UInt<8> := x + y      // Result is UInt<8>
+signal b: UInt<16> := p + q     // Result is UInt<16>
+```
+
+If operands have different widths, the compiler reports an error. There is no implicit widening or truncation:
+
+```syl
+signal x: UInt<8>
+signal y: UInt<16>
+# signal r: UInt<8> := x + y   // Error: width 8 and 16 mismatch
+```
+
+### Literal Widths
+
+Literals adopt the expected target width:
+
+```syl
+signal a: UInt<8> := 0          // 0 as UInt<8>
+signal b: UInt<16> := 0         // 0 as UInt<16>
+```
+
+### Conditional Branch Widths
+
+All branches of `select` and `match` must return types of the same width:
+
+```syl
+signal s: UInt<8> := select {
+    a => 1,                     // UInt<8>
+    b => 256,                   // Error: 256 exceeds UInt<8>
+}
+```
+
+## Slicing and Indexing
+
+### Bit Selection
+
+```syl
+signal value: UInt<8>
+signal low_bit: Bit := value[0]            // Bit 0
+signal high_nibble: UInt<4> := value[4..8] // Upper 4 bits
+```
+
+Range selection `[start..end]` requires `start` and `end` to be compile-time constants.
+
+### Field Packing
+
+Use `bundle` to group multiple fields into a single value:
+
+```syl
+bundle Pair {
+    high: UInt<4>,
+    low: UInt<4>,
+}
+
+signal word: UInt<8>
+signal pair: Pair := Pair { high: word[4..8], low: word[0..4] }
+```
+
+## Width Extension
+
+When assigning a narrower value to a wider signal, construct the wider value explicitly:
+
+```syl
+signal a: UInt<8>
+signal b: UInt<16>
+
+// Zero-extend a to 16 bits
+signal ext: UInt<16> := select {
+    default => a,              // a = 0xAB -> ext = 0x00AB
+}
+```
+
+This zero-extends the upper bits. Sign extension must be implemented explicitly if needed.
+
+## Pattern: Pulse Counter
+
+```syl
+cell PulseCounter<W: Nat>(
+    pulse: in Bit,
+    clear: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W>
+    signal next_val: UInt<W> := select {
+        clear => 0,
+        pulse => value + 1,
+        default => value,
+    }
+    next value := next_val
+    count := value
+}
+```
+
+`PulseCounter` counts input pulses. `W` determines the maximum count (`0..255` for `W = 8`).
+
+## UInt vs. Bit
+
+`Bit` is conceptually similar to `UInt<1>`, but they are distinct types:
+
+```syl
+signal b: Bit
+# signal u: UInt<1> := b       // Error: distinct types
+```
+
+Use `Bit` for single-bit signals. `Bit` and `UInt<W>` share the same operator keywords (`and`, `or`, `not`), and the compiler selects the appropriate semantics from the operand types.
+
+## Common Errors
+
+### Out-of-Range Literal
+
+```syl
+signal a: UInt<4> := 16        // Error: UInt<4> range is 0-15
+```
+
+### Arithmetic Wrap-Around
+
+```syl
+signal a: UInt<4> := 15
+signal b: UInt<4> := a + 1     // Result is 0 (wraps around)
+```
+
+The compiler does not insert overflow protection automatically. Add explicit logic if overflow detection is required.
+
+### Mismatched Comparison Widths
+
+```syl
+signal x: UInt<8>
+signal y: UInt<16>
+# signal eq: Bit := x == y     // Error: width mismatch
+```
+
+Values of different widths cannot be compared directly. Extend the narrower signal to match the wider one first.

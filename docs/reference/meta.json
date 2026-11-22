@@ -1,13 +1,35 @@
 {
   "title": "Reference",
-  "icon": "reference",
   "pages": [
+    "index",
+    "---Language Specification---",
+    "basic-types",
+    "numeric-word-types",
+    "composite-types",
+    "interfaces-and-views",
+    "hardware-semantics",
+    "sequential-logic",
+    "compile-time-constructs",
+    "structural-constructs",
+    "packages-and-imports",
+    "---Syntax & Builtins---",
     "lexical-syntax",
     "grammar",
-    "builtins",
     "attributes",
+    "builtins",
+    "---Standard Library & Tooling---",
+    "standard-library",
+    "manifest-and-opaque-schema",
     "cli",
+    "diagnostics",
     "lsp",
-    "diagnostics"
+    "---Project & Support---",
+    "project-status",
+    "faq",
+    "support",
+    "roadmap",
+    "release-policy",
+    "versioning-and-compatibility",
+    "changelog"
   ]
 }

@@ -12,8 +12,28 @@ description: sylc 命令行编译器的使用说明。
 ## 用法
 
 ```
-sylc [选项] <源文件>...
+sylc [OPTIONS] [FILE_OR_DIR]... [COMMAND]
 ```
+
+### 子命令
+
+- `sylc check [OPTIONS] [FILE_OR_DIR]...`：执行类型检查与展开期 DRC（不生成 SystemVerilog）。
+- `sylc emit [OPTIONS] [FILE_OR_DIR]...`：执行检查并输出 SystemVerilog 到标准输出、`--out` 或 `--out-dir`。
+
+## 常用选项
+
+- `--manifest <PATH>`：显式指定 `syl.toml` 清单路径。
+- `--package-root <PATH>`：显式指定包根目录。
+- `--std-root <PATH>`：指定标准库路径。
+- `--out <OUTPUT>`：输出单个 SystemVerilog 文件。
+- `--out-dir <DIR>`：按模块输出多个 SystemVerilog 文件并生成依赖排序的 filelist。
+- `--filelist <PATH>`：指定 filelist 路径（默认 `<out-dir>/filelist.f`）。
+- `--source-comments`：在生成的 SystemVerilog 中保留 Syl 源码位置注释。
+- `--diagnostics-format <human|json>`：设置诊断输出格式（默认 `human`）。
+
+### JSON 诊断输出 Schema
+
+使用 `--diagnostics-format json` 时，每条诊断以结构化 JSON 输出，包含 `code`、`severity`、`message`、`span`（文件与行列范围）等字段，便于 CI 与编辑器集成解析。
 
 ## 基本使用
 

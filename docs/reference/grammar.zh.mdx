@@ -67,7 +67,10 @@ stmt           ::= let_stmt | signal_stmt | reg_stmt
 
 let_stmt       ::= "let" ident (":" type_expr)? ("=" expr)?
 signal_stmt    ::= "signal" ident ":" type_expr (":=" expr)?
-reg_stmt       ::= "reg" ident ":" type_expr ("reset" "(" expr "," expr ")")?
+reg_stmt       ::= "reg" ident ":" type_expr ("reset" "(" expr "," expr ("," reset_mod)* ")")?
+reset_mod      ::= "sync" | "async" | "active_high" | "active_low"
+attr           ::= "@" ident ("(" attr_arg ("," attr_arg)* ")")?
+attr_arg       ::= ident ("=" expr)? | expr
 next_stmt      ::= "next" ident ":=" expr
 assign_stmt    ::= expr ":=" expr
 if_stmt        ::= "if" expr block ("else" block)?

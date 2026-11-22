@@ -21,6 +21,12 @@ syl-lsp
 
 ## 支持的功能
 
+`syl_lsp` 在 `ServerCapabilities` 中声明并支持以下能力：
+
+- **增量文档同步（`TextDocumentSyncKind::INCREMENTAL`）**：高效同步编辑器中的增量修改。
+- **语义高亮（`textDocument/semanticTokens/full`）**：基于编译器语法与语义信息提供精确的 Token 着色。
+- **后台 DRC 通道**：在独立后台任务中运行展开期设计规则检查（包括单驱动、CDC 与存储器 DRC），不阻塞主编辑响应。
+
 ### 悬停提示
 
 ```json

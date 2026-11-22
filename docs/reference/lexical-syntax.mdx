@@ -1,4 +1,123 @@
 ---
 title: Lexical Syntax
-description: Reference for Syl token classes, comments, literals, keywords, and punctuation.
+description: Token definitions and lexical rules of Syl.
 ---
+
+# Lexical Syntax
+
+This page defines Syl's lexical rules for compiler implementers and users who need an exact reference for tokens, literals, and operators.
+
+---
+
+## Character Set
+
+Syl source files are UTF-8 encoded. Valid characters include:
+
+- ASCII letters: `a-z`, `A-Z`
+- Digits: `0-9`
+- Underscore: `_`
+- Operators and delimiters: `+ - * / % = ! < > & | ^ ~ . , : ; ( ) [ ] { } @ #`
+- Whitespace: space, tab, newline
+
+Comments begin with `//` and run to the end of the line.
+
+## Keywords
+
+Reserved keywords cannot be used as identifiers:
+
+```
+cell  extern  fn  map  const  let  var  signal  reg
+in  out  inout  next  place  return
+if  else  for  while
+select  priority  unique  match
+enum  bundle  interface  view
+use  package
+true  false
+and  or  not  xor  eq
+Domain  Nat  Bool  Bit  Clock  Reset
+compile_error
+```
+
+## Identifiers
+
+Identifiers start with a letter or underscore, followed by letters, digits, or underscores:
+
+```
+counter  data_in  FIFO  _internal  Stream_8
+```
+
+Identifiers are case-sensitive (`counter` and `Counter` are distinct).
+
+## Literals
+
+### Integer Literals
+
+```
+42       // Decimal
+0xFF     // Hexadecimal
+0b1010   // Binary
+```
+
+Underscores may be used as digit separators: `1_000_000`.
+
+### Boolean Literals
+
+```
+true    false
+```
+
+### String Literals
+
+```
+"hello"   "data"
+```
+
+Strings are used in compile-time diagnostics such as `compile_error`.
+
+## Operators
+
+### Hardware Operators
+
+```
+and   or   xor   not   eq       // Logic / bitwise
++     -    *     /     %        // Arithmetic
+<<    >>                        // Shift
+==    !=    <    >    <=   >=   // Comparison
+:=                              // Continuous assignment
+```
+
+### Compile-Time Operators
+
+```
+and   or   not                  // Logical
++     -    *     /     %        // Arithmetic
+<<                              // Shift
+==    !=    <    >    <=   >=   // Comparison
+```
+
+## Delimiters
+
+```
+( )    // Grouping and parameter/argument lists
+{ }    // Blocks
+[ ]    // Array indexing and generic parameters
+:      // Type annotation
+,      // Separator
+.      // Field access and enum variants
+;      // Statement terminator (optional)
+->     // Return binding
+=>     // select/match arm
+:=     // Continuous assignment
+```
+
+## Comments
+
+```
+// Single-line comment
+```
+
+Syl supports single-line `//` comments.
+
+## Whitespace
+
+Whitespace (spaces, tabs, newlines) separates tokens. Syl is not indentation-sensitive, though consistent indentation is recommended.

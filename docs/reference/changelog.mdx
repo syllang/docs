@@ -1,0 +1,20 @@
+---
+title: Changelog
+description: Release history and Wave 0–3 capabilities in Syl.
+---
+
+# Changelog
+
+## Wave 3
+- Added Clock Domain Crossing (CDC) enforcement and `@cdc_sync(in, out, dst_clk)`.
+- Added `Reset<D, Sync|Async, ActiveHigh|ActiveLow>` polarity and `reg ... reset(..., async, active_low)`.
+- Added synthesizable `mem`, `mem_write`, and `mem_read_sync` primitives and `std.mem`.
+- Added JSON/TOML Opaque Summary `schema_version = 1`.
+
+## Wave 2
+- Expanded `std.*` to 13 modules (36 `cell`s including `std.vendor`).
+- Added `--out-dir`, `--filelist`, `--source-comments`, and `--diagnostics-format json`.
+- Added `syl-lsp` incremental sync, semantic tokens, and background DRC.
+
+## Wave 0–1
+- Salsa incremental query engine (`syl_query`), `syl.toml` manifest discovery, `check_fn`, `check_map`, and cycle detection.

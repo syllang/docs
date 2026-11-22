@@ -1,0 +1,73 @@
+---
+title: 清单与 Opaque Schema
+description: syl.toml 工程清单字段与 JSON/TOML Opaque Summary（schema_version = 1）规范。
+---
+
+# 清单与 Opaque Schema
+
+本文规范 `syl.toml` 工程清单格式以及 `sylc` 用于 `extern cell` DRC 与 CDC 分析的 Opaque Summary（`schema_version = 1`）格式。
+
+---
+
+## `syl.toml` 工程清单
+
+当未显式传入 `--package-root` 时，`sylc` 会从输入路径向上查找最近的 `syl.toml` 作为工程根目录。
+
+### 字段定义
+
+```toml
+[project]
+name = "my_soc"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+workspace_roots = ["."]
+std_roots = ["vendor/std"]
+package_roots = ["src", "lib"]
+opaque_summaries = ["summaries/vendor_ip.json"]
+```
+
+- `[project]`：`name`（不能为空白）、`version`、`edition`。
+- `[paths]`：`workspace_roots`（默认为 `["."]`）、`std_roots`、`package_roots`、`opaque_summaries`（指向 `.json` 或 `.toml` 摘要文件）。
+
+清单解析或校验失败时报告 `E_MANIFEST_PARSE` 或 `E_MANIFEST_INVALID`。
+
+---
+
+## Opaque Summary Schema（`schema_version = 1`）
+
+Opaque Summary 用于描述 `extern cell` 的内部驱动、消费与时钟域行为，使编译器在没有 SystemVerilog 实现源码的情况下也能执行完整的 DRC 与 CDC 检查。
+
+### 顶层结构
+
+```json
+{
+  "schema_version": 1,
+  "summaries": [
+    {
+      "kind": "extern_cell",
+      "callable": "VendorReadyValidSlice",
+      "endpoints": [],
+      "driven_fields": ["out_data", "out_valid"],
+      "consumed_fields": ["in_data", "in_valid"],
+      "domain_behavior": "same_domain",
+      "latency_class": "registered",
+      "protocol_preservation": "preserved",
+      "trust_boundary": "trusted",
+      "backend_constraints": []
+    }
+  ]
+}
+```
+
+### 核心字段
+
+- `schema_version`：必须为 `1`。
+- `kind`：不透明项类型（如 `extern_cell`）。
+- `callable`：`extern cell` 名称（不能为空白）。
+- `driven_fields` / `consumed_fields`：黑盒内部驱动或读取的端口/字段路径。
+- `domain_behavior`：时钟域行为（如同域 `same_domain` 或跨时钟域 `cdc_crossings`）。
+- `latency_class`、`protocol_preservation`、`trust_boundary`、`backend_constraints`：展开与后端约束元数据。
+
+摘要解析或校验失败时报告 `E_OPAQUE_SUMMARY_PARSE` 或 `E_OPAQUE_SUMMARY_INVALID`。

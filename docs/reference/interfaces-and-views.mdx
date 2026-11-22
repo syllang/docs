@@ -1,0 +1,248 @@
+---
+title: Interfaces and Views
+description: Declaring and using interface and view for port grouping and directional connection checking.
+---
+
+# Interfaces and Views
+
+Syl's `interface` and `view` constructs group related ports into a single reusable type. An `interface` declares a set of fields, while a `view` defines the port directions seen from a particular connection perspective. This keeps module port lists concise while enforcing directional correctness at compile time.
+
+---
+
+## Why Interfaces?
+
+In digital hardware design, module connections often follow recurring patterns such as valid-ready handshakes:
+
+```syl
+// Without interfaces, each module declares separate handshake ports
+cell Producer(
+    data_out: out UInt<8>,
+    valid_out: out Bit,
+    ready_in: in Bit,
+)
+
+cell Consumer(
+    data_in: in UInt<8>,
+    valid_in: in Bit,
+    ready_out: out Bit,
+)
+```
+
+`interface` groups these related signals into one type so modules only declare a single interface port.
+
+## Declaring an interface
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+}
+```
+
+Interfaces can take generic parameters; here `Stream<T>` parameterizes the payload type `T`.
+
+### Declaring Views
+
+A `view` defines port directions from a given perspective:
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+```
+
+- `source` view: the sender drives `payload` and `valid` (`out`) and reads `ready` (`in`).
+- `sink` view: the receiver reads `payload` and `valid` (`in`) and drives `ready` (`out`).
+
+### Using Interface Ports
+
+Module ports use `InterfaceName.ViewName` syntax:
+
+```syl
+cell Producer(
+    stream: out Stream<UInt<8>>.source,
+)
+
+cell Consumer(
+    stream: in Stream<UInt<8>>.sink,
+)
+```
+
+During compilation, `sylc` flattens interface ports into individual ports. For example, `Producer` lowers to:
+
+- `stream_payload: out UInt<8>`
+- `stream_valid: out Bit`
+- `stream_ready: in Bit`
+
+## Connecting Interfaces
+
+### Between Modules
+
+```syl
+cell Top(y: out UInt<8>) {
+    signal data_out: UInt<8>
+
+    let prod = place Producer(stream: ???)
+    let cons = place Consumer(stream: prod.stream)
+}
+```
+
+The sender's `source` view connects to the receiver's `sink` view, and the compiler verifies that directions match.
+
+### Inside a Module
+
+```syl
+cell Processor(
+    cmd_in: in Stream<AluCmd>.sink,
+    rsp_out: out Stream<AluRsp>.source,
+) {
+    // Read input interface
+    signal op: AluOp := cmd_in.payload.op
+    signal valid: Bit := cmd_in.valid
+
+    // Drive output interface
+    rsp_out.payload := compute(op)
+    rsp_out.valid := valid
+    cmd_in.ready := rsp_out.ready
+}
+```
+
+## Field Declaration Rules
+
+Interface fields and view ports follow distinct rules:
+
+- **Interface fields** declare the data carried by the interface without specifying direction.
+- **View ports** declare the direction and name visible from that perspective. Every view port name must correspond to a field in the interface.
+
+```syl
+interface Channel<T> {
+    data: T              // Interface field
+    enable: Bit          // Interface field
+    ready: Bit           // Interface field
+
+    view master {        // Master perspective
+        out data
+        out enable
+        in ready
+    }
+
+    view slave {         // Slave perspective
+        in data
+        in enable
+        out ready
+    }
+}
+```
+
+## Nested Interfaces
+
+An interface can contain another interface as a field:
+
+```syl
+interface PacketStream<T> {
+    header: UInt<8>
+    stream: Stream<T>
+}
+```
+
+This is common in layered protocols.
+
+## Example: Valid-Ready Stream
+
+```syl
+interface Stream<T> {
+    payload: T
+    valid: Bit
+    ready: Bit
+
+    view source {
+        out payload
+        out valid
+        in ready
+    }
+
+    view sink {
+        in payload
+        in valid
+        out ready
+    }
+}
+
+cell PipelineStage<T, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    upstream: in Stream<T>.sink,
+    downstream: out Stream<T>.source,
+) {
+    reg saved: T reset(rst, zero<T>())
+    reg valid_reg: Bit reset(rst, 0)
+
+    signal stall: Bit := downstream.valid and not downstream.ready
+    signal pass: Bit := upstream.valid and (not valid_reg or downstream.ready)
+
+    next saved := select {
+        pass => upstream.payload,
+        default => saved,
+    }
+    next valid_reg := select {
+        stall => 1,
+        pass => 1,
+        default => 0,
+    }
+
+    downstream.payload := saved
+    downstream.valid := valid_reg
+    upstream.ready := not stall
+}
+```
+
+## Compile-Time Guarantees
+
+Beyond port grouping, `interface` and `view` enable compile-time checks:
+
+- **View direction checking:** Ensures `out` ports of a `source` view connect to `in` ports of a `sink` view.
+- **Field completeness checking:** Ensures all visible fields of a view are handled.
+- **Capability checking:** Ensures read/drive capabilities match the view direction.
+
+## Best Practices
+
+- Keep interfaces focused; split overly large interfaces into smaller ones.
+- Define `master`/`source` and `slave`/`sink` views for standard handshake patterns.
+- Parameterize payload types with generics for reuse.
+
+## Common Errors
+
+### View Direction Mismatch
+
+A `source` view cannot connect directly to another `source` view; connect `source` to `sink`.
+
+### Unconnected View Fields
+
+All fields exposed by a view must be connected or driven; missing connections trigger compiler diagnostics.
+
+### Cross-Interface Assignment
+
+```syl
+interface A { field: Bit; view v { out field } }
+interface B { field: Bit; view v { out field } }
+
+signal a: A.v
+# signal b: B.v := a    // Error: A.v and B.v are distinct types
+```
+
+Different interfaces are distinct nominal types even if their fields are identical.

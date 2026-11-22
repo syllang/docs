@@ -1,0 +1,174 @@
+---
+title: Packages and Imports
+description: File organization in Syl—package, use, syl.toml root discovery, and cross-file references.
+---
+
+# Packages and Imports
+
+Syl organizes code into packages. Each source file belongs to a package, and packages import declarations from one another using `use`. This page covers package rules, import syntax, `syl.toml` root discovery, and file layout.
+
+---
+
+## Package Concept
+
+Each `.syl` file belongs to a package whose path is derived from its file path relative to the package root:
+
+```
+project/
+├── src/
+│   ├── top.syl        # package: project.src.top
+│   └── counter.syl    # package: project.src.counter
+└── lib/
+    └── utils.syl      # package: project.lib.utils
+```
+
+## use Imports
+
+`use` imports declarations from other packages.
+
+### Basic Syntax
+
+```syl
+use project.src.counter.Counter
+```
+
+### Importing Multiple Declarations
+
+```syl
+use project.src.counter.Counter
+use project.src.counter.Config
+```
+
+### Wildcard Import
+
+```syl
+use project.src.counter.*
+```
+
+### Importing from the Standard Library
+
+```syl
+use std.stream.Stream
+use std.stage.Stage
+use std.stage.stage_from_stream
+```
+
+Standard library packages begin with `std.`.
+
+## Package Organization
+
+### By Feature
+
+```
+project/
+├── alu.syl            # ALU types and cells
+├── counter.syl        # Counters
+├── stream.syl         # Stream interfaces
+└── top.syl            # Top-level cell
+```
+
+### Separating Types and Implementations
+
+```syl
+# types.syl
+enum State { Idle, Running, Done }
+bundle Control { state: State, data: UInt<8> }
+
+# fsm.syl
+use types.State
+use types.Control
+
+cell FSM(ctrl: out Control) { ... }
+```
+
+### Avoiding Cyclic Imports
+
+Package A cannot import package B if package B imports package A. The compiler detects and reports cyclic imports.
+
+## Cross-File References
+
+```syl
+# counter.syl
+cell Counter<W: Nat>(enable: in Bit, count: out UInt<W>) {
+    reg value: UInt<W>
+    next value := value + 1
+    count := value
+}
+```
+
+```syl
+# top.syl
+use counter.Counter
+
+cell Top(enable: in Bit, result: out UInt<8>) {
+    let cnt = place Counter<8>(enable: enable, count: result)
+}
+```
+
+Compile both files together:
+
+```
+sylc counter.syl top.syl
+```
+
+### Subdirectory Imports
+
+```syl
+# src/sub/counter.syl
+cell Counter(enable: in Bit, count: out UInt<8>) { ... }
+```
+
+```syl
+# src/top.syl
+use sub.counter.Counter
+```
+
+Import paths are relative to the package root.
+
+## Standard Library Packages
+
+```syl
+use std.stream.Stream
+use std.stage.Stage
+use std.stage.stage_from_stream
+use std.stage.stage_to_stream
+use std.stage.stage_link
+use std.stage.halt_link
+use std.stage.drop_link
+use std.pipeline.*
+use std.bundle.*
+use std.logic.*
+use std.assert.*
+```
+
+See [Standard Library](./standard-library) for the full reference.
+
+## Best Practices
+
+- Keep files between 100 and 500 lines for readability.
+- Place public types (`bundle`, `interface`, `enum`) at the top of the file.
+- Syl does not require a specific file order on the command line.
+
+## Common Errors
+
+### Wrong Import Path
+
+Import paths must match the full package path relative to the package root.
+
+### Name Collisions
+
+Imported declarations cannot share a name with local declarations in the same file.
+
+### Cyclic Imports
+
+Extract shared types into a third package to break import cycles.
+
+### Using Without Importing
+
+Cross-file references require `use`.
+
+### `syl.toml` Root Discovery, Unused `use` Checks, and `E_DUPLICATE_MODULE_FILE`
+
+- **`syl.toml` root discovery:** When `--package-root` is not explicitly passed, `sylc` searches upward from the input paths for the nearest `syl.toml` to determine the package root.
+- **Unused `use` validation:** The compiler checks whether imported declarations are actually referenced and reports unused `use` statements.
+- **Duplicate module files (`E_DUPLICATE_MODULE_FILE`):** When multiple source files map to the same module path or a module file is loaded twice, the compiler reports `E_DUPLICATE_MODULE_FILE`.

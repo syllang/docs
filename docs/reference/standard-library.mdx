@@ -1,0 +1,128 @@
+---
+title: Standard Library
+description: Complete reference for all 13 std.* modules—36 cells, bundles, interfaces, and maps.
+---
+
+# Standard Library
+
+The Syl standard library (`std.*`) provides 13 modules containing 36 public `cell`s (including 2 `extern cell`s in `std.vendor`), along with `interface`, `bundle`, and `map` definitions.
+
+---
+
+## 1. `std.stream`
+
+Valid-ready streaming interface and helpers.
+
+- **`interface Stream<T>`**: `payload: T`, `valid: Bit`, `ready: Bit` with `source`, `sink`, and `tap` views.
+- **`map stream_fire<T>(stream: Stream<T>.tap) -> Bit`**: Returns `stream.valid and stream.ready`.
+- **`cell stream_connect<T>(...)`**: Connects an upstream `Stream<T>.sink` to a downstream `Stream<T>.source`.
+- **`cell stream_skid_buffer<T, D: Domain>(...)`**: Registered skid buffer breaking combinational ready/valid paths.
+
+## 2. `std.stage`
+
+Pipeline stage interface and link primitives.
+
+- **`interface Stage<T>`**: `payload: T`, `valid: Bit`, `ready: Bit` with `source`, `sink`, and `tap` views.
+- **`map fire<T>(this stage: Stage<T>.tap) -> Bit`**: Handshake fire predicate.
+- **`map moving<T>(this stage: Stage<T>.tap) -> Bit`**: Stage transfer predicate.
+- **`cell stage_from_stream<T>(...)`**: Adapts `Stream<T>` to `Stage<T>`.
+- **`cell stage_to_stream<T>(...)`**: Adapts `Stage<T>` to `Stream<T>`.
+- **`cell direct_link<T>(...)`**: Zero-latency combinational stage link.
+- **`cell map_stage<A, B>(...)`**: Transforms stage payload from `A` to `B`.
+- **`cell stage_link<T, D: Domain>(...)`**: Registered pipeline stage link.
+- **`cell halt_link<T>(...)`**: Stage link with halt control.
+- **`cell drop_link<T>(...)`**: Stage link with drop control.
+
+## 3. `std.pipeline`
+
+Multi-stage pipeline helpers.
+
+- **`interface Stage<T>`**: Pipeline stage interface (`source`, `sink`, `tap`).
+- **`map fire<T>(this stage: Stage<T>.tap) -> Bit`**
+- **`map moving<T>(this stage: Stage<T>.tap) -> Bit`**
+- **`cell stage_from_stream<T>(...)`**
+- **`cell stage_to_stream<T>(...)`**
+- **`cell direct_link<T>(...)`**
+- **`cell map_stage<A, B>(...)`**
+- **`cell stage_link<T, D: Domain>(...)`**
+- **`cell halt_link<T>(...)`**
+- **`cell drop_link<T>(...)`**
+
+## 4. `std.skid`
+
+Skid buffers for backpressure decoupling.
+
+- **`cell SkidBuffer<T, D: Domain>(...)`**: Generic skid buffer for arbitrary payload `T`.
+- **`cell WordSkidBuffer<W: nat = 8, D: Domain>(...)`**: Word-width parameterized skid buffer.
+
+## 5. `std.fifo`
+
+Synchronous FIFOs.
+
+- **`cell SyncFifo<W: nat = 8, DEPTH: nat = 8, ADDR_W: nat = 3, CNT_W: nat = 4, D: Domain>(...)`**: Synchronous FIFO with push/pop, full/empty, and count.
+- **`cell StreamSyncFifo<W: nat = 8, DEPTH: nat = 8, ADDR_W: nat = 3, CNT_W: nat = 4, D: Domain>(...)`**: `Stream<UInt<W>>` wrapper around `SyncFifo`.
+
+## 6. `std.mem`
+
+Synthesizable memory wrappers.
+
+- **`cell SinglePortRam<W: nat = 8, DEPTH: nat = 16, ADDR_W: nat = 4, D: Domain>(...)`**: Single-port synchronous RAM.
+- **`cell SimpleDualPortRam<W: nat = 8, DEPTH: nat = 16, ADDR_W: nat = 4, D: Domain>(...)`**: Simple dual-port RAM (1 read port, 1 write port).
+- **`cell DistributedRam<W: nat = 8, DEPTH: nat = 16, ADDR_W: nat = 4, D: Domain>(...)`**: Distributed/async-read RAM.
+
+## 7. `std.cdc`
+
+Clock Domain Crossing (CDC) synchronizers annotated with `@cdc_sync`.
+
+- **`cell Sync2FF<D_DST: Domain>(...)`**: Two-flip-flop synchronizer (active-high sync reset).
+- **`cell Sync2FFAsyncLow<D_DST: Domain>(...)`**: Two-flip-flop synchronizer with async active-low reset.
+- **`cell PulseSynchronizer<D_SRC: Domain, D_DST: Domain>(...)`**: Toggle-based single-cycle pulse synchronizer across domains.
+
+## 8. `std.arbiter`
+
+Arbitration logic.
+
+- **`map first_request(req: UInt<4>) -> UInt<4>`**: Returns one-hot lowest-index request.
+- **`cell FixedPriorityArbiter4(...)`**: 4-input fixed-priority arbiter.
+- **`cell RoundRobinArbiter4<D: Domain>(...)`**: 4-input round-robin arbiter.
+
+## 9. `std.pulse`
+
+Edge detectors and pulse stretchers.
+
+- **`cell RisingEdgeDetector<D: Domain>(...)`**: Detects `0 -> 1` transitions.
+- **`cell FallingEdgeDetector<D: Domain>(...)`**: Detects `1 -> 0` transitions.
+- **`cell EdgeDetector<D: Domain>(...)`**: Detects both rising and falling edges.
+- **`cell PulseStretcher<CYCLES: nat = 4, CNT_W: nat = 3, D: Domain>(...)`**: Stretches a single-cycle pulse for `CYCLES` cycles.
+
+## 10. `std.logic`
+
+Combinational bit and word helpers.
+
+- **`map bit_mux(sel: Bit, when_true: Bit, when_false: Bit) -> Bit`**
+- **`map bit_enable(value: Bit, enable: Bit) -> Bit`**
+- **`map word_increment<W: nat>(value: UInt<W>) -> UInt<W>`**
+
+## 11. `std.bundle`
+
+Common bundle types and constructors.
+
+- **`bundle ReadyValidWord<W: nat>`**: `data: UInt<W>`, `valid: Bit`, `ready: Bit`.
+- **`bundle MaybeWord<W: nat>`**: `valid: Bit`, `data: UInt<W>`.
+- **`map valid_word<W: nat>(value: UInt<W>) -> MaybeWord<W>`**
+- **`map invalid_word<W: nat>() -> MaybeWord<W>`**
+
+## 12. `std.assert`
+
+Simulation/verification observation helpers.
+
+- **`map assert_pass(condition: Bit) -> Bit`**
+- **`cell observe_stream<T>(...)`**
+- **`cell vendor_assert_stream_fire<T, D: Domain>(...)`**
+
+## 13. `std.vendor`
+
+External vendor black-box declarations.
+
+- **`extern cell VendorReadyValidSlice<W: nat, D: Domain>(...)`**
+- **`extern cell VendorAssertBit<D: Domain>(...)`**

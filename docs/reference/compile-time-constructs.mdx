@@ -1,0 +1,241 @@
+---
+title: Compile-Time Constructs
+description: Usage of const, fn, and compile-time if and for in Syl.
+---
+
+# Compile-Time Constructs
+
+Syl executes a subset of code at compile time. These constructs generate no runtime hardware; instead, their results determine hardware parameters, widths, and structural generation. Compile-time constructs include `const`, `fn`, `if`, and `for`.
+
+---
+
+## const
+
+`const` declares an immutable compile-time constant.
+
+### Basic Usage
+
+```syl
+const WIDTH: Nat = 8
+const DEPTH: Nat = 16
+const DEBUG: Bool = true
+```
+
+Constants can participate in compile-time arithmetic:
+
+```syl
+const WORDS: Nat = 4
+const TOTAL_BITS: Nat = WORDS * WIDTH
+```
+
+### Constants as Type Parameters
+
+```syl
+const BUF_SIZE: Nat = 64
+
+cell Buffer(
+    data_in: in UInt<BUF_SIZE>,
+    data_out: out UInt<BUF_SIZE>,
+)
+```
+
+### Constant Expressions
+
+Any expression evaluable at compile time can initialize a `const`:
+
+```syl
+const ADDR_BITS: Nat = clog2(16)    // Compile-time function call
+const MASK: Nat = (1 << 8) - 1       // Arithmetic
+const IS_DEBUG: Bool = (WIDTH > 32)  // Comparison
+```
+
+## fn
+
+`fn` defines a compile-time function supporting parameters, conditionals, and loops.
+
+### Basic Definition
+
+```syl
+fn clog2(x: Nat) -> Nat {
+    var n: Nat = 0
+    var p: Nat = 1
+
+    while p < x {
+        p = p << 1
+        n = n + 1
+    }
+
+    return n
+}
+```
+
+### Calling fn
+
+```syl
+const W: Nat = clog2(64)     // W = 6
+const ADDR_W: Nat = clog2(16) // ADDR_W = 4
+```
+
+### Mutable Variables in fn
+
+Inside `fn`, `var` declares mutable local variables that exist only during compile-time evaluation:
+
+```syl
+fn sum_to(n: Nat) -> Nat {
+    var result: Nat = 0
+    var i: Nat = 1
+    while i <= n {
+        result = result + i
+        i = i + 1
+    }
+    return result
+}
+```
+
+### Restrictions on fn
+
+`fn` operates only on compile-time types (`Nat`, `Bool`). It cannot manipulate hardware signals (`Bit`, `UInt<W>`). Use `map` for combinational hardware functions.
+
+## Compile-Time if
+
+Compile-time `if` requires a `Bool` condition. The compiler keeps only the active branch.
+
+```syl
+const HAS_TIMEOUT: Bool = true
+
+cell Controller(
+    data_in: in UInt<8>,
+    data_out: out UInt<8>,
+) {
+    if HAS_TIMEOUT {
+        signal timeout: Bit
+        // Logic with timeout
+    } else {
+        // Logic without timeout
+    }
+}
+```
+
+If `HAS_TIMEOUT` is `false`, no `timeout` hardware is generated.
+
+### Parameter Validation with if
+
+```syl
+cell Buffer<W: Nat>(data: in UInt<W>) {
+    if W == 0 {
+        compile_error("Buffer width must be greater than 0")
+    }
+    if W > 64 {
+        compile_error("Buffer width must not exceed 64")
+    }
+}
+```
+
+## Compile-Time for
+
+Compile-time `for` loops unroll during elaboration. Bounds must be compile-time constants.
+
+```syl
+signal values: [4] UInt<8> := for i in 0..4 {
+    inputs[i] + 1
+}
+```
+
+Unrolls to 4 independent assignments.
+
+### for in Module Bodies
+
+```syl
+cell ArrayAdd<N: Nat, W: Nat>(
+    inputs: in [N] UInt<W>,
+    outputs: out [N] UInt<W>,
+) {
+    for i in 0..N {
+        outputs[i] := inputs[i] + 1
+    }
+}
+```
+
+### Nested for
+
+```syl
+for i in 0..4 {
+    for j in 0..4 {
+        matrix[i][j] := i * 4 + j
+    }
+}
+```
+
+## compile_error
+
+`compile_error(message)` aborts compilation with an error message, typically paired with compile-time `if` for parameter validation:
+
+```syl
+cell FIFO<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    data_in: in UInt<W>,
+    data_out: out UInt<W>,
+) {
+    if W == 0 {
+        compile_error("FIFO width must be greater than 0")
+    }
+    if W > 1024 {
+        compile_error("FIFO width 1024 exceeds implementation limit")
+    }
+}
+```
+
+## Design Validation Pattern
+
+```syl
+fn valid_config(width: Nat, depth: Nat) -> Bool {
+    if width == 0 { return false }
+    if depth == 0 { return false }
+    if width > 64 { return false }
+    return true
+}
+
+const CFG_OK: Bool = valid_config(8, 16)
+
+cell Buffer<W: Nat, D: Nat>(
+    data_in: in UInt<W>,
+    data_out: out UInt<W>,
+) {
+    if not CFG_OK {
+        compile_error("invalid buffer configuration")
+    }
+}
+```
+
+## Performance Considerations
+
+- Compile-time `fn` evaluation runs once during compilation and adds minimal overhead.
+- Compile-time `for` unrolling duplicates hardware logic `N` times; large `N` increases generated area.
+
+## Common Errors
+
+### Mixing Compile-Time and Hardware Types
+
+```syl
+# fn add(x: UInt<8>) -> UInt<8> { ... }  // Error: fn cannot operate on hardware types
+```
+
+### Non-Constant for Bounds
+
+```syl
+# for i in 0..variable { }   // Error: variable is not a compile-time constant
+```
+
+### Constant Exceeding Hardware Range
+
+```syl
+const W: Nat = 256
+signal s: UInt<8> := W       // Error: 256 exceeds UInt<8> range
+```
+
+### Full `fn` Body Checking, `map` Return Consistency, and Constant Cycles (`E_MIDDLE_CONST_CYCLE`)
+
+- **Full `fn` body checking (`check_fn`):** The compiler performs full type and semantic checking on `fn` bodies, including parameter types, `var` assignments, immutable parameter writes (`E_MIDDLE_IMMUTABLE_ASSIGNMENT`), missing `return` (`E_MIDDLE_MISSING_RETURN`), return type mismatches (`E_MIDDLE_RETURN_TYPE_MISMATCH`), and hardware statements inside `fn` (`E_MIDDLE_HARDWARE_STMT_IN_FN`).
+- **`map` return consistency (`check_map`):** All branches and return paths of a `map` must match its declared return type, and compile-time `Bool` cannot be used in hardware value positions (`E_MIDDLE_BOOL_IN_HARDWARE_VALUE`).
+- **Constant cycle detection (`E_MIDDLE_CONST_CYCLE`):** Direct or indirect cyclic dependencies between `const` declarations are detected and reported as `E_MIDDLE_CONST_CYCLE`.

@@ -1,4 +1,59 @@
 ---
 title: CLI Reference
-description: Reference for sylc input, output, diagnostics, and exit behavior.
+description: Command-line usage for sylc check, sylc emit, options, filelists, and JSON diagnostics.
 ---
+
+# CLI Reference
+
+`sylc` is the command-line compiler for Syl. It type-checks, runs elaboration Design Rule Checks (DRC), and emits SystemVerilog.
+
+---
+
+## Usage
+
+```
+sylc [OPTIONS] [FILE_OR_DIR]... [COMMAND]
+```
+
+### Subcommands
+
+- `sylc check [OPTIONS] [FILE_OR_DIR]...`: Type-check and run elaboration DRC without emitting SystemVerilog.
+- `sylc emit [OPTIONS] [FILE_OR_DIR]...`: Check and emit SystemVerilog to stdout, `--out`, or `--out-dir`.
+
+## Options
+
+- `--manifest <PATH>`: Explicitly specify the `syl.toml` manifest path.
+- `--package-root <PATH>`: Explicitly specify the package root directory.
+- `--std-root <PATH>`: Specify the standard library root path.
+- `--out <OUTPUT>`: Write a single SystemVerilog file.
+- `--out-dir <DIR>`: Write one SystemVerilog file per module and a dependency-ordered filelist.
+- `--filelist <PATH>`: Set the filelist path (defaults to `<out-dir>/filelist.f`).
+- `--source-comments`: Include Syl source locations in the emitted SystemVerilog.
+- `--diagnostics-format <human|json>`: Set diagnostics output format (default: `human`).
+- `-h, --help`: Print help.
+- `-V, --version`: Print version.
+
+## Output
+
+### Normal Output
+
+On success, SystemVerilog is written to stdout (or `--out` / `--out-dir`).
+
+### Diagnostics
+
+Diagnostics are written to stderr. With `--diagnostics-format human`:
+
+```
+error[E_MIDDLE_TYPE_MISMATCH]: expected `UInt<8>`, found `Bit`
+  ┌─ input.syl:2:9
+  │
+2 │     y := x
+  │         ^ expected `UInt<8>`, found `Bit`
+```
+
+With `--diagnostics-format json`, each diagnostic is emitted as structured JSON containing `code`, `severity`, `message`, and `span` (file, line, column) for CI and editor integration.
+
+### Exit Codes
+
+- `0`: Compilation succeeded
+- `1`: Compilation failed (error diagnostics present)

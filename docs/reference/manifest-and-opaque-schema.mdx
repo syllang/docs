@@ -1,0 +1,73 @@
+---
+title: Manifest and Opaque Schema
+description: Specification for syl.toml project manifests and JSON/TOML Opaque Summary schema_version = 1.
+---
+
+# Manifest and Opaque Schema
+
+This page specifies the `syl.toml` project manifest format and the versioned Opaque Summary schema (`schema_version = 1`) used by `sylc` for `extern cell` DRC and CDC analysis.
+
+---
+
+## `syl.toml` Project Manifest
+
+`sylc` discovers the nearest `syl.toml` upward from the input path when `--package-root` is not explicitly provided.
+
+### Fields
+
+```toml
+[project]
+name = "my_soc"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+workspace_roots = ["."]
+std_roots = ["vendor/std"]
+package_roots = ["src", "lib"]
+opaque_summaries = ["summaries/vendor_ip.json"]
+```
+
+- `[project]`: `name` (must not be blank), `version`, `edition`.
+- `[paths]`: `workspace_roots` (defaults to `["."]`), `std_roots`, `package_roots`, `opaque_summaries` (paths to `.json` or `.toml` opaque summary files).
+
+Invalid manifests report `E_MANIFEST_PARSE` or `E_MANIFEST_INVALID`.
+
+---
+
+## Opaque Summary Schema (`schema_version = 1`)
+
+Opaque summaries describe the internal driver, consumption, and clock-domain behavior of `extern cell`s so DRC can verify designs without seeing their SystemVerilog implementation.
+
+### Top-Level Document
+
+```json
+{
+  "schema_version": 1,
+  "summaries": [
+    {
+      "kind": "extern_cell",
+      "callable": "VendorReadyValidSlice",
+      "endpoints": [],
+      "driven_fields": ["out_data", "out_valid"],
+      "consumed_fields": ["in_data", "in_valid"],
+      "domain_behavior": "same_domain",
+      "latency_class": "registered",
+      "protocol_preservation": "preserved",
+      "trust_boundary": "trusted",
+      "backend_constraints": []
+    }
+  ]
+}
+```
+
+### Key Fields
+
+- `schema_version`: Must be `1`.
+- `kind`: Opaque item kind (e.g., `extern_cell`).
+- `callable`: Non-blank name of the `extern cell`.
+- `driven_fields` / `consumed_fields`: Port/field paths driven or consumed by the black box.
+- `domain_behavior`: Clock domain relationship (e.g., `same_domain`, `cdc_crossings` / synchronizer behavior).
+- `latency_class`, `protocol_preservation`, `trust_boundary`, `backend_constraints`: Metadata for elaboration and backend checks.
+
+Invalid summaries report `E_OPAQUE_SUMMARY_PARSE` or `E_OPAQUE_SUMMARY_INVALID`.
