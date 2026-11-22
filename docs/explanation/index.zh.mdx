@@ -5,8 +5,6 @@ description: 从设计哲学、静态分析模型到编译器内部架构与 Sal
 
 # 原理解析总览
 
-本栏目深入阐述 Syl 的设计动机与编译器内部机制，涵盖三大主题：
-
 1. **设计哲学与定位**：为什么 Syl 选择独立于宿主语言、原生支持硬件语义与静态可分析性，以及它的适用边界。
 2. **静态分析模型**：编译期如何拦截多驱动冲突、缺失驱动、端口能力违规、越界索引、聚合不完整、类型与位宽不匹配、跨时钟域 CDC 与复位极性错误，以及循环与跨模块命名消歧。
 3. **编译器内部与增量引擎**：从源码到 SystemVerilog 的完整管线、各层 IR（AST → HIR → TIR → Const MIR / Map IR → EIR → HW IR → SV AST）的职责边界，以及基于 Salsa 0.28.2 的声明级增量查询架构。
@@ -55,6 +53,7 @@ flowchart TB
     P3 --> P4
     P5 -.-> P4
     P4 --> P6
+    P4 --> Sim["原生仿真：syl_sim 与 SimDesign"]
 ```
 
 | 文章 | 核心内容 |
@@ -66,5 +65,6 @@ flowchart TB
 | [常量 MIR 与 Map IR](/zh/docs/explanation/const-mir-and-map-ir) | 纯函数编译期求值、`owner_const_mir` / `owner_map_ir` 声明级隔离 |
 | [展开与 EIR](/zh/docs/explanation/elab-and-eir) | `module_eir_stage` 定向构建、`EirNameDisambiguator`、`mem` 原语降级与 DRC |
 | [HW IR 与 SV IR](/zh/docs/explanation/hw-and-sv-ir) | 多文件 `EmittedSvBundle` / `filelist.f`、复位极性 SV 发射与可综合 RAM |
+| [原生仿真与 GPU 加速](/zh/docs/explanation/simulation-and-gpu) | 字级调度、状态语义、CPU/GPU 实测交叉区间与缓存成本 |
 | [仓库地图](/zh/docs/explanation/repository-map) | Workspace crate 依赖拓扑、13 个标准库模块与仿真/一致性测试布局 |
 | [测试与贡献指南](/zh/docs/explanation/testing-and-contributing) | `quality_gate.sh`、Verilator + Yosys 门禁、无 inline tests 规范与 API 快照 |

@@ -25,11 +25,12 @@ flowchart TB
     Front --> Sema
     Sema --> Elab
     Elab --> Backend
+    Elab --> Sim["原生仿真：syl_sim → SimDesign"]
 ```
 
 每个箭头代表一次数据转换。转换过程中还可能产生诊断信息（错误和警告）。在现代 `syl_session` 架构中，这些转换被拆分为细粒度的 Salsa 查询（如单次解析去重 `Arc<ParsedFileOutput>`、声明级 `owner_const_mir` / `owner_map_ir`、规范路径定向构建 `module_eir_stage`），从而在文件编辑时只重算受影响的声明与模块。
 
-下面按阶段顺序逐个讲解。
+执行 `sylc sim` 时，`syl_sim` 将展开结果特化为字级 `SimDesign`，参考后端、CPU SIMD 与 CUDA 后端直接执行该设计。参见[原生仿真与 GPU 加速](/zh/docs/explanation/simulation-and-gpu)。
 
 ## 前端
 

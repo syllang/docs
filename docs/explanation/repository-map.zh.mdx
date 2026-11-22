@@ -1,6 +1,6 @@
 ---
 title: 仓库地图
-description: Syl 编译器 13 个 crate 的职责分布、13 个标准库模块、仿真与一致性测试布局及依赖关系。
+description: Syl 编译器 14 个 crate 的职责分布、13 个标准库模块、仿真与一致性测试布局及依赖关系。
 ---
 
 # 仓库地图
@@ -16,7 +16,7 @@ Syl 编译器仓库是一个 Cargo workspace。顶层目录的结构如下：
 ```
 syl/
 ├── api/             # 公共 API 快照 (public-surface.txt) 与消费者索引
-├── crates/          # 编译器核心代码（13 个 crate）
+├── crates/          # 编译器核心代码（14 个 crate）
 ├── examples/        # Syl 语言示例与 std 标准库（13 个模块）
 ├── tests/sim/       # Verilator C++ 联合仿真测试台
 ├── conformance/     # 一致性测试套件
@@ -63,6 +63,8 @@ syl_elab 是编译器中最复杂的阶段。它把 TIR 中的类型化描述展
 
 **syl_emit。** SystemVerilog 生成。它将 HW IR 转换为 SystemVerilog 代码（单文件或 `EmittedSvBundle` 多文件包），包含规范化、SV 下降和 SV 验证三个步骤。它依赖 `syl_hw`。
 
+**syl_sim。** 将展开结果特化为 `SimDesign`，调度字级逻辑，执行参考、CPU SIMD 或 CUDA 仿真，并回放失败断言。参见[原生仿真与 GPU 加速](/zh/docs/explanation/simulation-and-gpu)。
+
 ### 工作区和工具层
 
 **syl_session。** 工作区管理和阶段编排。它基于 Salsa 0.28.2 管理源文件的打开和关闭、声明级增量缓存、以及跨阶段的诊断收集。它依赖 `syl_syntax`、`syl_sema`、`syl_elab` 和 `syl_hw`。
@@ -77,7 +79,7 @@ syl_session 是所有其他 crate 的"调度员"。它知道如何依次调用�
 
 **syl。** 顶层库门面 crate，统一导出面向外部集成的稳定公共接口。
 
-**sylc。** CLI 二进制入口。它解析命令行参数，调用编译器流水线，输出单文件或 `filelist.f` 多文件包。它依赖 `syl_session`、`syl_emit`、`syl_span` 和 `syl_syntax`。
+**sylc。** CLI 二进制入口。它解析命令行参数，调用编译器流水线，运行原生仿真，或输出单文件及 `filelist.f` 多文件包。它依赖 `syl_session`、`syl_sim`、`syl_emit`、`syl_span` 和 `syl_syntax`。
 
 **syl_fuzz。** 模糊测试工具。它不发布到 crates.io，只在 CI 中使用。
 
@@ -91,6 +93,10 @@ syl_session 是所有其他 crate 的"调度员"。它知道如何依次调用�
 flowchart TB
     sylc --> syl_session
     sylc --> syl_emit
+    sylc --> syl_sim
+    syl_sim --> syl_elab
+    syl_sim --> syl_hw
+    syl_sim --> syl_span
     sylc --> syl_span
     sylc --> syl_syntax
 

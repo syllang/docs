@@ -20,6 +20,7 @@
     "---Advanced Hardware & Verification---",
     "cdc-and-async-reset",
     "synthesizable-ram-fifo",
+    "native-simulation",
     "verilator-and-yosys",
     "---Migrating to Syl---",
     "from-verilog",

@@ -5,10 +5,6 @@ description: What Syl can do today, what is experimental, and what is not yet su
 
 # Project Status
 
-The tables below list the current capabilities, maturity, and boundaries of the Syl compiler.
-
----
-
 ## Verified Capabilities
 
 The following capabilities are verified by architectural contract tests on every CI run:
@@ -57,6 +53,8 @@ The following capabilities are verified by architectural contract tests on every
 
 **SystemVerilog emission.** The compiler emits synthesizable SystemVerilog verified by Verilator smoke tests in CI.
 
+**Native simulation.** `sylc sim` runs four-state reference traces and deterministic batches. Supported two-state designs run on CPU SIMD or CUDA with batch or instance-family parallelism. The reference backend verifies the earliest batch assertion and can record a hierarchical VCD. See [native simulation](/docs/how-to/native-simulation).
+
 ## Experimental
 
 **Enumerations.** `enum` declarations define named state sets for state machines and instruction decoding.
@@ -69,11 +67,9 @@ The following capabilities are verified by architectural contract tests on every
 
 **Black-box IP workflows.** `extern cell` declares external module signatures, though full vendor IP import workflows are still evolving.
 
-**Formal verification interfaces.** Syl does not emit SystemVerilog `assert` or `cover` properties directly.
+**Formal verification interfaces.** Clocked assertions support simulation. A complete formal property and coverage workflow remains open.
 
 **High-level synthesis (HLS).** Syl is an RTL hardware description language, not a C-to-RTL synthesis tool.
-
-**Built-in simulation.** `sylc` does not run simulation itself; use standard simulators on the emitted SystemVerilog.
 
 ## Standard Library Status
 

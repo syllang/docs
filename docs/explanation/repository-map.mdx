@@ -1,6 +1,6 @@
 ---
 title: Repository Map
-description: Responsibility breakdown and dependency topology of the 13 Syl workspace crates, 13 stdlib modules, and simulation/conformance tests.
+description: Responsibility breakdown and dependency topology of the 14 Syl workspace crates, 13 stdlib modules, and simulation/conformance tests.
 ---
 
 # Repository Map
@@ -16,7 +16,7 @@ The Syl compiler repository is a Cargo workspace:
 ```
 syl/
 ├── api/             # Public API snapshot (public-surface.txt) & consumer index
-├── crates/          # Core compiler workspace (13 crates)
+├── crates/          # Core compiler workspace (14 crates)
 ├── examples/        # Syl examples & stdlib (13 modules in examples/std/)
 ├── tests/sim/       # Verilator C++ co-simulation testbenches
 ├── conformance/     # Conformance test suite
@@ -47,6 +47,7 @@ All core compiler logic lives under `crates/`, with each crate owning a stage or
 
 - **`syl_hw`**: backend-independent HW IR (modules, ports, instances, connections, memory primitives). Depends only on `syl_span`.
 - **`syl_emit`**: SystemVerilog lowering, `EmittedSvBundle` / `filelist.f` emission, and SV validation. Depends only on `syl_hw`.
+- **`syl_sim`** specializes elaboration output into `SimDesign`, schedules word-level logic, and executes reference, CPU SIMD or CUDA simulation with assertion replay. [Simulation and GPU acceleration](/docs/explanation/simulation-and-gpu).
 
 ### Workspace & Tooling Layer
 
@@ -57,7 +58,7 @@ All core compiler logic lives under `crates/`, with each crate owning a stage or
 ### Entry & Facade
 
 - **`syl`**: top-level library facade crate exporting the public API.
-- **`sylc`**: CLI binary entry point.
+- **`sylc`**: CLI entry point for checking, emission and native simulation.
 - **`syl_fuzz`**: parser fuzzing harness used in CI.
 
 ## Standard Library (`examples/std/`)
@@ -70,6 +71,10 @@ All core compiler logic lives under `crates/`, with each crate owning a stage or
 flowchart TB
     sylc --> syl_session
     sylc --> syl_emit
+    sylc --> syl_sim
+    syl_sim --> syl_elab
+    syl_sim --> syl_hw
+    syl_sim --> syl_span
     sylc --> syl_span
     sylc --> syl_syntax
 

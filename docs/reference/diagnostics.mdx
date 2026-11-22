@@ -5,10 +5,6 @@ description: Reference index of real E_* compiler error codes in sylc.
 
 # Diagnostics
 
-This page lists the diagnostic codes emitted by the Syl compiler. Each diagnostic includes an error code, description, and example.
-
----
-
 ## Diagnostic Format
 
 Compiler diagnostics follow this format:
@@ -111,12 +107,17 @@ error[E_MIDDLE_UNKNOWN_TYPE]: unknown type `CustomType`
 
 Check the type name spelling and ensure it is imported.
 
-## Real `E_*` Error Code Index
+## Native simulation
 
-Below is the complete categorized index of real `E_*` error codes defined in the compiler source:
+**`E_SIM` (error, exit 1).** Simulation can fail during specialization, backend selection or execution. A failed `expect` reports the port and its observed value. A failed batch assertion reports its zero-based lane, global stimulus step, hierarchical assertion path and Syl source location. `--replay-vcd` records the verified failing trajectory.
+
+**`W_SIM_UNIQUE` (warning).** A direct reference trace encountered multiple true guards in a `select unique`. The warning carries the guard overlap location. Warnings alone exit 0. With `--strict-unique` the overlap raises `E_SIM` and exits 1.
+
+## Real `E_*` Error Code Index
 
 - **Lexical & Syntax (`syl_syntax`)**: `E_SYNTAX_PARSE`, `E_SYNTAX_UNEXPECTED_CHARACTER`, `E_SYNTAX_UNSUPPORTED_STRING_ESCAPE`, `E_SYNTAX_UNTERMINATED_STRING`, `E_SYNTAX_DOC_COMMENT`
 - **Project, Manifest & Opaque (`syl_session` / `sylc`)**: `E_CLI`, `E_IO`, `E_EMIT`, `E_PROJECT`, `E_IMPORT_RESOLVE`, `E_INVALID_MODULE_PATH`, `E_DUPLICATE_MODULE_FILE`, `E_MANIFEST_PARSE`, `E_MANIFEST_INVALID`, `E_OPAQUE_SUMMARY_PARSE`, `E_OPAQUE_SUMMARY_INVALID`
 - **Semantic & Type Checking (`syl_sema`)**: `E_MIDDLE_TYPE_MISMATCH`, `E_MIDDLE_UNKNOWN_TYPE`, `E_MIDDLE_UNKNOWN_IMPORT`, `E_MIDDLE_UNRESOLVED_NAME`, `E_MIDDLE_UNKNOWN_ELAB_IDENTIFIER`, `E_MIDDLE_UNKNOWN_PARAMETER`, `E_MIDDLE_DUPLICATE_ARGUMENT`, `E_MIDDLE_TOO_MANY_POSITIONAL_ARGS`, `E_MIDDLE_MISSING_AGGREGATE_FIELD`, `E_MIDDLE_UNKNOWN_AGGREGATE_FIELD`, `E_MIDDLE_RECURSIVE_STRUCT`, `E_MIDDLE_RECURSIVE_BUNDLE`, `E_MIDDLE_DUPLICATE_CONST`, `E_MIDDLE_DUPLICATE_FN`, `E_MIDDLE_IMMUTABLE_ASSIGNMENT`, `E_MIDDLE_MISSING_RETURN`, `E_MIDDLE_RETURN_TYPE_MISMATCH`, `E_MIDDLE_HARDWARE_STMT_IN_FN`, `E_MIDDLE_BOOL_IN_HARDWARE_VALUE`, `E_MIDDLE_REQUIRES_NAT`, `E_MIDDLE_INVALID_ELAB_EXPR`, `E_MIDDLE_NOT_DRIVABLE`, `E_MIDDLE_CONTINUOUS_DRIVE_TO_REG`, `E_MIDDLE_DIRECT_DRIVE_TO_MEM`, `E_MIDDLE_INVALID_CDC_ATTR`, `E_MIDDLE_INVALID_RESET_QUALIFIER`, `E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`, `E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`, `E_MIDDLE_MEMORY_TARGET_NOT_MEM`
 - **Elaboration, DRC, CDC & Memory (`syl_elab`)**: `E_MIDDLE_CONST_CYCLE`, `E_MIDDLE_DUPLICATE_HARDWARE_DRIVER`, `E_MIDDLE_CDC_VIOLATION`, `E_MIDDLE_INPLACE_ON_CDC_SYNC`, `E_MIDDLE_RESET_DOMAIN_MISMATCH`, `E_MIDDLE_RESET_CONFIG_CONFLICT`, `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`
 - **Backend & SystemVerilog Emission (`syl_sv`)**: `E_EMIT` (production CLI emission error; internal/conformance aliases include `E_HW_DUPLICATE_BINDING`, `E_HW_DUPLICATE_MODULE`, `E_HW_INVALID_IDENTIFIER`, `E_HW_UNKNOWN_INSTANCE_TARGET`, `E_HW_UNKNOWN_REFERENCE`, `E_SV_UNSUPPORTED_FUNCTION_CALL`)
+- **Native simulation (`sylc`)**: `E_SIM`.

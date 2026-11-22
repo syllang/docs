@@ -3,7 +3,7 @@ title: Verilator 与 Yosys 验证
 description: 使用 scripts/check_std_sim.sh、编写 C++17 Verilator 周期级仿真 testbench，并通过 Yosys 进行综合验证。
 ---
 
-`sylc` 的静态类型检查与 DRC 可以保证结构合法性，而周期级功能正确性与综合资源推断则需要通过 **Verilator** 与 **Yosys** 进行端到端验证。
+Verilator 用 C++ 测试台运行生成的 SystemVerilog，Yosys 检查综合与资源推断。若要在展开后的设计上直接使用四态激励、按种子运行 CPU/GPU 批处理或回放断言，可使用[原生仿真](/zh/docs/how-to/native-simulation)。
 
 ## 运行标准库验证套件（`scripts/check_std_sim.sh`）
 

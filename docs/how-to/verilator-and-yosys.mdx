@@ -3,7 +3,7 @@ title: Verilator & Yosys Verification
 description: Run scripts/check_std_sim.sh, write C++17 Verilator cycle-accurate testbenches, and verify synthesis with Yosys.
 ---
 
-Static type checking and DRC in `sylc` guarantee structural soundness, but cycle-accurate functional behavior and synthesis resource inference must be verified with **Verilator** and **Yosys**.
+Verilator exercises emitted SystemVerilog with a C++ testbench. Yosys checks synthesis and resource inference. For four-state Syl stimuli, seeded CPU/GPU batches or assertion replay directly on the elaborated design, use [native simulation](/docs/how-to/native-simulation).
 
 ## Running the Standard Library Suite (`scripts/check_std_sim.sh`)
 
