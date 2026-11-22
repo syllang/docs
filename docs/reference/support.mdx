@@ -1,0 +1,81 @@
+---
+title: Support
+description: Channels for getting help and reporting feedback on Syl.
+---
+
+# Support
+
+This page lists the channels available for getting help when you run into issues with Syl.
+
+---
+
+## Self-Troubleshooting
+
+Before asking for help, try the following checks:
+
+1. Check for undefined symbols: are `use` import paths and module names spelled correctly?
+2. Check port directions: `in` ports cannot be driven inside a module, and `out` ports cannot be read.
+3. Check type and width matches: do both sides of assignments match, and are generic parameters within valid bounds?
+4. Check `select` and `match` exhaustiveness: are all branches covered?
+5. Check `reg` reset declarations: ensure `reset(rst, value)` matches the clock domain.
+6. Check `let` vs. `signal`: `let` is a name alias, while `signal` creates a hardware wire.
+
+Compiler diagnostics include source locations and error codes that you can look up in [Diagnostics](./diagnostics).
+
+## Understanding Compiler Output
+
+When running `sylc`, output has two parts:
+
+**Diagnostics.** Errors and warnings are printed to stderr with severity, error code, message, and source span:
+
+```
+error[E_MIDDLE_TYPE_MISMATCH]: expected `UInt<8>`, found `Bit`
+  ┌─ input.syl:2:9
+  │
+2 │     y := x
+  │         ^ expected `UInt<8>`, found `Bit`
+```
+
+**SystemVerilog output.** On success, SV is printed to stdout (or to `--out` / `--out-dir`).
+
+## Documentation
+
+Consult the Reference Manual sections:
+
+- **Language Specification**: Type system, syntax, interfaces, views, and hardware semantics
+- **Syntax & Builtins**: Lexical rules, grammar, attributes, and memory primitives
+- **Standard Library & Tooling**: `std.*` modules, `syl.toml`, CLI, diagnostics, and LSP
+
+## GitHub Issues
+
+Open an issue in the project repository for:
+
+- **Bug reports:** Compiler crashes, incorrect diagnostics, or invalid generated SystemVerilog. Include a minimal reproduction.
+- **Feature requests:** Language features, standard library components, or toolchain improvements with your use case.
+- **Design discussions:** Prefix `[design]` in the issue title.
+
+Search existing issues by error code (e.g., `E_MIDDLE_TYPE_MISMATCH`) or feature name before opening a new one.
+
+## Contributing
+
+See `CONTRIBUTING.md` in the repository. Contributions are especially welcome in:
+
+- Designing real hardware in Syl and reporting edge cases
+- Expanding `std.*` standard library components
+- Improving compiler diagnostic messages
+- Writing examples and tutorials
+
+## Tracking Project Progress
+
+- **Changelog:** Per-release new features, bug fixes, and breaking changes
+- **Roadmap:** Medium- and long-term priorities
+- **GitHub Releases:** Release notes and binary downloads
+
+## Troubleshooting Order
+
+When compilation fails, work through errors in this order:
+
+1. **Fix the first error:** Subsequent errors are often cascading effects of the first one.
+2. **Look up the error code:** Search the code (e.g., `E_MIDDLE_TYPE_MISMATCH`) in [Diagnostics](./diagnostics).
+3. **Minimize the reproduction:** Strip unrelated modules and signals down to the smallest failing `.syl` file.
+4. **Check recent changes:** Isolate what changed since the last working build.

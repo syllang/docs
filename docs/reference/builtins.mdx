@@ -1,4 +1,169 @@
 ---
-title: Built-ins
-description: Built-in types, literals, functions, and operators in Syl.
+title: Built-in Types and Primitives
+description: Syl's built-in types, functions, memory primitives, and special constructs.
 ---
+
+# Built-in Types and Primitives
+
+Syl provides a set of built-in types, functions, and hardware primitives directly from the compiler without requiring imports.
+
+---
+
+## Built-in Types
+
+### `Bit`
+
+Single-bit hardware signal. Values: `0` or `1`.
+
+```syl
+signal valid: Bit := 1
+```
+
+Operators: `and`, `or`, `xor`, `not`, `eq`.
+
+### `Nat`
+
+Compile-time non-negative integer.
+
+```syl
+const W: Nat = 8
+```
+
+Operators: `+`, `-`, `*`, `/`, `%`, `<<`, `==`, `!=`, `<`, `>`, `<=`, `>=`.
+
+### `Bool`
+
+Compile-time boolean. Values: `true`, `false`.
+
+```syl
+const debug: Bool = true
+```
+
+Operators: `and`, `or`, `not`.
+
+### `UInt<W>`
+
+`W`-bit unsigned integer. `W` must be a compile-time `Nat`.
+
+```syl
+signal data: UInt<8>
+```
+
+### `Clock` and `Domain`
+
+`Clock<D>` is a clock signal, where `D` is a `Domain` type parameter.
+
+```syl
+signal clk: Clock<A>
+```
+
+### `Reset`
+
+`Reset<D>` is a reset signal. `D` must match the corresponding `Clock<D>`.
+
+```syl
+signal rst: Reset<A>
+```
+
+### `Domain`
+
+Clock domain identifier used to associate clocks, resets, and registers.
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+)
+```
+
+## Built-in Functions
+
+### `zero<T>()`
+
+Returns the zero value of type `T`.
+
+```syl
+reg data: UInt<8> reset(rst, zero<UInt<8>>())
+```
+
+### `compile_error(message)`
+
+Reports an error at compile time and aborts compilation.
+
+```syl
+if W == 0 {
+    compile_error("width must be greater than 0")
+}
+```
+
+## Built-in Constructs
+
+### `select`
+
+Conditional selection supporting `priority` and `unique` modes.
+
+```syl
+signal s: UInt<8> := select priority {
+    a => 1,
+    b => 2,
+    default => 0,
+}
+```
+
+### `match`
+
+Enum pattern matching. Must cover all variants.
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+    State.Done => State.Idle,
+}
+```
+
+### `place`
+
+Module or `cell` instantiation.
+
+```syl
+let inst = place Counter<8>(enable: en, count: cnt)
+```
+
+### `for`
+
+Compile-time loop unrolling.
+
+```syl
+for i in 0..4 {
+    signal s: UInt<8>
+}
+```
+
+### `if`
+
+Compile-time conditional branching.
+
+```syl
+if W > 8 {
+    signal wide: UInt<16>
+}
+```
+
+## Synthesizable Memory Primitives
+
+### `mem`
+
+Declares a synthesizable memory (block RAM or register file). Its element type must be an array type (`E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`):
+
+```syl
+mem ram: [256] UInt<32>
+```
+
+### `mem_write(m, addr, data, en)`
+
+Writes `data` to `m[addr]` on the clock edge when `en` is asserted. Can only be used as a statement (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`), and duplicate write ports on the same memory trigger `E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`.
+
+### `mem_read_sync(m, addr, en)`
+
+Synchronously reads `m[addr]` on the clock edge. Can only be used as a statement (`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`), and its target must be a `mem` (`E_MIDDLE_MEMORY_TARGET_NOT_MEM`).

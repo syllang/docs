@@ -1,4 +1,111 @@
 ---
 title: Grammar
-description: Practical syntax reference for declarations, statements, expressions, and types in Syl.
+description: Formal EBNF-style grammar of the Syl language.
 ---
+
+# Grammar
+
+This page defines Syl's grammar in EBNF style for compiler implementers and language users.
+
+---
+
+## Top-Level Declarations
+
+```
+file             ::= item*
+item             ::= use_item | const_item | fn_item | enum_item
+                   | bundle_item | interface_item | map_item
+                   | cell_item | extern_cell_item
+
+use_item         ::= "use" path ("." path)*
+const_item       ::= "const" ident ":" type_expr "=" expr
+fn_item          ::= "fn" ident generic_params? param_list ("->" type_expr)? block
+enum_item        ::= "enum" ident "{" ident ("," ident)* "}"
+bundle_item      ::= "bundle" ident generic_params? "{" field_decl* "}"
+interface_item   ::= "interface" ident generic_params? "{" field_decl* view_decl* "}"
+map_item         ::= "map" ident generic_params? param_list ("->" type_expr)? "=" expr
+cell_item        ::= attr* "cell" ident generic_params? param_list port_list? result_binding? block
+extern_cell_item ::= attr* "extern" "cell" ident generic_params? param_list port_list? result_binding?
+```
+
+## Parameters and Ports
+
+```
+generic_params ::= "<" generic_param ("," generic_param)* ">"
+generic_param  ::= ident ":" type_expr ("=" expr)?
+
+param_list     ::= "(" param ("," param)* ")"
+param          ::= ident ":" ident         // Value parameter
+               | ident ":" type_expr       // Type parameter
+
+port_list      ::= "(" port ("," port)* ")"
+port           ::= ident ":" direction type_expr
+direction      ::= "in" | "out" | "inout"
+
+result_binding ::= "->" ident ":" type_expr
+```
+
+## Types and Attributes
+
+```
+type_expr      ::= ident                       // Named type
+                 | ident "<" type_arg ("," type_arg)* ">"  // Generic type
+                 | "[" expr "]" type_expr      // Array type
+                 | type_expr "." ident         // View selection
+type_arg       ::= type_expr | expr
+
+attr           ::= "@" ident ("(" attr_arg ("," attr_arg)* ")")?
+attr_arg       ::= ident ("=" expr)? | expr
+```
+
+## Statements
+
+```
+block          ::= "{" stmt* expr? "}"
+stmt           ::= let_stmt | signal_stmt | reg_stmt
+                 | next_stmt | assign_stmt
+                 | if_stmt | for_stmt | while_stmt
+                 | return_stmt | expr_stmt
+
+let_stmt       ::= "let" ident (":" type_expr)? ("=" expr)?
+signal_stmt    ::= "signal" ident ":" type_expr (":=" expr)?
+reg_stmt       ::= "reg" ident ":" type_expr ("reset" "(" expr "," expr ("," reset_mod)* ")")?
+reset_mod      ::= "sync" | "async" | "active_high" | "active_low"
+next_stmt      ::= "next" ident ":=" expr
+assign_stmt    ::= expr ":=" expr
+if_stmt        ::= "if" expr block ("else" block)?
+for_stmt       ::= "for" ident "in" expr ".." expr block
+return_stmt    ::= "return" expr?
+```
+
+## Expressions
+
+```
+expr           ::= primary
+                 | expr "." ident              // Field access
+                 | expr "[" expr "]"           // Indexing
+                 | expr "(" call_arg ("," call_arg)* ")"  // Call
+                 | expr "<" type_expr ("," type_expr)* ">" // Generic call
+                 | unary_op expr               // Unary op
+                 | expr binary_op expr         // Binary op
+                 | expr ":=" expr              // Assignment
+                 | "select" select_mode? "{" select_arm* "}"
+                 | "match" expr "{" match_arm* "}"
+                 | "place" expr "(" call_arg* ")"  // Instantiation
+
+primary        ::= ident | int_literal | bool_literal | string_literal
+                 | "(" expr ")" | block
+                 | type_expr "{" field_init ("," field_init)* "}"
+
+select_mode    ::= "priority" | "unique"
+select_arm     ::= expr "=>" expr (",")?
+match_arm      ::= "." ident "=>" expr (",")?
+call_arg       ::= ident ":" expr
+field_init     ::= ident ":" expr
+
+unary_op       ::= "-" | "not"
+binary_op      ::= "+" | "-" | "*" | "/" | "%"
+                 | "and" | "or" | "xor" | "eq"
+                 | "<<" | ">>"
+                 | "==" | "!=" | "<" | ">" | "<=" | ">="
+```

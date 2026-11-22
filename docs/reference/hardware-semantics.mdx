@@ -1,0 +1,251 @@
+---
+title: Hardware Semantics
+description: Continuous assignment, single-driver rules, signal read/drive capabilities, CDC domains, and @cdc_sync.
+---
+
+# Hardware Semantics
+
+This page explains how hardware signals are created, driven, and read in Syl, as well as the compile-time Design Rule Checks (DRC) including Clock Domain Crossing (CDC) enforcement.
+
+---
+
+## Creating Signals
+
+There are three ways to create hardware signals in Syl:
+
+**`signal`.** Declares a combinational signal:
+
+```syl
+signal s: UInt<8> := 0
+```
+
+**`reg`.** Declares a register updated on clock edges:
+
+```syl
+reg count: UInt<8> reset(rst, 0)
+```
+
+**Ports.** Module `in`, `out`, and `inout` declarations create port signals:
+
+```syl
+cell Top(x: in Bit, y: out Bit)
+```
+
+## Continuous Assignment
+
+`:=` is continuous assignment: whenever the right-hand side changes, the left-hand side updates immediately.
+
+### Basic Assignment
+
+```syl
+y := x and enable    // y continuously tracks x and enable
+```
+
+### Conditional Assignment
+
+Use `select` for conditional assignment:
+
+```syl
+signal result: UInt<8> := select priority {
+    add => a + b,
+    sub => a - b,
+    default => a,
+}
+```
+
+All branches of `select` must return the same type.
+
+### Assignable Targets
+
+Signals that can be driven:
+
+- `out` ports
+- `signal` declarations
+- `inout` ports
+
+Signals that cannot be driven:
+
+- `in` ports (read-only)
+- `let` bindings (aliases only)
+
+## Driver Rules
+
+Syl enforces a strict single-driver rule for every signal.
+
+### Single-Driver Rule
+
+Each signal may be driven by at most one continuous assignment:
+
+```syl
+signal s: UInt<8>
+s := 1
+# s := 2      // Error: s is already driven
+```
+
+To drive a signal conditionally, combine conditions in a single `select` expression:
+
+```syl
+signal s: UInt<8> := select {
+    cond1 => 1,
+    cond2 => 2,
+    default => 0,
+}
+```
+
+### out Ports Must Be Driven
+
+```syl
+cell Top(y: out UInt<8>) {
+    // Error: y is undriven
+}
+```
+
+Every `out` port must be driven.
+
+### in Ports Cannot Be Driven
+
+```syl
+cell Top(x: in UInt<8>) {
+    // x := 1    // Error: in port cannot be driven
+}
+```
+
+`in` ports are driven externally and can only be read inside the module.
+
+## Reading Signals
+
+Readability rules are the dual of drivable rules:
+
+- `out` ports cannot be read
+- `in` ports can be read
+- `signal` declarations can be read
+- `inout` ports can be read
+
+### Reading an out Port
+
+```syl
+cell Top(y: out UInt<8>) {
+    signal s: UInt<8> := y    // Error: out port cannot be read
+}
+```
+
+To read back an output value, declare an internal `signal` and assign it to `y`:
+
+```syl
+cell Top(y: out UInt<8>) {
+    signal internal: UInt<8> := compute()
+    y := internal
+    // internal can be read here
+}
+```
+
+## select and match Semantics
+
+### select Modes
+
+`select` supports two modes:
+
+**`priority` mode.** Conditions are evaluated in order; the first matching branch wins.
+
+```syl
+signal s: UInt<8> := select priority {
+    a => 1,
+    b => 2,
+    default => 0,
+}
+```
+
+**`unique` mode.** All conditions are evaluated in parallel and must be mutually exclusive.
+
+```syl
+signal s: UInt<8> := select unique {
+    a and b => 1,
+    not a and b => 2,
+    default => 0,
+}
+```
+
+### match Semantics
+
+`match` selects based on enum variants and must be exhaustive:
+
+```syl
+signal next: State := match state {
+    State.Idle => State.Run,
+    State.Run => State.Done,
+    State.Done => State.Idle,
+}
+```
+
+## Driver Sources
+
+A signal can be driven from three sources:
+
+1. **Internal assignment:** `:=` or `next` inside the module body.
+2. **Submodule instance:** An `out` port of a `place`d submodule.
+3. **Opaque summary:** An `extern cell` whose summary declares it drives the signal.
+
+```syl
+extern cell Driver(y: out Bit)
+
+cell Top(y: out Bit) {
+    let d = place Driver(y: y)  // Driver drives y
+}
+```
+
+DRC accounts for all three sources when checking for multiple drivers.
+
+## Clock Domain Crossing (CDC) and `@cdc_sync`
+
+Syl enforces clock domain isolation in both the type system and DRC:
+
+- **Domain binding:** `reg` and `mem` belong to a specific clock domain `D`. Direct signal connections across different domains trigger `E_MIDDLE_CDC_VIOLATION`.
+- **Reset domain matching:** A `Reset<D>` used by a `reg` must match the register's clock domain, otherwise `E_MIDDLE_RESET_DOMAIN_MISMATCH` is reported.
+- **Explicit synchronizers:** Cross-domain transfers must pass through a synchronizer `cell` annotated with `@cdc_sync(in = <src>, out = <dst>, dst_clk = <clk>)`.
+- **`inplace` forbidden:** Synchronizer boundaries cannot be inlined with `inplace`; doing so triggers `E_MIDDLE_INPLACE_ON_CDC_SYNC`.
+
+## Compile-Time Checks
+
+Hardware semantics are checked during elaboration before SystemVerilog emission:
+
+- Every signal has exactly one driver
+- Every `out` port is driven
+- Every `in` port is read-only
+- `select` and `match` cover all cases
+
+## Common Errors
+
+### Multiple Drivers
+
+```syl
+signal s: Bit
+s := a
+s := b    // Error: multiple drivers
+```
+
+Combine conditions in a `select` expression.
+
+### Undriven out Port
+
+```syl
+cell Top(y: out Bit) { }    // Error: y is undriven
+```
+
+### Reading an out Port
+
+```syl
+cell Top(y: out Bit) {
+    signal s: Bit := y    // Error
+}
+```
+
+### Misusing inout Ports
+
+```syl
+cell Top(bus: inout Bit) {
+    bus := 1        // Can drive
+    signal s := bus // Can read
+}
+```
+
+`inout` supports both reading and driving, but the designer must ensure no electrical contention occurs.

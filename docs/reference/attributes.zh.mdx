@@ -53,6 +53,25 @@ bundle Word {
 
 布局控制。当前只支持 `packed`。未来可能支持其他布局方式。
 
+### @cdc_sync(in, out, dst_clk)
+
+声明跨时钟域（CDC）同步器边界。用于标注执行异步时钟域同步的 `cell` 或 `extern cell`：
+
+```syl
+@cdc_sync(in = src_sig, out = dst_sig, dst_clk = dst_clk)
+cell TwoStageSync<D_SRC: Domain, D_DST: Domain>(
+    dst_clk: in Clock<D_DST>,
+    src_sig: in Bit,
+    dst_sig: out Bit,
+) {
+    // 同步器实现
+}
+```
+
+**校验规则：**
+- `in`、`out`、`dst_clk` 参数必须引用该 `cell` 的有效端口；参数缺失、重复或引用不存在的端口会触发 `E_MIDDLE_INVALID_CDC_ATTR`。
+- 标注了 `@cdc_sync` 的 `cell` 不允许使用 `inplace` 展开，否则触发 `E_MIDDLE_INPLACE_ON_CDC_SYNC`。
+
 ## 属性使用场景
 
 ### 协议接口

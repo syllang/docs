@@ -1,0 +1,220 @@
+---
+title: Basic Types
+description: Syl's basic types—Bit, Nat, and Bool—their semantics, operations, and usage rules.
+---
+
+# Basic Types
+
+Syl has three basic types: `Bit`, `Nat`, and `Bool`. Each serves a distinct role in hardware description and compile-time computation. This page explains their semantics, operations, and common pitfalls.
+
+---
+
+## Bit
+
+`Bit` is the fundamental hardware type in Syl. It represents the logic level on a physical wire: `0` or `1`.
+
+```syl
+signal s: Bit := 1
+```
+
+### When to Use Bit
+
+`Bit` is used for single-bit signals and ports:
+
+- Control signals: `valid`, `ready`, `enable`
+- Single-bit I/O: `data_in`, `data_out`
+- Status flags: `full`, `empty`, `done`
+
+### Bit Operations
+
+`Bit` supports the following hardware logic operations:
+
+```syl
+signal a: Bit := x and y    // AND
+signal b: Bit := x or y     // OR
+signal c: Bit := x xor y    // XOR
+signal d: Bit := not x      // NOT
+signal e: Bit := x eq y     // Equality
+```
+
+Note that `and`, `or`, `not`, `xor`, and `eq` are hardware logic operators, corresponding to `&`, `|`, `~`, `^`, and `==` in SystemVerilog.
+
+### Bit vs. Bool
+
+`Bit` is a hardware signal. `Bool` is a compile-time boolean value. They cannot be mixed:
+
+```syl
+signal s: Bit := 1           // OK: Bit literals are 0 or 1
+
+const c: Bool = true         // OK: Bool literals are true or false
+# signal t: Bit := true     // Error: Bool cannot be assigned to Bit
+```
+
+Bit literals are written `0` or `1`. Bool literals are written `true` or `false`.
+
+## Nat
+
+`Nat` represents a non-negative integer. It is used exclusively at compile time and generates no hardware.
+
+```syl
+const WIDTH: Nat = 8
+const DEPTH: Nat = 16
+```
+
+### When to Use Nat
+
+`Nat` is used in the following contexts:
+
+**Generic parameters.** Width parameters on modules or types must be `Nat`:
+
+```syl
+cell Counter<W: Nat>(
+    count: out UInt<W>
+) { }
+```
+
+**Array sizes.** Array lengths must be `Nat`:
+
+```syl
+signal arr: [4] UInt<8>
+```
+
+**Compile-time arithmetic.** `Nat` participates in compile-time calculations:
+
+```syl
+const WORDS: Nat = 4
+const WIDTH: Nat = 8
+const TOTAL: Nat = WORDS * WIDTH
+```
+
+### Nat Operations
+
+`Nat` supports the following compile-time operations:
+
+```syl
+const a: Nat = 10 + 20       // Addition
+const b: Nat = 30 - 15       // Subtraction (result must not be negative)
+const c: Nat = 4 * 8         // Multiplication
+const d: Nat = 16 / 4        // Division
+const e: Nat = 17 % 4        // Modulo
+const f: Nat = 1 << 4        // Left shift
+```
+
+`Nat` operations execute at compile time and emit no hardware. Their results determine type widths and array dimensions.
+
+## Bool
+
+`Bool` represents a compile-time truth value (`true` or `false`). It is used only at compile time and generates no hardware.
+
+```syl
+const debug: Bool = true
+```
+
+### When to Use Bool
+
+**Compile-time conditionals.** `if` conditions must be `Bool`:
+
+```syl
+const ENABLE_DEBUG: Bool = true
+
+cell Top(y: out UInt<8>) {
+    if ENABLE_DEBUG {
+        y := debug_value
+    } else {
+        y := normal_value
+    }
+}
+```
+
+If `ENABLE_DEBUG` is `true`, the compiler keeps the `debug_value` branch; if `false`, it keeps `normal_value`.
+
+**Compile-time assertions.** Conditions can be checked at compile time:
+
+```syl
+const W: Nat = 4
+const VALID: Bool = W > 0    // Compile-time check that W > 0
+```
+
+### Bool Operations
+
+`Bool` supports the following compile-time logic operations:
+
+```syl
+const a: Bool = true and false    // Logical AND (short-circuiting)
+const b: Bool = true or false     // Logical OR (short-circuiting)
+const c: Bool = not true          // Logical NOT
+const d: Bool = (4 > 2)           // Comparison
+const e: Bool = (8 == 8)          // Equality
+```
+
+When `and`, `or`, and `not` are applied to `Bool`, they are compile-time logical operators (like `&&`, `||`, `!`). The same keywords on `Bit` are hardware operators; the compiler distinguishes them by context.
+
+## Type Conversion Rules
+
+Implicit conversion between the three basic types is not allowed:
+
+```syl
+# const n: Nat = true     // Error: Bool cannot convert to Nat
+# signal b: Bit = 5       // Error: Nat cannot convert to Bit (5 is not 0 or 1)
+```
+
+When conversion is needed, use a compile-time `fn`:
+
+```syl
+fn bool_to_nat(b: Bool) -> Nat {
+    if b { return 1 } else { return 0 }
+}
+
+const result: Nat = bool_to_nat(true)
+```
+
+## Clock and Reset
+
+In addition to `Bit`, `Nat`, and `Bool`, two closely related primitive types are `Clock<D>` and `Reset<D>`:
+
+**`Clock<D>`.** A clock signal. `D` is a `Domain` type parameter that distinguishes clock domains.
+
+```syl
+cell Top<D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+) { }
+```
+
+Clock signals connect to `reg` clock inputs. The compiler verifies that a register's clock matches the module's clock domain.
+
+**`Reset<D>`.** A reset signal (with optional sync/async and polarity parameters). Its `D` must also match the clock domain.
+
+**`Domain`.** A clock domain identifier. `Domain` is a type parameter used to bind clocks, resets, and registers to the same domain. Clocks and resets from different domains cannot be mixed.
+
+## Common Errors
+
+### Confusing Bit and Bool
+
+```syl
+# signal s: Bit := true    // Error
+# if s { }                  // Error: if condition requires Bool, not Bit
+```
+
+`Bit` is a hardware signal; `Bool` is a compile-time value. Using `Bit` in a compile-time `if` is an error. For hardware conditional selection, use `select`.
+
+### Using Nat at Runtime
+
+```syl
+# signal s: Nat := 5       // Error: Nat cannot be used for hardware
+```
+
+`Nat` exists only at compile time. Use `UInt<W>` for hardware signals.
+
+### Literal Ambiguity
+
+`0` and `1` can be either `Bit` or `Nat` literals; the compiler infers the type from context:
+
+```syl
+signal b: Bit := 0          // 0 is a Bit literal
+const n: Nat = 0            // 0 is a Nat literal
+```
+
+## Next
+
+After basic types, see [Numeric Word Types](./numeric-word-types) for `UInt<W>`.

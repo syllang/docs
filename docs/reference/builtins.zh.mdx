@@ -149,3 +149,21 @@ if W > 8 {
     signal wide: UInt<16>
 }
 ```
+
+## 可综合存储器原语
+
+### mem
+
+声明一个可综合存储器（块 RAM 或寄存器堆），元素类型必须为数组类型（否则触发 `E_MIDDLE_MEMORY_REQUIRES_ARRAY_TYPE`）：
+
+```syl
+mem ram: [256] UInt<32>
+```
+
+### mem_write(m, addr, data, en)
+
+在时钟边沿向存储器 `m` 的 `addr` 地址写入 `data`（受 `en` 使能控制）。只能作为语句使用（`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`），且同一存储器不能有重复写端口（`E_MIDDLE_DUPLICATE_MEM_WRITE_PORT`）。
+
+### mem_read_sync(m, addr, en)
+
+在时钟边沿同步读取存储器 `m` 的 `addr` 地址数据。只能作为语句使用（`E_MIDDLE_MEMORY_OP_STATEMENT_ONLY`），且目标必须为 `mem`（`E_MIDDLE_MEMORY_TARGET_NOT_MEM`）。

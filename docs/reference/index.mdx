@@ -1,0 +1,77 @@
+---
+title: Reference Manual
+description: Authoritative reference for the Syl language specification, syntax, builtins, standard library, manifest schema, CLI, diagnostics, LSP, and project status.
+---
+
+# Reference Manual
+
+Welcome to the Syl Reference Manual. This section is the authoritative, complete specification for the Syl hardware description language, its compiler (`sylc`), standard library (`std.*`), manifest and opaque summary schemas, and tooling.
+
+## Design Philosophy
+
+Syl's type system and constructs are designed around one core goal: **let the compiler catch as many hardware design errors as possible at compile time**.
+
+Compared to Verilog, Syl carries richer type information—the compiler knows every signal's bit width, direction, clock/reset domain, and capabilities (readable, drivable, clock, reset). With this information, the compiler detects connection mismatches, width errors, driver conflicts, and CDC violations before emitting SystemVerilog.
+
+## Type System Overview
+
+Syl types fall into three categories:
+
+- **Basic types:** `Bit` (single bit), `Nat` (compile-time natural number), `Bool` (compile-time boolean).
+- **Numeric word types:** `UInt<W>` (`W`-bit unsigned integer, where `W` is a compile-time `Nat`).
+- **Composite types:** `[N] T` (arrays), `bundle` (structs), `enum` (enumerations), `interface` (port groups).
+
+## Core Constructs
+
+- **Combinational logic (`map`):** Pure combinational functions with deterministic input-output relationships and no state or side effects.
+- **Sequential logic (`reg`, `next`, `mem`):** Registers with explicit clock/reset domains, polarity, and synthesizable memories.
+- **Hardware cells (`cell`, `extern cell`):** Parameterizable hardware modules and external/vendor black-box cells.
+- **Interfaces and views (`interface`, `view`):** Grouping related ports and defining directional views (`master`/`slave`, etc.).
+- **Compile-time constructs (`const`, `fn`, `if`, `for`):** Evaluated at compile time with zero runtime hardware overhead.
+
+## Reference Sections
+
+### 1. Language Specification
+
+| Page | Description |
+|------|-------------|
+| [Basic Types](./basic-types) | `Bit`, `Nat`, `Bool`, and their usage rules |
+| [Numeric Word Types](./numeric-word-types) | `UInt<W>` declaration, arithmetic, and width rules |
+| [Composite Types](./composite-types) | `bundle`, `enum`, arrays, and recursion rules |
+| [Interfaces and Views](./interfaces-and-views) | `interface`, `view`, port grouping, and directional views |
+| [Hardware Semantics](./hardware-semantics) | Continuous assignment, single-driver rule, CDC domains, and `@cdc_sync` |
+| [Sequential Logic](./sequential-logic) | `reg`, `next`, `Reset` polarity, and synthesizable `mem` |
+| [Compile-Time Constructs](./compile-time-constructs) | `const`, `fn`, compile-time `if` and `for`, cycle detection |
+| [Structural Constructs](./structural-constructs) | `cell`, `extern cell`, ports, and `place` instantiation |
+| [Packages and Imports](./packages-and-imports) | `package`, `use`, `syl.toml` root discovery, and file layout |
+
+### 2. Syntax & Builtins
+
+| Page | Description |
+|------|-------------|
+| [Lexical Syntax](./lexical-syntax) | Identifiers, keywords, literals, comments, and operators |
+| [Grammar](./grammar) | Formal EBNF grammar for Syl declarations, statements, and expressions |
+| [Attributes](./attributes) | `@cdc_sync` and attribute syntax and validation rules |
+| [Builtins](./builtins) | Built-in functions, `mem`, `mem_write`, `mem_read_sync`, and type/width helpers |
+
+### 3. Standard Library & Tooling
+
+| Page | Description |
+|------|-------------|
+| [Standard Library](./standard-library) | Complete reference for all 13 `std.*` modules (36 `cell`s, `bundle`s, `interface`s, `map`s) |
+| [Manifest & Opaque Schema](./manifest-and-opaque-schema) | `syl.toml` fields and JSON/TOML Opaque Summary `schema_version = 1` specification |
+| [CLI (`sylc`)](./cli) | `sylc check`, `sylc emit`, flags, filelists, and JSON diagnostics schema |
+| [Diagnostics](./diagnostics) | Complete index of real `E_*` compiler error codes |
+| [LSP (`syl-lsp`)](./lsp) | Language Server Protocol capabilities, semantic tokens, and background DRC |
+
+### 4. Project & Support
+
+| Page | Description |
+|------|-------------|
+| [Project Status](./project-status) | Current implementation status (Wave 0–3) |
+| [FAQ](./faq) | Frequently asked questions on Syl, Salsa, CDC, RAM, and LSP |
+| [Support](./support) | Getting help, reporting issues, and community channels |
+| [Roadmap](./roadmap) | Completed milestones and future direction |
+| [Release Policy](./release-policy) | Release cadence and stability guarantees |
+| [Versioning & Compatibility](./versioning-and-compatibility) | Semantic versioning and compatibility guarantees |
+| [Changelog](./changelog) | Release history and Wave 0–3 capabilities |

@@ -1,0 +1,194 @@
+---
+title: Structural Constructs
+description: Declaring cells, ports, extern cells, and instantiating modules with place.
+---
+
+# Structural Constructs
+
+Syl's structural constructs define hardware hierarchy: modules/cells, ports, instantiation, and connections. This page covers `cell`, `extern cell`, port declarations, and `place` instantiation.
+
+---
+
+## cell
+
+`cell` defines an instantiable hardware unit.
+
+### Basic Declaration
+
+```syl
+cell AddOne(x: in UInt<8>, y: out UInt<8>) {
+    y := x + 1
+}
+```
+
+- `cell AddOne` declares the unit name
+- `(x: in UInt<8>, y: out UInt<8>)` declares the port list
+- `{ y := x + 1 }` is the body
+
+### Generic cell
+
+```syl
+cell Counter<W: Nat, D: Domain>(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    enable: in Bit,
+    count: out UInt<W>,
+) {
+    reg value: UInt<W> reset(rst, 0)
+    signal next_value: UInt<W> := value + 1
+    next value := next_value
+    count := value
+}
+```
+
+Generic parameters appear in `<...>` after the cell name and are specified at instantiation.
+
+### Result Binding
+
+Syl supports named return ports with `->`:
+
+```syl
+cell Counter<W: Nat>(
+    enable: in Bit,
+) -> count: UInt<W> {
+    reg value: UInt<W>
+    next value := value + 1
+    count := value
+}
+```
+
+## Inline vs. Hierarchical Instantiation
+
+```syl
+cell Add(x: in UInt<8>, y: in UInt<8>) -> result: UInt<8> {
+    result := x + y
+}
+
+cell Top(a: in UInt<8>, b: in UInt<8>, c: out UInt<8>) {
+    let adder = place Add(x: a, y: b)
+    c := adder.result
+}
+```
+
+## Port Declarations
+
+### Port Directions
+
+Every port must declare a direction:
+
+- `in`: Input. Readable inside the cell, cannot be driven.
+- `out`: Output. Drivable inside the cell, cannot be read.
+- `inout`: Bidirectional. Readable and drivable (e.g., tri-state buses).
+
+```syl
+cell IO(
+    addr: in UInt<16>,
+    data: out UInt<8>,
+    bidir: inout Bit,
+)
+```
+
+### Port Types
+
+Ports can have any valid Syl hardware type:
+
+```syl
+cell Processor(
+    clk: in Clock<D>,
+    rst: in Reset<D>,
+    cmd: in UInt<8>,
+    stream: out Stream<Packet>.source,
+)
+```
+
+## place Instantiation
+
+`place` instantiates a `cell` or `extern cell`.
+
+### Basic Instantiation
+
+```syl
+let inst = place Counter<8>(
+    clk: clk,
+    rst: rst,
+    enable: en,
+    count: cnt,
+)
+```
+
+### Accessing Instance Ports
+
+```syl
+let cnt = place Counter<8>(enable: en, count: cnt_val)
+signal val: UInt<8> := cnt.count
+```
+
+### Unbound Instantiation
+
+If you do not need to reference the instance's outputs by name, `let` can be omitted:
+
+```syl
+place Driver(clk: clk, data: data_out)
+```
+
+### Named Arguments
+
+Instantiation uses named arguments; argument order does not matter:
+
+```syl
+let inst = place Add(
+    y: b,
+    x: a,
+    result: r,
+)
+```
+
+## extern cell
+
+`extern cell` declares the signature of an external module without a Syl body:
+
+```syl
+extern cell VendorIP(
+    clk: in Clock<D>,
+    data_in: in UInt<8>,
+    data_out: out UInt<8>,
+)
+```
+
+External cells can be paired with Opaque Summaries to describe their internal driver and CDC behavior for DRC.
+
+## Common Errors
+
+### Driving an in Port
+
+```syl
+cell Bad(x: in Bit) {
+    x := 1    // Error: in port cannot be driven
+}
+```
+
+### Reading an out Port
+
+```syl
+cell Bad(y: out Bit) {
+    signal s: Bit := y    // Error: out port cannot be read
+}
+```
+
+### Missing Port Connection
+
+```syl
+cell Sub(a: in Bit, b: out Bit) { }
+cell Top(y: out Bit) {
+    let s = place Sub(a: y)    // Error: b is unconnected
+}
+```
+
+### Misspelled Port Name
+
+```syl
+cell Sub(data: in Bit) { }
+cell Top {
+    let s = place Sub(dat: 1)    // Error: Sub has no port named dat
+}
+```

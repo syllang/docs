@@ -1,0 +1,76 @@
+---
+title: Roadmap
+description: Medium- and long-term plans and priorities for Syl.
+---
+
+# Roadmap
+
+This page outlines Syl's medium- and long-term roadmap and engineering priorities.
+
+---
+
+## Current Stage
+
+Syl has completed Wave 0–3 milestones: frontend parsing, Salsa incremental queries, semantic analysis, elaboration DRC (single-driver, CDC, memory), and SystemVerilog backend emission are all operational for small-to-medium digital designs.
+
+## Near-Term Goals
+
+### Stabilize Core Language
+
+**Complete type system.** Refine generic parameters and type inference for remaining edge cases.
+
+**Better diagnostics.** Improve error messages with precise locations, clear explanations, and actionable fix suggestions.
+
+**Multi-file compilation.** Continue refining `syl.toml` manifest discovery and package management.
+
+### Standard Library Expansion
+
+**Bus interfaces.** Add standard bus definitions such as AXI and Wishbone.
+
+**FIFO components.** Expand synchronous and asynchronous FIFO implementations.
+
+**Clock domain crossing.** Expand CDC synchronizer components building on `@cdc_sync`.
+
+### Toolchain
+
+**LSP improvements.** Expand `syl-lsp` beyond incremental sync, semantic tokens, hover, definition, and completion.
+
+**Waveform debugging.** Explore exporting debug metadata to assist waveform viewers.
+
+## Medium-Term Goals
+
+### Compiler Optimization
+
+**Compilation speed.** Optimize first-compile throughput for large designs alongside incremental caching.
+
+**Output quality.** Improve emitted SystemVerilog formatting and readability.
+
+### Verification Support
+
+**Structured diagnostics.** Expand JSON diagnostic integration for CI systems and editors.
+
+**Formal verification interfaces.** Explore emitting formal assertion properties from Syl.
+
+## Long-Term Goals
+
+### Language Features
+
+**Signed integers.** Add `SInt<W>` for signed arithmetic.
+
+**Floating-point.** Explore hardware floating-point support.
+
+**High-level synthesis optimizations.** Explore compiler-level area and timing optimizations.
+
+### Ecosystem
+
+**Package manager.** Design package publishing and dependency management.
+
+**Third-party IP integration.** Expand `extern cell` and Opaque Summary workflows.
+
+**Simulation integration.** Explore tighter integration with simulation tools.
+
+## Priority Principles
+
+1. **Correctness first.** Emitted hardware must be functionally correct before optimizing.
+2. **Diagnostics first.** Clear error messages matter more than premature optimization.
+3. **Simplicity first.** Keep language features simple and explicit.
