@@ -65,7 +65,7 @@ let dropped = place drop_link<UInt<8>>(
 
 ## Design Checklist
 
-1. **Balance stage depth**: Keep combinational logic between `stage_link` boundaries roughly equal to maximize $F_{\max}$.
+1. **Balance stage depth**: Keep combinational logic between `stage_link` boundaries roughly equal to maximize `Fmax`.
 2. **Stall vs. Flush**: Use `halt_link` when downstream is not ready; use `drop_link` for branch mispredictions or exceptions.
 3. **Stream boundaries**: Wrap pipeline entry and exit with `stage_from_stream` / `stage_to_stream` for clean backpressure integration.
 
