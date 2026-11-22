@@ -134,8 +134,6 @@ flowchart TB
 
 箭头指向被依赖的 crate。
 
-这个依赖图有两个关键模式：
-
 **单向流动。** 依赖方向从顶层（CLI、LSP）指向底层（syntax、span）。不存在反向依赖。这保证了底层 crate 的修改不会影响高层 crate 的公共接口。
 
 **底部汇聚。** `syl_span` 在最底层，被所有 crate 依赖。`syl_syntax` 和 `syl_hir` 在第二层。`syl_sema` 在第三层，是语义分析的核心。

@@ -52,7 +52,7 @@ CPU 矩阵使用 Ryzen 9 7950X（16 核/32 线程）及调优的 Verilator 5.052
 | Verilator (1 × 32) | 256 | 4,413 ms | 2.894 ms | 362 |
 | CUDA (Mode 1) | 1,000 | 1,954.19 ms | 0.4669 ms | 8,772 |
 
-在此 RAM 测点，已编译 GPU 程序的进程墙钟仍为 224.07 ms。对于 `LaneArray N=64, B=4096`，每条轨迹运行 16 拍，Verilator 吞吐为 11.54 Mcycles/s，SoA 为 2.37 Mcycles/s。CPU 短故障搜索在 `B=4096` 时定位到轨迹 3073、第 500 个边沿。16 个 SoA 工作线程的**冷启动总耗时为 3.14 ms**。Verilator 的**冷启动总耗时为 4.43 s**（构建 4.415 s，16 个宿主工作线程运行 9.637 ms）。[CPU 实测数据](https://github.com/syllang/syl/blob/3c7f4f48a9c7048e6325f67b4bb219981ed72d60/docs/benchmarks/t3_cpu_simd_verilator.md)
+在此 RAM 测点，已编译 GPU 程序的进程墙钟仍为 224.07 ms。对于 `LaneArray N=64, B=4096`，每条轨迹运行 16 拍，Verilator 吞吐为 11.54 Mcycles/s，SoA 为 2.37 Mcycles/s。CPU 短故障搜索在 `B=4096` 时定位到轨迹 3073、第 500 个边沿。16 个 SoA 工作线程的**冷启动总耗时为 3.14 ms**。Verilator 的**冷启动总耗时为 4.425 s**（构建 4.415 s，16 个宿主工作线程运行 9.637 ms）。[CPU 实测数据](https://github.com/syllang/syl/blob/3c7f4f48a9c7048e6325f67b4bb219981ed72d60/docs/benchmarks/t3_cpu_simd_verilator.md)
 
 `LaneArray N=64`、每条轨迹 1,000 拍时，CUDA 冷编译在 Mode 1 耗时 17.155 s，在 Mode 2 耗时 2.311 s（**7.4×**）。`B=1` 时，内核加速 **18.1×**（121.753 降至 6.719 ms），对应热进程墙钟分别为 429.30 和 350.42 ms。增大 `B` 后，两种内核的快慢顺序反转。[GPU 实测数据](https://github.com/syllang/syl/blob/c510fed65b21a24e3d038a7db67441983a450cc4/docs/benchmarks/t3_rtx2080ti_gpu.md)
 

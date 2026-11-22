@@ -52,7 +52,7 @@ The CPU matrix used a Ryzen 9 7950X (16 cores/32 threads) and tuned Verilator 5.
 | Verilator (1 × 32) | 256 | 4,413 ms | 2.894 ms | 362 |
 | CUDA (Mode 1) | 1,000 | 1,954.19 ms | 0.4669 ms | 8,772 |
 
-The cached GPU executable still took 224.07 ms wall time at this RAM point. Verilator also led SoA on `LaneArray N=64, B=4096` at 11.54 versus 2.37 Mcycles/s (16 cycles per trajectory). The short CPU fault search found lane 3073, edge 500 at `B=4096` in **3.14 ms cold** on 16 SoA workers. Verilator took **4.43 s cold** (4.415 s build, 9.637 ms run with 16 host workers). [CPU measurements](https://github.com/syllang/syl/blob/3c7f4f48a9c7048e6325f67b4bb219981ed72d60/docs/benchmarks/t3_cpu_simd_verilator.md)
+The cached GPU executable still took 224.07 ms wall time at this RAM point. Verilator also led SoA on `LaneArray N=64, B=4096` at 11.54 versus 2.37 Mcycles/s (16 cycles per trajectory). The short CPU fault search found lane 3073, edge 500 at `B=4096` in **3.14 ms cold** on 16 SoA workers. Verilator took **4.425 s cold** (4.415 s build, 9.637 ms run with 16 host workers). [CPU measurements](https://github.com/syllang/syl/blob/3c7f4f48a9c7048e6325f67b4bb219981ed72d60/docs/benchmarks/t3_cpu_simd_verilator.md)
 
 For `LaneArray N=64`, 1,000 cycles per trajectory, cold CUDA compilation took 17.155 s in Mode 1 and 2.311 s in Mode 2 (**7.4×**). With `B=1`, the **18.1×** kernel speedup (121.753 to 6.719 ms) translated to hot process wall times of 429.30 and 350.42 ms. Increasing `B` reverses the kernel ranking. [GPU measurements](https://github.com/syllang/syl/blob/c510fed65b21a24e3d038a7db67441983a450cc4/docs/benchmarks/t3_rtx2080ti_gpu.md)
 

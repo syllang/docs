@@ -92,7 +92,9 @@ A successful direct trace prints `<top> cycles=<count>` and one `port=bits` line
 WideAluArray backend=gpu-cuda/family batch=256 cycles=100 seed=42 digest=14271358684969178033 cache=hit
 ```
 
-Diagnostics go to stderr. JSON mode writes one document with `schema_version` and a `diagnostics` array. Each entry has `severity`, `code`, `source`, `message`, `location` and `related` fields. A located batch assertion includes the zero-based lane, global stimulus step (first edge is 1), hierarchical path, assertion ID and Syl source span.
+Diagnostics go to stderr. JSON mode writes one document with `schema_version` and a `diagnostics` array. If argument parsing fails (for example, an invalid option value or mutually exclusive arguments), `clap` writes its own plain-text error to stderr and exits with status `2` before diagnostic formatting.
+
+Each JSON diagnostic has `severity`, `code`, `source`, `message`, `location` and `related` fields. A located batch assertion includes the zero-based lane, global stimulus step (first edge is 1), hierarchical path, assertion ID and Syl source span.
 
 - `0` indicates success. A direct trace with a `W_SIM_UNIQUE` overlap warning alone succeeds.
 - `1` indicates a compiler, project or simulation error. `E_SIM` covers simulation failures such as an expectation mismatch, a failed assertion or a `--strict-unique` overlap.

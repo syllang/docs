@@ -7,14 +7,15 @@ description: Syl 编译器诊断信息代码参考。
 
 ## 诊断格式
 
-编译器输出的诊断信息格式：
+诊断包含源码位置时，`sylc` 打印文件、行和列，并用脱字符标出对应的源码范围。关联说明用波浪线标出相关位置。
 
 ```
 <severity>[<code>]: <message>
-  ┌─ <file>:<line>:<column>
-  │
-<line> │     <source>
-  │         <highlight>
+  --> <file>:<line>:<column>
+       |
+<line> | <source>
+       | ^^^^^^^^
+       |
 ```
 
 - severity：`error` 或 `warning`
@@ -28,27 +29,41 @@ description: Syl 编译器诊断信息代码参考。
 类型不匹配。
 
 ```
-error[E_MIDDLE_TYPE_MISMATCH]: expected `UInt<8>`, found `Bit`
-    ┌─ input.syl:2:9
-    │
-2   │     y := x
-    │         ^ expected `UInt<8>`, found `Bit`
+error[E_MIDDLE_TYPE_MISMATCH]: type mismatch: expected nat, got bool
+  --> input.syl:1:23
+   |
+ 1 | fn f() -> nat { clog2(true) }
+   |                       ^^^^
+   |
+error: aborting due to 1 previous errors
 ```
 
-检查赋值两侧的类型和位宽是否一致。
+向 `clog2` 传入自然数。
 
 ### E_MIDDLE_DUPLICATE_HARDWARE_DRIVER
 
 多驱动冲突。同一个信号被多个来源驱动。
 
 ```
-error[E_MIDDLE_DUPLICATE_HARDWARE_DRIVER]: duplicate hardware driver for `y`
-    ┌─ input.syl:2:5
-    │
-2   │     y := 1
-    │     ^ first driver
-3   │     y := 2
-    │     ^ duplicate driver
+error[E_MIDDLE_DUPLICATE_HARDWARE_DRIVER]: duplicate hardware driver for y
+  --> input.syl:3:5
+   |
+ 3 |     y := 0
+   |     ^^^^^^
+   |
+note: previous driver claim
+  --> input.syl:2:5
+   |
+ 2 |     y := 1
+   |     ~~~~~~
+   |
+note: conflicting driver claim
+  --> input.syl:3:5
+   |
+ 3 |     y := 0
+   |     ~~~~~~
+   |
+error: aborting due to 1 previous errors
 ```
 
 每个信号只能有一个驱动源。使用 `select` 合并多条件赋值。
@@ -58,7 +73,7 @@ error[E_MIDDLE_DUPLICATE_HARDWARE_DRIVER]: duplicate hardware driver for `y`
 使用了未定义的类型。
 
 ```
-error[E_MIDDLE_UNKNOWN_TYPE]: unknown type `CustomType`
+error[E_MIDDLE_UNKNOWN_TYPE]: unknown type CustomType
 ```
 
 检查类型名字是否拼写正确，是否已导入。
