@@ -40,11 +40,12 @@ fn is_pow2(n: nat) -> bool {
     return true
 }
 
-fn require_pow2(n: nat) -> bool {
-    if !is_pow2(n) {
+cell Pow2Guard<DEPTH: nat = 64,>(din: in Bit, dout: out Bit) {
+    const OK: bool = is_pow2(DEPTH)
+    if !OK {
         compile_error("DEPTH must be a power of two")
     }
-    return true
+    dout := din
 }
 ```
 

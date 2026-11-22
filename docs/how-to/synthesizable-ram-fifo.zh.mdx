@@ -104,8 +104,10 @@ cell RingBuffer<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, CNT_W: nat = 7, D:
     reg rptr: UInt<ADDR_W> reset(rst, 0)
     reg count: UInt<CNT_W> reset(rst, 0)
 
-    signal do_push: Bit := push and not full
-    signal do_pop: Bit := pop and not empty
+    signal is_empty: Bit := count eq 0
+    signal is_full: Bit := count eq DEPTH
+    signal do_push: Bit := push and not is_full
+    signal do_pop: Bit := pop and not is_empty
 
     mem_write(storage, clk, do_push, wptr, wdata)
     mem_read_sync(storage, clk, do_pop, rptr, rdata)
@@ -118,7 +120,7 @@ cell RingBuffer<W: nat = 8, DEPTH: nat = 64, ADDR_W: nat = 6, CNT_W: nat = 7, D:
         default => count,
     }
 
-    empty := count eq 0
-    full := count eq DEPTH
+    empty := is_empty
+    full := is_full
 }
 ```

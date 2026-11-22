@@ -89,13 +89,17 @@ cell UartFsm<D: Domain>(
 SystemVerilog `generate for (genvar i = 0; i < N; i = i + 1)` maps directly to Syl's elaboration-time `for i in 0..N`:
 
 ```syl
-cell VectorAnd<N: nat = 8>(
+cell BitAnd(a: in Bit, b: in Bit, y: out Bit) {
+    y := a and b
+}
+
+cell VectorAnd<N: nat = 8,>(
     a: in [N] Bit,
     b: in [N] Bit,
     y: out [N] Bit,
 ) {
-    for i in 0..N {
-        y[i] := a[i] and b[i]
+    let lanes = for i in 0..N {
+        place BitAnd(a: a[i], b: b[i], y: y[i])
     }
 }
 ```
