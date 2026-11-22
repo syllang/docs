@@ -20,13 +20,17 @@ const examples = {
     grant := req_b
 }`,
     diag: [
-      { text: 'error[E_DRIVER_OVERLAP]: multiple drivers for signal \'grant\'', kind: 'error' },
-      { text: '  ┌─ arbiter.syl:5:5', kind: 'path' },
-      { text: '  │', kind: 'plain' },
-      { text: '5 │   grant := req_a', kind: 'code' },
-      { text: '  │   ----- first driver here', kind: 'hint' },
-      { text: '6 │   grant := req_b', kind: 'code' },
-      { text: '  │   ----- second driver here', kind: 'error' },
+      { text: 'error[E_MIDDLE_DUPLICATE_HARDWARE_DRIVER]: duplicate hardware driver for grant', kind: 'error' },
+      { text: '  --> arbiter.syl:6:5', kind: 'path' },
+      { text: '   |', kind: 'plain' },
+      { text: ' 6 |     grant := req_b', kind: 'code' },
+      { text: '   |     ^^^^^^^^^^^^^^', kind: 'error' },
+      { text: '   |', kind: 'plain' },
+      { text: 'note: previous driver claim', kind: 'hint' },
+      { text: '  --> arbiter.syl:5:5', kind: 'path' },
+      { text: '   |', kind: 'plain' },
+      { text: ' 5 |     grant := req_a', kind: 'code' },
+      { text: '   |     ~~~~~~~~~~~~~~', kind: 'hint' },
     ],
   },
   domain: {
@@ -34,25 +38,29 @@ const examples = {
     code: `cell Sync<A: Domain, B: Domain>(
     clk_a: in Clock<A>,
     clk_b: in Clock<B>,
+    rst_a: in Reset<A>,
+    rst_b: in Reset<B>,
     d: in Bit,
 ) -> q: Bit {
-    reg r1: Bit reset(clk_b, 0)
+    reg r1: Bit reset(rst_a, 0)
     next r1 := d
 
-    reg r2: Bit reset(clk_a, 0)
+    reg r2: Bit reset(rst_b, 0)
     next r2 := r1
     q := r2
 }`,
     diag: [
-      { text: 'error[E_DOMAIN]: clock domain mismatch', kind: 'error' },
-      { text: '  ┌─ cross_domain.syl:6:30', kind: 'path' },
-      { text: '  │', kind: 'plain' },
-      { text: '6 │   reg r1: Bit reset(clk_b, 0)', kind: 'code' },
-      { text: '  │                        ^^^^^ domain B', kind: 'error' },
-      { text: '7 │   next r1 := d', kind: 'code' },
-      { text: '  │               ^ signal \'d\' belongs to domain A', kind: 'error' },
-      { text: '  │', kind: 'plain' },
-      { text: '  = use an explicit synchronizer primitive to cross domains', kind: 'hint' },
+      { text: 'error[E_MIDDLE_CDC_VIOLATION]: CDC violation: r1 launched in clk_a sampled by r2 in clk_b', kind: 'error' },
+      { text: '   --> cross_domain.syl:11:5', kind: 'path' },
+      { text: '    |', kind: 'plain' },
+      { text: ' 11 |     reg r2: Bit reset(rst_b, 0)', kind: 'code' },
+      { text: '    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^', kind: 'error' },
+      { text: '    |', kind: 'plain' },
+      { text: 'note: r1 launched by clk_a', kind: 'hint' },
+      { text: '  --> cross_domain.syl:8:5', kind: 'path' },
+      { text: '   |', kind: 'plain' },
+      { text: ' 8 |     reg r1: Bit reset(rst_a, 0)', kind: 'code' },
+      { text: '   |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~', kind: 'hint' },
     ],
   },
   type: {
@@ -63,8 +71,8 @@ const examples = {
     b: in UInt<8>,
     c: in UInt<8>,
     d: in UInt<16>,
-) -> out: UInt<8> {
-    out := select {
+) -> y: UInt<8> {
+    y := select {
         sel eq 0 => a,
         sel eq 1 => b,
         sel eq 2 => c,
@@ -72,13 +80,11 @@ const examples = {
     }
 }`,
     diag: [
-      { text: 'error[E_TYPE_MISMATCH]: branch type mismatch in select', kind: 'error' },
-      { text: '  ┌─ mux.syl:12:21', kind: 'path' },
-      { text: '  │', kind: 'plain' },
-      { text: '12│         default  => d,', kind: 'code' },
-      { text: '  │                     ^ expected UInt<8>, found UInt<16>', kind: 'error' },
-      { text: '  │', kind: 'plain' },
-      { text: '  = all branches must have the same type', kind: 'hint' },
+      { text: 'error[E_MIDDLE_TYPE_MISMATCH]: type mismatch: expected UInt<8>, got UInt<16>', kind: 'error' },
+      { text: '   --> mux.syl:12:21', kind: 'path' },
+      { text: '    |', kind: 'plain' },
+      { text: ' 12 |         default  => d,', kind: 'code' },
+      { text: '    |                     ^', kind: 'error' },
     ],
   },
 } as const;
@@ -113,11 +119,11 @@ const copy = {
     paths: [
       {
         label: 'I use Chisel / SpinalHDL / Verilog — what\'s different?',
-        href: '/docs/migration/from-chisel',
+        href: '/docs/how-to/from-chisel',
       },
       {
         label: 'I\'m new — show me the language',
-        href: '/docs/language',
+        href: '/docs/reference',
       },
     ],
     footer: 'Syl is in early development. Standard library and some features are still being built.',
@@ -151,11 +157,11 @@ const copy = {
     paths: [
       {
         label: '我用 Chisel / SpinalHDL / Verilog — 有什么不同？',
-        href: '/zh/docs/migration/from-chisel',
+        href: '/zh/docs/how-to/from-chisel',
       },
       {
         label: '我是新用户 — 带我看语言',
-        href: '/zh/docs/language',
+        href: '/zh/docs/reference',
       },
     ],
     footer: 'Syl 处于早期开发阶段。标准库和部分功能仍在实现中。',
